@@ -26,6 +26,20 @@ export interface ForwardResult {
 
 const PROVIDER_TIMEOUT_MS = 180_000;
 
+/**
+ * Maps canonical DB model names to the actual API model names accepted by
+ * providers.  Keyed by endpoint key, then by canonical name → API name.
+ *
+ * Example: DeepSeek's API uses "deepseek-chat" / "deepseek-reasoner" but
+ * the pricing DB stores "deepseek-v3" / "deepseek-r1".
+ */
+const PROVIDER_MODEL_MAP: Record<string, Record<string, string>> = {
+  deepseek: {
+    'deepseek-v3': 'deepseek-chat',
+    'deepseek-r1': 'deepseek-reasoner',
+  },
+};
+
 @Injectable()
 export class ProviderClient {
   private readonly logger = new Logger(ProviderClient.name);
@@ -44,6 +58,9 @@ export class ProviderClient {
       throw new Error(`No endpoint configured for provider: ${provider}`);
     }
 
+    // Translate canonical DB name to provider-specific API name if needed
+    const apiModel = PROVIDER_MODEL_MAP[endpointKey]?.[model] ?? model;
+
     const endpoint = PROVIDER_ENDPOINTS[endpointKey];
     const isGoogle = endpoint.format === 'google';
     const isAnthropic = endpoint.format === 'anthropic';
@@ -53,20 +70,20 @@ export class ProviderClient {
     let requestBody: Record<string, unknown>;
 
     if (isGoogle) {
-      url = `${endpoint.baseUrl}${endpoint.buildPath(model)}?key=${apiKey}`;
+      url = `${endpoint.baseUrl}${endpoint.buildPath(apiModel)}?key=${apiKey}`;
       if (stream) url += '&alt=sse';
       headers = endpoint.buildHeaders(apiKey);
-      requestBody = toGoogleRequest(body, model);
+      requestBody = toGoogleRequest(body, apiModel);
     } else if (isAnthropic) {
-      url = `${endpoint.baseUrl}${endpoint.buildPath(model)}`;
+      url = `${endpoint.baseUrl}${endpoint.buildPath(apiModel)}`;
       headers = endpoint.buildHeaders(apiKey);
-      requestBody = toAnthropicRequest(body, model);
-      requestBody.model = model;
+      requestBody = toAnthropicRequest(body, apiModel);
+      requestBody.model = apiModel;
       if (stream) requestBody.stream = true;
     } else {
-      url = `${endpoint.baseUrl}${endpoint.buildPath(model)}`;
+      url = `${endpoint.baseUrl}${endpoint.buildPath(apiModel)}`;
       headers = endpoint.buildHeaders(apiKey);
-      requestBody = { ...body, model, stream };
+      requestBody = { ...body, model: apiModel, stream };
 
       // Inject cache_control for OpenRouter requests targeting Anthropic models
       if (endpointKey === 'openrouter' && model.startsWith('anthropic/')) {
