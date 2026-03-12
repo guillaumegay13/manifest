@@ -9,7 +9,7 @@ export function registerCommand(api: any, config: ManifestConfig, logger: Plugin
     return;
   }
 
-  const commandHandler = async () => {
+  const formatStatus = async (): Promise<string> => {
     try {
       const check = await verifyConnection(config);
       const lines = [
@@ -34,8 +34,14 @@ export function registerCommand(api: any, config: ManifestConfig, logger: Plugin
   api.registerCommand({
     name: 'manifest',
     description: 'Show Manifest plugin status and connection info',
-    handler: commandHandler,
-    execute: commandHandler,
+    async handler() {
+      const text = await formatStatus();
+      return { text };
+    },
+    async execute() {
+      const text = await formatStatus();
+      return { text, content: [{ type: 'text', text }] };
+    },
   });
 
   logger.debug('[manifest] Registered /manifest command');

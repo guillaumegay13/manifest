@@ -13,12 +13,6 @@ const PROVIDER_NAMES: Record<string, string> = {
   sendgrid: 'SendGrid',
 };
 
-const PROVIDER_API_KEY_URLS: Record<string, string> = {
-  resend: "https://resend.com/api-keys",
-  mailgun: "https://app.mailgun.com/app/account/security/api_keys",
-  sendgrid: "https://app.sendgrid.com/settings/api_keys",
-};
-
 interface Props {
   open: boolean;
   initialProvider: string;
@@ -254,8 +248,6 @@ const EmailProviderModal: Component<Props> = (props) => {
         return 'key-xxxx...';
     }
   };
-
-  const keyDocsUrl = () => PROVIDER_API_KEY_URLS[provider()] ?? null;
 
   return (
     <Portal>

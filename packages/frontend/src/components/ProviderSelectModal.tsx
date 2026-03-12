@@ -14,7 +14,9 @@ import CustomProviderForm from './CustomProviderForm.js';
 import { CopyButton } from './SetupStepInstall.js';
 
 interface Props {
+  agentName: string;
   providers: RoutingProvider[];
+  customProviders?: CustomProviderData[];
   onClose: () => void;
   onUpdate: () => void;
 }
@@ -28,10 +30,10 @@ const ProviderSelectModal: Component<Props> = (props) => {
     null,
   );
   const [busy, setBusy] = createSignal(false);
-  const [keyInput, setKeyInput] = createSignal("");
+  const [keyInput, setKeyInput] = createSignal('');
   const [editing, setEditing] = createSignal(false);
   const [validationError, setValidationError] = createSignal<string | null>(null);
-  const [direction, setDirection] = createSignal<"forward" | "back" | null>(null);
+  const [direction, setDirection] = createSignal<'forward' | 'back' | null>(null);
 
   const subscriptionProviders = () => PROVIDERS.filter((p) => p.supportsSubscription);
   const apiKeyProviders = () =>
@@ -79,9 +81,11 @@ const ProviderSelectModal: Component<Props> = (props) => {
   };
 
   const goBack = () => {
-    setDirection("back");
+    setDirection('back');
     setSelectedProvider(null);
-    setKeyInput("");
+    setShowCustomForm(false);
+    setEditingCustomProvider(null);
+    setKeyInput('');
     setEditing(false);
     setValidationError(null);
   };
@@ -140,7 +144,7 @@ const ProviderSelectModal: Component<Props> = (props) => {
 
     setBusy(true);
     try {
-      await connectProvider({
+      await connectProvider(props.agentName, {
         provider: provId,
         apiKey: isOllama ? undefined : keyInput().replace(/\s/g, ''),
         authType: selectedAuthType(),
@@ -168,7 +172,7 @@ const ProviderSelectModal: Component<Props> = (props) => {
 
     setBusy(true);
     try {
-      await connectProvider({
+      await connectProvider(props.agentName, {
         provider: provId,
         apiKey: keyInput().replace(/\s/g, ''),
         authType: selectedAuthType(),
@@ -205,8 +209,12 @@ const ProviderSelectModal: Component<Props> = (props) => {
   return (
     <div
       class="modal-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) props.onClose(); }}
-      onKeyDown={(e) => { if (e.key === "Escape") props.onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) props.onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') props.onClose();
+      }}
     >
       <div
         class="modal-card"
@@ -238,7 +246,7 @@ const ProviderSelectModal: Component<Props> = (props) => {
         <Show when={selectedProvider() === null && !showCustomForm() && !editingCustomProvider()}>
           <div
             class="provider-modal__view"
-            classList={{ "provider-modal__view--from-left": direction() === "back" }}
+            classList={{ 'provider-modal__view--from-left': direction() === 'back' }}
           >
             <div class="routing-modal__header">
               <div>
@@ -249,13 +257,23 @@ const ProviderSelectModal: Component<Props> = (props) => {
                   Use your subscriptions or API keys to enable routing
                 </div>
               </div>
+              <button class="modal__close" onClick={props.onClose} aria-label="Close">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
             </div>
-            <button class="modal__close" onClick={props.onClose} aria-label="Close">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-              </svg>
-            </button>
-          </div>
 
             {/* -- Tabs -- */}
             <div class="provider-modal__tabs" role="tablist">
@@ -479,9 +497,11 @@ const ProviderSelectModal: Component<Props> = (props) => {
               </div>
             </Show>
 
-          <div class="provider-modal__footer">
-            <button class="btn btn--primary" onClick={props.onClose}>Done</button>
-          </div>
+            <div class="provider-modal__footer">
+              <button class="btn btn--primary" onClick={props.onClose}>
+                Done
+              </button>
+            </div>
           </div>
         </Show>
 
@@ -507,14 +527,28 @@ const ProviderSelectModal: Component<Props> = (props) => {
               const editAriaLabel = () =>
                 isSubMode() ? `New ${provDef.name} setup token` : `New ${provDef.name} API key`;
 
-            return (
-              <div class="provider-detail">
-                {/* Back arrow */}
-                <button class="provider-detail__back" onClick={goBack} aria-label="Back to providers">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="m15 18-6-6 6-6" />
-                  </svg>
-                </button>
+              return (
+                <div class="provider-detail">
+                  {/* Back arrow */}
+                  <button
+                    class="provider-detail__back"
+                    onClick={goBack}
+                    aria-label="Back to providers"
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="m15 18-6-6 6-6" />
+                    </svg>
+                  </button>
 
                   {/* Title */}
                   <div
@@ -530,7 +564,6 @@ const ProviderSelectModal: Component<Props> = (props) => {
                       </div>
                     </div>
                   </div>
-                </div>
 
                   {/* Provider row */}
                   <div class="provider-detail__header">
@@ -638,7 +671,7 @@ const ProviderSelectModal: Component<Props> = (props) => {
                     </div>
                     <button
                       class="btn btn--primary provider-detail__action"
-                      disabled={busy()}
+                      disabled={busy() || !keyInput().trim()}
                       onClick={() => handleConnect(provId)}
                     >
                       <Show when={!busy()} fallback={<span class="spinner" />}>
@@ -713,7 +746,9 @@ const ProviderSelectModal: Component<Props> = (props) => {
                             setKeyInput(e.currentTarget.value);
                             setValidationError(null);
                           }}
-                          onKeyDown={(e) => { if (e.key === "Enter") handleUpdateKey(provId); }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleUpdateKey(provId);
+                          }}
                         />
                         <Show when={validationError()}>
                           <div class="provider-detail__error">{validationError()}</div>
@@ -729,9 +764,9 @@ const ProviderSelectModal: Component<Props> = (props) => {
                       </Show>
                     </div>
                   </Show>
-              </div>
-            );
-          })()}
+                </div>
+              );
+            })()}
           </div>
         </Show>
       </div>
