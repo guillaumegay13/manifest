@@ -35,8 +35,7 @@ export function registerCommand(api: any, config: ManifestConfig, logger: Plugin
     name: 'manifest',
     description: 'Show Manifest plugin status and connection info',
     async handler() {
-      const text = await formatStatus();
-      return { text };
+      return formatStatus();
     },
     async execute() {
       const text = await formatStatus();

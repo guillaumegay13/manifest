@@ -47,7 +47,7 @@ describe("registerCommand", () => {
     );
   });
 
-  it("handler returns { text } on successful verify", async () => {
+  it("handler returns status text on successful verify", async () => {
     mockVerify.mockResolvedValueOnce({
       endpointReachable: true,
       authValid: true,
@@ -61,11 +61,11 @@ describe("registerCommand", () => {
     const cmd = api.registerCommand.mock.calls[0][0];
     const result = await cmd.handler();
 
-    expect(result.text).toContain("Mode: cloud");
-    expect(result.text).toContain("Endpoint reachable: yes");
-    expect(result.text).toContain("Auth valid: yes");
-    expect(result.text).toContain("Agent: test-agent");
-    expect(result.text).not.toContain("Error:");
+    expect(result).toContain("Mode: cloud");
+    expect(result).toContain("Endpoint reachable: yes");
+    expect(result).toContain("Auth valid: yes");
+    expect(result).toContain("Agent: test-agent");
+    expect(result).not.toContain("Error:");
   });
 
   it("execute returns { text, content } on successful verify", async () => {
@@ -103,8 +103,8 @@ describe("registerCommand", () => {
     const cmd = api.registerCommand.mock.calls[0][0];
     const result = await cmd.handler();
 
-    expect(result.text).toContain("Endpoint reachable: no");
-    expect(result.text).toContain("Error: Cannot reach endpoint: ECONNREFUSED");
+    expect(result).toContain("Endpoint reachable: no");
+    expect(result).toContain("Error: Cannot reach endpoint: ECONNREFUSED");
   });
 
   it("execute wraps error status in both text and content", async () => {
@@ -134,7 +134,7 @@ describe("registerCommand", () => {
     const cmd = api.registerCommand.mock.calls[0][0];
     const result = await cmd.handler();
 
-    expect(result.text).toContain("Manifest status check failed: network down");
+    expect(result).toContain("Manifest status check failed: network down");
   });
 
   it("execute wraps thrown error in text and content", async () => {
@@ -161,7 +161,7 @@ describe("registerCommand", () => {
     const cmd = api.registerCommand.mock.calls[0][0];
     const result = await cmd.handler();
 
-    expect(result.text).toContain("Manifest status check failed: string-error");
+    expect(result).toContain("Manifest status check failed: string-error");
   });
 
   it("omits agent line when agentName is null", async () => {
@@ -178,9 +178,9 @@ describe("registerCommand", () => {
     const cmd = api.registerCommand.mock.calls[0][0];
     const result = await cmd.handler();
 
-    expect(result.text).toContain("Mode: cloud");
-    expect(result.text).toContain("Endpoint reachable: yes");
-    expect(result.text).not.toContain("Agent:");
+    expect(result).toContain("Mode: cloud");
+    expect(result).toContain("Endpoint reachable: yes");
+    expect(result).not.toContain("Agent:");
   });
 
   it("logs debug message after registering the command", () => {
