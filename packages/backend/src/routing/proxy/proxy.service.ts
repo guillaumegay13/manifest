@@ -277,7 +277,15 @@ export class ProxyService {
         this.logger.debug(`Fallback ${i}: skipping model=${requestedModel} (no provider data)`);
         continue;
       }
-      const model = this.normalizeProviderModel(provider, requestedModel);
+      // Strip the inferred provider prefix from the model name so that
+      // providers with preserveModelId: true (e.g. huggingface, github-models)
+      // don't receive a double-prefixed model like "huggingface/Qwen/Qwen3.5-27B".
+      let strippedModel = requestedModel;
+      if (provider === inferProviderFromModelName(requestedModel)) {
+        const slashIdx = requestedModel.indexOf('/');
+        if (slashIdx > 0) strippedModel = requestedModel.substring(slashIdx + 1);
+      }
+      const model = this.normalizeProviderModel(provider, strippedModel);
       const authType = await this.routingService.getAuthType(agentId, provider);
       let apiKey = await this.routingService.getProviderApiKey(agentId, provider, authType);
       if (apiKey === null) {
