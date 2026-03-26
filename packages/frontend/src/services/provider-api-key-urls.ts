@@ -5,7 +5,7 @@ export const ROUTING_PROVIDER_API_KEY_URLS: Record<string, string> = {
   cohere: 'https://dashboard.cohere.com/api-keys',
   deepseek: 'https://platform.deepseek.com/api_keys',
   gemini: 'https://aistudio.google.com/apikey',
-  'github-models': 'https://github.com/marketplace/models',
+  'github-models': 'https://github.com/settings/tokens',
   groq: 'https://console.groq.com/keys',
   huggingface: 'https://huggingface.co/settings/tokens',
   kluster: 'https://platform.kluster.ai/apikeys',
