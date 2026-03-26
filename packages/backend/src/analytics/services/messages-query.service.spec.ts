@@ -7,7 +7,6 @@ import { TenantCacheService } from '../../common/services/tenant-cache.service';
 
 describe('MessagesQueryService', () => {
   let service: MessagesQueryService;
-  let mockAddSelect: jest.Mock;
   let mockGetRawOne: jest.Mock;
   let mockGetRawMany: jest.Mock;
   let mockTenantResolve: jest.Mock;
@@ -32,7 +31,6 @@ describe('MessagesQueryService', () => {
       getRawOne: mockGetRawOne,
       getRawMany: mockGetRawMany,
     };
-    mockAddSelect = mockQb.addSelect;
 
     const chainableMethods = [
       'select',
@@ -126,33 +124,6 @@ describe('MessagesQueryService', () => {
     expect(result.items).toHaveLength(2);
     expect(result.next_cursor).toBeNull();
     expect(result.providers).toEqual(['anthropic', 'openai']);
-  });
-
-  it('selects provider metadata from llm calls for message rows', async () => {
-    mockGetRawOne.mockResolvedValueOnce({ total: 1 });
-    mockGetRawMany
-      .mockResolvedValueOnce([
-        {
-          id: 'msg-1',
-          timestamp: '2026-02-16 10:00:00',
-          model: 'Qwen/Qwen3.5-9B',
-          provider: 'huggingface',
-          cost: 0.01,
-        },
-      ])
-      .mockResolvedValueOnce([{ model: 'Qwen/Qwen3.5-9B' }]);
-
-    const result = await service.getMessages({
-      range: '24h',
-      userId: 'test-user',
-      limit: 20,
-    });
-
-    expect(result.items[0]).toHaveProperty('provider', 'huggingface');
-    expect(mockAddSelect).toHaveBeenCalledWith(
-      expect.stringContaining('SELECT lc.gen_ai_system'),
-      'provider',
-    );
   });
 
   it('returns next_cursor when more items exist', async () => {

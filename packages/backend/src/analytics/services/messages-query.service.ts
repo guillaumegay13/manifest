@@ -96,22 +96,6 @@ export class MessagesQueryService {
 
     // Data (with cursor) — treat negative costs as NULL (invalid pricing)
     const costExpr = sqlCastFloat(sqlSanitizeCost('at.cost_usd'), this.dialect);
-    const providerExpr = `(
-      SELECT lc.gen_ai_system
-      FROM llm_calls lc
-      WHERE lc.turn_id = at.id
-        AND lc.gen_ai_system IS NOT NULL
-      ORDER BY
-        CASE
-          WHEN lc.response_model = at.model THEN 0
-          WHEN lc.request_model = at.model THEN 1
-          ELSE 2
-        END,
-        CASE WHEN lc.call_index IS NULL THEN 1 ELSE 0 END,
-        lc.call_index DESC,
-        lc.timestamp DESC
-      LIMIT 1
-    )`;
     const dataQb = baseQb
       .clone()
       .select('at.id', 'id')
@@ -119,7 +103,6 @@ export class MessagesQueryService {
       .addSelect('at.agent_name', 'agent_name')
       .addSelect('at.model', 'model')
       .addSelect('at.model', 'display_name')
-      .addSelect(providerExpr, 'provider')
       .addSelect('at.description', 'description')
       .addSelect('at.service_type', 'service_type')
       .addSelect('at.input_tokens', 'input_tokens')

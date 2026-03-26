@@ -17,7 +17,6 @@ import {
   stripCustomPrefix,
 } from '../services/routing-utils.js';
 import { getModelDisplayName } from '../services/model-display.js';
-import { PROVIDERS } from '../services/providers.js';
 import { providerIcon } from './ProviderIcon.jsx';
 import { authBadgeFor, authLabel } from './AuthBadge.js';
 
@@ -145,22 +144,6 @@ export function ModelCell(
   item: MessageRow,
   customProviderName: (m: string) => string | undefined,
 ): JSX.Element {
-  const providerId = (() => {
-    if (item.provider) {
-      const key = item.provider.toLowerCase();
-      const provider = PROVIDERS.find((p) => p.id === key || p.name.toLowerCase() === key);
-      return provider?.id ?? key;
-    }
-    return item.model ? inferProviderFromModel(item.model) : undefined;
-  })();
-
-  const providerName = (() => {
-    if (item.provider) {
-      return PROVIDERS.find((p) => p.id === providerId)?.name ?? item.provider;
-    }
-    return item.model ? inferProviderName(item.model) : undefined;
-  })();
-
   return (
     <td style={MONO_XS}>
       <span style="display: inline-flex; align-items: center; gap: 4px;">
@@ -185,14 +168,14 @@ export function ModelCell(
               </span>
             );
           })()
-        ) : providerId ? (
+        ) : item.model && inferProviderFromModel(item.model) ? (
           <span
             role="img"
-            aria-label={`${providerName ?? providerId} (${authLabel(item.auth_type)})`}
-            title={`${providerName ?? providerId} (${authLabel(item.auth_type)})`}
+            aria-label={`${inferProviderName(item.model)} (${authLabel(item.auth_type)})`}
+            title={`${inferProviderName(item.model)} (${authLabel(item.auth_type)})`}
             style="display: inline-flex; flex-shrink: 0; position: relative;"
           >
-            {providerIcon(providerId, 14)}
+            {providerIcon(inferProviderFromModel(item.model)!, 14)}
             {authBadgeFor(item.auth_type, 8)}
           </span>
         ) : null}

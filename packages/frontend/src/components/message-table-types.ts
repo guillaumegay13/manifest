@@ -3,7 +3,6 @@ export interface MessageRow {
   timestamp: string;
   agent_name: string | null;
   model: string | null;
-  provider?: string | null;
   display_name?: string | null;
   routing_tier?: string;
   routing_reason?: string;
