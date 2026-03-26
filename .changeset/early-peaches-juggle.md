@@ -1,4 +1,6 @@
 ---
+"manifest": patch
 ---
 
-Track the Messages provider-icon regression fix as a standalone PR.
+Fix message-row provider icons by using recorded provider metadata instead of
+re-inferring the provider from vendor-prefixed model IDs.

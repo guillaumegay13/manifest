@@ -96,17 +96,13 @@ export class MessagesQueryService {
 
     // Data (with cursor) — treat negative costs as NULL (invalid pricing)
     const costExpr = sqlCastFloat(sqlSanitizeCost('at.cost_usd'), this.dialect);
+    // Use the latest recorded LLM-call provider for the message row.
     const providerExpr = `(
       SELECT lc.gen_ai_system
       FROM llm_calls lc
       WHERE lc.turn_id = at.id
         AND lc.gen_ai_system IS NOT NULL
       ORDER BY
-        CASE
-          WHEN lc.response_model = at.model THEN 0
-          WHEN lc.request_model = at.model THEN 1
-          ELSE 2
-        END,
         CASE WHEN lc.call_index IS NULL THEN 1 ELSE 0 END,
         lc.call_index DESC,
         lc.timestamp DESC
