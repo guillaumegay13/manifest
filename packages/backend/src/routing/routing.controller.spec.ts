@@ -570,7 +570,7 @@ describe('RoutingController', () => {
 
     it('should expose is_free for free-tier models', async () => {
       mockDiscoveryService.getModelsForAgent.mockResolvedValue([
-        makeDiscovered({ id: 'llama-3.1-8b-instant', provider: 'groq', isFree: true }),
+        makeDiscovered({ id: 'llama-3.1-8b-instant', provider: 'groq' }),
       ]);
 
       const result = await controller.getAvailableModels(mockUser, mockAgentName);

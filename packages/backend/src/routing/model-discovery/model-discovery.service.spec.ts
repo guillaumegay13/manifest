@@ -410,30 +410,6 @@ describe('ModelDiscoveryService', () => {
       expect(result[1].displayName).toBe('custom-llm');
     });
 
-    it('should backfill isFree for cached free-tier provider models', async () => {
-      const providers = [
-        makeProvider({
-          provider: 'groq',
-          cached_models: [
-            makeModel({
-              id: 'llama-3.1-8b-instant',
-              provider: 'groq',
-              inputPricePerToken: null,
-              outputPricePerToken: null,
-              isFree: undefined,
-            }),
-          ],
-        }),
-      ];
-      providerRepo.find.mockResolvedValue(providers);
-      customProviderRepo.find.mockResolvedValue([]);
-
-      const result = await service.getModelsForAgent('agent-1');
-
-      expect(result).toHaveLength(1);
-      expect(result[0].isFree).toBe(true);
-    });
-
     it('should deduplicate models by id', async () => {
       const providers = [
         makeProvider({
@@ -513,26 +489,6 @@ describe('ModelDiscoveryService', () => {
 
       expect(result[0].inputPricePerToken).toBeCloseTo(1.5 / 1_000_000);
       expect(result[0].outputPricePerToken).toBeCloseTo(3.0 / 1_000_000);
-    });
-
-    it('should mark zero-priced custom models as free', async () => {
-      providerRepo.find.mockResolvedValue([]);
-      customProviderRepo.find.mockResolvedValue([
-        makeCustomProvider({
-          models: [
-            {
-              model_name: 'free-custom',
-              input_price_per_million_tokens: 0,
-              output_price_per_million_tokens: 0,
-            },
-          ],
-        }),
-      ]);
-
-      const result = await service.getModelsForAgent('agent-1');
-
-      expect(result).toHaveLength(1);
-      expect(result[0].isFree).toBe(true);
     });
 
     it('should default custom model context window to 128000', async () => {

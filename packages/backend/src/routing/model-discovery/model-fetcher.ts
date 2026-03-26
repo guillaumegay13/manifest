@@ -16,11 +16,6 @@ export interface DiscoveredModel {
   capabilityReasoning: boolean;
   capabilityCode: boolean;
   qualityScore: number;
-  /**
-   * True when the model is available on a documented free tier for this
-   * auth path. This is intentionally broader than literal zero token pricing.
-   */
-  isFree?: boolean;
   authType?: 'api_key' | 'subscription';
 }
 

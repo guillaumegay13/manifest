@@ -5,6 +5,7 @@ import { RoutingService } from './routing.service';
 import { ResolveAgentService } from './resolve-agent.service';
 import { CustomProviderService } from './custom-provider.service';
 import { ModelDiscoveryService } from './model-discovery/model-discovery.service';
+import { isFreeTierModel } from './model-discovery/free-tier-models';
 import { OllamaSyncService } from '../database/ollama-sync.service';
 import { CopilotDeviceAuthService } from './copilot-device-auth.service';
 import {
@@ -270,7 +271,13 @@ export class RoutingController {
         capability_reasoning: m.capabilityReasoning,
         capability_code: m.capabilityCode,
         quality_score: m.qualityScore,
-        is_free: m.isFree ?? false,
+        is_free: isFreeTierModel({
+          provider: m.provider,
+          id: m.id,
+          inputPricePerToken: m.inputPricePerToken,
+          outputPricePerToken: m.outputPricePerToken,
+          authType: m.authType ?? 'api_key',
+        }),
         display_name: isCustom ? CustomProviderService.rawModelName(m.id) : m.displayName || null,
         ...(isCustom && {
           provider_display_name: cpNameMap.get(m.provider) ?? m.provider,
