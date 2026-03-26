@@ -12,6 +12,7 @@ import { encrypt, decrypt, getEncryptionSecret } from '../common/utils/crypto.ut
 import { expandProviderNames, inferProviderFromModelName } from './provider-aliases';
 import { TIERS } from './scorer/types';
 import { isManifestUsableProvider, isSupportedSubscriptionProvider } from './subscription-support';
+import { parseCloudflareCredentials } from './provider-base-url';
 
 const TIER_LABELS: Record<string, string> = {
   simple: 'Simple',
@@ -19,6 +20,15 @@ const TIER_LABELS: Record<string, string> = {
   complex: 'Complex',
   reasoning: 'Reasoning',
 };
+
+function deriveKeyPrefix(provider: string, apiKey?: string): string | null {
+  if (!apiKey) return null;
+  if (provider.toLowerCase() === 'cloudflare') {
+    const parsed = parseCloudflareCredentials(apiKey);
+    if (parsed) return parsed.apiToken.substring(0, 8);
+  }
+  return apiKey.substring(0, 8);
+}
 
 @Injectable()
 export class RoutingService {
@@ -64,7 +74,7 @@ export class RoutingService {
   ): Promise<{ provider: UserProvider; isNew: boolean }> {
     const effectiveAuthType = authType ?? 'api_key';
     const apiKeyEncrypted = apiKey ? encrypt(apiKey, getEncryptionSecret()) : null;
-    const keyPrefix = apiKey ? apiKey.substring(0, 8) : null;
+    const keyPrefix = deriveKeyPrefix(provider, apiKey);
 
     const existing = await this.providerRepo.findOne({
       where: { agent_id: agentId, provider, auth_type: effectiveAuthType },

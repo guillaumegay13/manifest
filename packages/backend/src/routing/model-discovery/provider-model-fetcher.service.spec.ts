@@ -17,20 +17,29 @@ describe('ProviderModelFetcherService', () => {
 
   it('should have configs for all providers including subscription variants', () => {
     const expected = [
-      'openai',
-      'openai-subscription',
+      'anthropic',
+      'cerebras',
+      'cloudflare',
+      'cohere',
       'deepseek',
-      'mistral',
-      'moonshot',
-      'xai',
+      'gemini',
+      'github-models',
+      'groq',
+      'huggingface',
+      'kluster',
+      'llm7',
       'minimax',
       'minimax-subscription',
-      'qwen',
-      'zai',
-      'anthropic',
-      'gemini',
-      'openrouter',
+      'mistral',
+      'moonshot',
       'ollama',
+      'ollama-cloud',
+      'openai',
+      'openai-subscription',
+      'openrouter',
+      'qwen',
+      'xai',
+      'zai',
     ];
     for (const id of expected) {
       expect(PROVIDER_CONFIGS[id]).toBeDefined();
@@ -163,6 +172,50 @@ describe('ProviderModelFetcherService', () => {
     const result = await service.fetch('deepseek', 'key');
     expect(result).toHaveLength(1);
     expect(result[0].provider).toBe('deepseek');
+  });
+
+  it('should parse GitHub Models catalog entries', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          id: 'openai/gpt-4.1',
+          name: 'OpenAI GPT-4.1',
+          limits: { max_input_tokens: 1048576 },
+          supported_output_modalities: ['text'],
+        },
+      ],
+    });
+
+    const result = await service.fetch('github-models', 'github_pat_test');
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'openai/gpt-4.1',
+        displayName: 'OpenAI GPT-4.1',
+        provider: 'github-models',
+        contextWindow: 1048576,
+      }),
+    ]);
+  });
+
+  it('should build Cloudflare discovery endpoint from account credentials', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        result: [{ id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', task: 'text-generation' }],
+      }),
+    });
+
+    await service.fetch('cloudflare', '0123456789abcdef0123456789abcdef:token-value');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/models/search?per_page=100',
+      expect.objectContaining({
+        headers: {
+          Authorization: 'Bearer token-value',
+        },
+      }),
+    );
   });
 
   /* ── Bearer auth header ── */
