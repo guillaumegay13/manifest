@@ -245,23 +245,38 @@ function parseGitHubCatalog(body: unknown, provider: string): DiscoveredModel[] 
 }
 
 function parseHuggingFace(body: unknown, provider: string): DiscoveredModel[] {
-  return getArray(body)
+  return getArray(body, 'data')
     .map((entry) => {
       const record = asRecord(entry);
       const id = readString(record, 'id');
       if (!id) return null;
-      const pipelineTag = readString(record, 'pipeline_tag')?.toLowerCase();
-      if (
-        pipelineTag &&
-        pipelineTag !== 'text-generation' &&
-        pipelineTag !== 'image-text-to-text'
-      ) {
+      const architecture = asRecord(record?.['architecture']);
+      const outputModalities = readStringList(architecture, 'output_modalities').map((item) =>
+        item.toLowerCase(),
+      );
+      if (outputModalities.length > 0 && !outputModalities.includes('text')) {
         return null;
       }
+
+      const liveProviders = getArray(record, 'providers')
+        .map((item) => asRecord(item))
+        .filter((item): item is UnknownRecord => item !== null)
+        .filter((item) => readString(item, 'status')?.toLowerCase() === 'live');
+      if (liveProviders.length === 0) return null;
+
+      const contextWindow = liveProviders.reduce((max, item) => {
+        const contextLength = readNumber(item, 'context_length');
+        return contextLength ? Math.max(max, contextLength) : max;
+      }, 0);
+
       return createModel(provider, id, id, {
-        capabilityCode: readStringList(record, 'tags').some((item) =>
-          item.toLowerCase().includes('code'),
-        ),
+        contextWindow: contextWindow > 0 ? contextWindow : DEFAULT_CONTEXT_WINDOW,
+        // Hugging Face router exposes provider-specific pricing in USD per million tokens.
+        // The router selects providers server-side, so we avoid surfacing misleading
+        // per-token prices for the aggregate model entry.
+        inputPricePerToken: null,
+        outputPricePerToken: null,
+        capabilityCode: /\b(code|coder)\b/i.test(id),
       });
     })
     .filter((model): model is DiscoveredModel => model !== null);
@@ -389,8 +404,7 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     parse: parseOpenAI,
   },
   huggingface: {
-    endpoint:
-      'https://huggingface.co/api/models?inference_provider=hf-inference&pipeline_tag=text-generation&limit=500',
+    endpoint: 'https://router.huggingface.co/v1/models',
     buildHeaders: bearerHeaders,
     parse: parseHuggingFace,
   },

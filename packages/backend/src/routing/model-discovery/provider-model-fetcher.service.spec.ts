@@ -198,6 +198,79 @@ describe('ProviderModelFetcherService', () => {
     ]);
   });
 
+  it('should parse Hugging Face router catalog entries', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            id: 'Qwen/Qwen3.5-Coder-32B',
+            architecture: {
+              output_modalities: ['text'],
+            },
+            providers: [
+              {
+                provider: 'together',
+                status: 'live',
+                context_length: 262144,
+                pricing: {
+                  input: 0.2,
+                  output: 0.4,
+                },
+              },
+            ],
+          },
+          {
+            id: 'black-forest-labs/flux-dev',
+            architecture: {
+              output_modalities: ['image'],
+            },
+            providers: [
+              {
+                provider: 'fal-ai',
+                status: 'live',
+                context_length: 8192,
+              },
+            ],
+          },
+          {
+            id: 'meta-llama/Llama-3.3-70B-Instruct',
+            architecture: {
+              output_modalities: ['text'],
+            },
+            providers: [
+              {
+                provider: 'together',
+                status: 'staging',
+                context_length: 131072,
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const result = await service.fetch('huggingface', 'hf_test');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://router.huggingface.co/v1/models',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer hf_test' },
+      }),
+    );
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'Qwen/Qwen3.5-Coder-32B',
+        displayName: 'Qwen/Qwen3.5-Coder-32B',
+        provider: 'huggingface',
+        contextWindow: 262144,
+        inputPricePerToken: null,
+        outputPricePerToken: null,
+        capabilityCode: true,
+      }),
+    ]);
+  });
+
   it('should build Cloudflare discovery endpoint from account credentials', async () => {
     fetchSpy.mockResolvedValue({
       ok: true,
