@@ -176,17 +176,6 @@ export const PROVIDERS: ProviderDef[] = [
     models: [],
   },
   {
-    id: 'kluster',
-    name: 'Kluster AI',
-    color: '#1d4ed8',
-    initial: 'Kl',
-    subtitle: 'DeepSeek, Qwen, Llama and more',
-    keyPrefix: '',
-    minKeyLength: 20,
-    keyPlaceholder: 'API key',
-    models: [],
-  },
-  {
     id: 'llm7',
     name: 'LLM7.io',
     color: '#0f766e',

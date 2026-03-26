@@ -21,7 +21,6 @@ const PROVIDER_ALIASES: Record<string, string> = {
   'github models': 'github-models',
   groq: 'groq',
   'hugging face': 'huggingface',
-  'kluster ai': 'kluster',
   'llm7.io': 'llm7',
   moonshot: 'moonshot',
   kimi: 'moonshot',

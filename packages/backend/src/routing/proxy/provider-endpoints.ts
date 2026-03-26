@@ -142,13 +142,6 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
     format: 'openai',
     preserveModelId: true,
   },
-  kluster: {
-    baseUrl: 'https://api.kluster.ai',
-    buildHeaders: openaiHeaders,
-    buildPath: openaiPath,
-    format: 'openai',
-    preserveModelId: true,
-  },
   llm7: {
     baseUrl: 'https://api.llm7.io',
     buildHeaders: openaiHeaders,

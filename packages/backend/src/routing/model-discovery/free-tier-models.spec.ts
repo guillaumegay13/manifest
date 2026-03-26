@@ -59,7 +59,6 @@ describe('free-tier-models', () => {
       'github-models',
       'groq',
       'huggingface',
-      'kluster',
       'llm7',
       'ollama',
       'ollama-cloud',

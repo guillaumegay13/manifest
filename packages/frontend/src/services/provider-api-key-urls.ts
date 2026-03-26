@@ -8,7 +8,6 @@ export const ROUTING_PROVIDER_API_KEY_URLS: Record<string, string> = {
   'github-models': 'https://github.com/settings/tokens',
   groq: 'https://console.groq.com/keys',
   huggingface: 'https://huggingface.co/settings/tokens',
-  kluster: 'https://platform.kluster.ai/apikeys',
   llm7: 'https://token.llm7.io',
   minimax: 'https://platform.minimax.io/docs/api-reference/api-overview',
   mistral: 'https://console.mistral.ai/api-keys/',

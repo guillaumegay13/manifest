@@ -26,7 +26,6 @@ describe('ProviderModelFetcherService', () => {
       'github-models',
       'groq',
       'huggingface',
-      'kluster',
       'llm7',
       'minimax',
       'minimax-subscription',

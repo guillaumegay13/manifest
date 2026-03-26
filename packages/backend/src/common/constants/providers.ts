@@ -118,14 +118,6 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     localOnly: false,
   },
   {
-    id: 'kluster',
-    displayName: 'Kluster AI',
-    aliases: ['kluster ai'],
-    openRouterPrefixes: [],
-    requiresApiKey: true,
-    localOnly: false,
-  },
-  {
     id: 'llm7',
     displayName: 'LLM7.io',
     aliases: ['llm7.io'],

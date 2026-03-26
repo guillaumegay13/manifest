@@ -409,11 +409,6 @@ export const PROVIDER_CONFIGS: Record<string, FetcherConfig> = {
     buildHeaders: bearerHeaders,
     parse: parseHuggingFace,
   },
-  kluster: {
-    endpoint: 'https://api.kluster.ai/v1/models',
-    buildHeaders: bearerHeaders,
-    parse: parseOpenAI,
-  },
   llm7: {
     endpoint: 'https://api.llm7.io/v1/models',
     buildHeaders: bearerHeaders,
