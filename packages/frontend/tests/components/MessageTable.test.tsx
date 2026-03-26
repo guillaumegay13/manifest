@@ -26,13 +26,13 @@ vi.mock('../../src/services/routing-utils.js', () => ({
     if (m.startsWith('gpt')) return 'openai';
     if (m.startsWith('claude')) return 'anthropic';
     if (m.startsWith('custom:')) return 'custom';
-    if (m.startsWith('huggingface:')) return 'huggingface';
+    if (m.startsWith('anthropic/')) return 'openrouter';
     return null;
   },
   inferProviderName: (m: string) => {
     if (m.startsWith('gpt')) return 'OpenAI';
     if (m.startsWith('claude')) return 'Anthropic';
-    if (m.startsWith('huggingface:')) return 'Hugging Face';
+    if (m.startsWith('anthropic/')) return 'OpenRouter';
     return m;
   },
   stripCustomPrefix: (m: string) => m.replace(/^custom:[^/]+\//, ''),
@@ -333,13 +333,13 @@ describe('MessageTable', () => {
     it('prefers explicit provider over model-prefix inference', () => {
       const { container } = render(() => (
         <MessageTable
-          items={[makeRow({ model: 'Qwen/Qwen3.5-9B', provider: 'huggingface' })]}
+          items={[makeRow({ model: 'anthropic/claude-sonnet-4', provider: 'anthropic' })]}
           columns={['model']}
           agentName="agent-1"
           customProviderName={noopProvider}
         />
       ));
-      expect(container.querySelector('[data-testid="icon-huggingface"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="icon-anthropic"]')).not.toBeNull();
       expect(container.querySelector('[data-testid="icon-openrouter"]')).toBeNull();
     });
 

@@ -135,12 +135,12 @@ describe('MessagesQueryService', () => {
         {
           id: 'msg-1',
           timestamp: '2026-02-16 10:00:00',
-          model: 'Qwen/Qwen3.5-9B',
-          provider: 'huggingface',
+          model: 'anthropic/claude-sonnet-4',
+          provider: 'anthropic',
           cost: 0.01,
         },
       ])
-      .mockResolvedValueOnce([{ model: 'Qwen/Qwen3.5-9B' }]);
+      .mockResolvedValueOnce([{ model: 'anthropic/claude-sonnet-4' }]);
 
     const result = await service.getMessages({
       range: '24h',
@@ -148,7 +148,7 @@ describe('MessagesQueryService', () => {
       limit: 20,
     });
 
-    expect(result.items[0]).toHaveProperty('provider', 'huggingface');
+    expect(result.items[0]).toHaveProperty('provider', 'anthropic');
     expect(mockAddSelect).toHaveBeenCalledWith(
       expect.stringContaining('SELECT lc.gen_ai_system'),
       'provider',

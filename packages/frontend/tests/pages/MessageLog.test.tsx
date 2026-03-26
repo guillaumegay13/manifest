@@ -680,8 +680,8 @@ describe("MessageLog", () => {
       items: [
         {
           ...messagesData.items[0],
-          model: "Qwen/Qwen3.5-9B",
-          provider: "huggingface",
+          model: "anthropic/claude-sonnet-4",
+          provider: "anthropic",
         },
       ],
       total_count: 1,
@@ -691,7 +691,7 @@ describe("MessageLog", () => {
     await vi.waitFor(() => {
       const providerSpan = container.querySelector('[role="img"]') as HTMLElement | null;
       expect(providerSpan).not.toBeNull();
-      expect(providerSpan?.getAttribute("title")).toContain("Hugging Face");
+      expect(providerSpan?.getAttribute("title")).toContain("Anthropic");
       expect(providerSpan?.getAttribute("title")).not.toContain("OpenRouter");
     });
   });
