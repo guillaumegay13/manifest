@@ -91,7 +91,13 @@ function readContextWindow(record: UnknownRecord | null): number {
   const limits = asRecord(record['limits']);
   const contextWindow = asRecord(record['context_window']);
   return (
-    readNumber(record, 'context_length', 'inputTokenLimit', 'max_context_length') ??
+    readNumber(
+      record,
+      'context_length',
+      'context_window',
+      'inputTokenLimit',
+      'max_context_length',
+    ) ??
     readNumber(limits, 'max_input_tokens') ??
     readNumber(contextWindow, 'tokens') ??
     DEFAULT_CONTEXT_WINDOW
@@ -140,16 +146,26 @@ function cloudflareModelsEndpoint(key: string): string {
   return `${baseUrl}/models/search?per_page=100`;
 }
 
+/**
+ * Minimum context window for a model to be considered a chat/text model.
+ * Non-chat models (speech-to-text, TTS) typically have tiny context windows
+ * (e.g. Whisper = 448, Orpheus = 4000) that no chat model would have.
+ */
+const MIN_CHAT_CONTEXT_WINDOW = 8192;
+
 function parseOpenAI(body: unknown, provider: string): DiscoveredModel[] {
   return getArray(body, 'data')
     .map((entry) => {
       const record = asRecord(entry);
       const id = readString(record, 'id');
       if (!id) return null;
+      if (record?.['active'] === false) return null;
+      const contextWindow = readContextWindow(record);
+      if (contextWindow < MIN_CHAT_CONTEXT_WINDOW) return null;
       const displayName = readString(record, 'display_name', 'name', 'friendly_name') ?? id;
       const { inputPricePerToken, outputPricePerToken } = readCommonPrice(record);
       return createModel(provider, id, displayName, {
-        contextWindow: readContextWindow(record),
+        contextWindow,
         inputPricePerToken,
         outputPricePerToken,
       });
@@ -293,6 +309,15 @@ function extractCloudflareTaskNames(record: UnknownRecord | null): string[] {
   return tasks.map((task) => task.toLowerCase());
 }
 
+function isCloudflareTextTask(task: string): boolean {
+  return (
+    task.includes('text generation') ||
+    task.includes('text-generation') ||
+    task.includes('conversational') ||
+    task.includes('chat')
+  );
+}
+
 function parseCloudflare(body: unknown, provider: string): DiscoveredModel[] {
   return getArray(body, 'result')
     .map((entry) => {
@@ -301,17 +326,7 @@ function parseCloudflare(body: unknown, provider: string): DiscoveredModel[] {
       const id = modelName ?? readString(record, 'id');
       if (!id) return null;
       const tasks = extractCloudflareTaskNames(record);
-      if (
-        tasks.length > 0 &&
-        !tasks.some(
-          (task) =>
-            task.includes('text-generation') ||
-            task.includes('conversational') ||
-            task.includes('chat'),
-        )
-      ) {
-        return null;
-      }
+      if (!tasks.some(isCloudflareTextTask)) return null;
       return createModel(provider, id, modelName ?? id, {
         contextWindow: readContextWindow(record),
       });

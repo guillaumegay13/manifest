@@ -160,6 +160,42 @@ describe('ProviderModelFetcherService', () => {
     });
   });
 
+  describe('parseOpenAI non-chat model filtering', () => {
+    it('should exclude models with context_window below 8192', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            { id: 'whisper-large-v3', context_window: 448 },
+            { id: 'orpheus-v1', context_window: 4000 },
+            { id: 'llama-3.3-70b', context_window: 131072 },
+          ],
+        }),
+      });
+
+      const result = await service.fetch('groq', 'gsk-test');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('llama-3.3-70b');
+    });
+
+    it('should exclude inactive models', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            { id: 'active-model', active: true },
+            { id: 'inactive-model', active: false },
+            { id: 'no-active-field' },
+          ],
+        }),
+      });
+
+      const result = await service.fetch('groq', 'gsk-test');
+      expect(result).toHaveLength(2);
+      expect(result.map((m) => m.id)).toEqual(['active-model', 'no-active-field']);
+    });
+  });
+
   /* ── OpenAI-compatible providers use same parser ── */
 
   it('should work for deepseek provider', async () => {
@@ -288,6 +324,29 @@ describe('ProviderModelFetcherService', () => {
         },
       }),
     );
+  });
+
+  it('should exclude Cloudflare models without a text-generation task', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        result: [
+          { name: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', task: 'Text Generation' },
+          { name: '@cf/openai/whisper', task: 'Automatic Speech Recognition' },
+          { name: '@cf/baai/bge-m3', task: 'Text Embeddings' },
+          { name: '@cf/black-forest-labs/flux-1', task: 'Text-to-Image' },
+          { name: '@cf/no-task-model' },
+        ],
+      }),
+    });
+
+    const result = await service.fetch(
+      'cloudflare',
+      '0123456789abcdef0123456789abcdef:token-value',
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('@cf/meta/llama-3.3-70b-instruct-fp8-fast');
   });
 
   it('should prefer Cloudflare model name over internal id', async () => {
