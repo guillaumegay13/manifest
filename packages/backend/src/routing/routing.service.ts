@@ -10,16 +10,9 @@ import { RoutingCacheService } from './routing-cache.service';
 import { randomUUID } from 'crypto';
 import { encrypt, decrypt, getEncryptionSecret } from '../common/utils/crypto.util';
 import { expandProviderNames, inferProviderFromModelName } from './provider-aliases';
-import { TIERS } from './scorer/types';
+import { TIERS, TIER_LABELS } from 'manifest-shared';
 import { isManifestUsableProvider, isSupportedSubscriptionProvider } from './subscription-support';
 import { parseCloudflareCredentials } from './provider-base-url';
-
-const TIER_LABELS: Record<string, string> = {
-  simple: 'Simple',
-  standard: 'Standard',
-  complex: 'Complex',
-  reasoning: 'Reasoning',
-};
 
 function deriveKeyPrefix(provider: string, apiKey?: string): string | null {
   if (!apiKey) return null;
@@ -29,7 +22,6 @@ function deriveKeyPrefix(provider: string, apiKey?: string): string | null {
   }
   return apiKey.substring(0, 8);
 }
-
 @Injectable()
 export class RoutingService {
   private readonly logger = new Logger(RoutingService.name);
@@ -296,7 +288,7 @@ export class RoutingService {
       for (const { tier, modelName } of invalidated) {
         const updated = tierMap.get(tier);
         const newModel = updated?.auto_assigned_model ?? null;
-        const tierLabel = TIER_LABELS[tier] ?? tier;
+        const tierLabel = TIER_LABELS[tier as keyof typeof TIER_LABELS] ?? tier;
         const suffix = newModel
           ? `${tierLabel} is back to automatic mode (${newModel}).`
           : `${tierLabel} is back to automatic mode.`;
