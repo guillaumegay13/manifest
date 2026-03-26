@@ -2148,6 +2148,21 @@ describe('ProxyService', () => {
 
       expect(result.meta.model).toBe('custom:cp-abc/my-model');
       expect(result.meta.fallbackFromModel).toBe('gpt-4o');
+      expect(providerClient.forward).toHaveBeenNthCalledWith(
+        2,
+        'custom:cp-abc',
+        'sk-custom',
+        'my-model',
+        body,
+        false,
+        undefined,
+        undefined,
+        expect.objectContaining({
+          baseUrl: 'https://my-endpoint.com',
+          format: 'openai',
+        }),
+        'api_key',
+      );
     });
 
     it('returns all failed fallbacks when all fail', async () => {

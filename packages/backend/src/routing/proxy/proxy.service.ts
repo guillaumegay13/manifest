@@ -280,8 +280,13 @@ export class ProxyService {
       // Strip the inferred provider prefix from the model name so that
       // providers with preserveModelId: true (e.g. huggingface, github-models)
       // don't receive a double-prefixed model like "huggingface/Qwen/Qwen3.5-27B".
+      // Custom providers are handled later in forwardToProvider, which extracts
+      // the raw model name while preserving the prefixed ID in routing metadata.
       let strippedModel = requestedModel;
-      if (provider === inferProviderFromModelName(requestedModel)) {
+      if (
+        !CustomProviderService.isCustom(requestedModel) &&
+        provider === inferProviderFromModelName(requestedModel)
+      ) {
         const slashIdx = requestedModel.indexOf('/');
         if (slashIdx > 0) strippedModel = requestedModel.substring(slashIdx + 1);
       }
