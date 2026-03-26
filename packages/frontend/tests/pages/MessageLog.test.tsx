@@ -674,6 +674,28 @@ describe("MessageLog", () => {
     });
   });
 
+  it("prefers explicit provider metadata for vendor-prefixed models", async () => {
+    const dataWithExplicitProvider = {
+      ...messagesData,
+      items: [
+        {
+          ...messagesData.items[0],
+          model: "Qwen/Qwen3.5-9B",
+          provider: "huggingface",
+        },
+      ],
+      total_count: 1,
+    };
+    mockGetMessages.mockResolvedValue(dataWithExplicitProvider);
+    const { container } = render(() => <MessageLog />);
+    await vi.waitFor(() => {
+      const providerSpan = container.querySelector('[role="img"]') as HTMLElement | null;
+      expect(providerSpan).not.toBeNull();
+      expect(providerSpan?.getAttribute("title")).toContain("Hugging Face");
+      expect(providerSpan?.getAttribute("title")).not.toContain("OpenRouter");
+    });
+  });
+
   it("renders subscription auth badge on provider icon", async () => {
     const dataWithSub = {
       ...messagesData,
