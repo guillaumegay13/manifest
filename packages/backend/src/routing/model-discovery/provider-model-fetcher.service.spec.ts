@@ -291,6 +291,34 @@ describe('ProviderModelFetcherService', () => {
     );
   });
 
+  it('should prefer Cloudflare model name over internal id', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        result: [
+          {
+            id: 'f9f2250b-1048-4a52-9910-d0bf976616a1',
+            name: '@cf/openai/gpt-oss-120b',
+            task: 'text-generation',
+          },
+        ],
+      }),
+    });
+
+    const result = await service.fetch(
+      'cloudflare',
+      '0123456789abcdef0123456789abcdef:token-value',
+    );
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: '@cf/openai/gpt-oss-120b',
+        displayName: '@cf/openai/gpt-oss-120b',
+        provider: 'cloudflare',
+      }),
+    ]);
+  });
+
   /* ── Bearer auth header ── */
 
   it('should send bearer auth header for openai', async () => {

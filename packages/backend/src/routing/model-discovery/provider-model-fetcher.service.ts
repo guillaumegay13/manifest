@@ -297,7 +297,8 @@ function parseCloudflare(body: unknown, provider: string): DiscoveredModel[] {
   return getArray(body, 'result')
     .map((entry) => {
       const record = asRecord(entry);
-      const id = readString(record, 'id', 'name');
+      const modelName = readString(record, 'name');
+      const id = modelName ?? readString(record, 'id');
       if (!id) return null;
       const tasks = extractCloudflareTaskNames(record);
       if (
@@ -311,7 +312,7 @@ function parseCloudflare(body: unknown, provider: string): DiscoveredModel[] {
       ) {
         return null;
       }
-      return createModel(provider, id, readString(record, 'name') ?? id, {
+      return createModel(provider, id, modelName ?? id, {
         contextWindow: readContextWindow(record),
       });
     })
