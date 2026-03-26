@@ -1,5 +1,28 @@
 # manifest
 
+## 5.31.0
+
+### Minor Changes
+
+- 506c25a: Add routing setup step to agent onboarding wizard
+
+### Patch Changes
+
+- f3abb28: Remove Product Hunt launch modal and badge
+
+## 5.30.0
+
+### Minor Changes
+
+- 9fd49cc: Support multiple agents in local mode, matching cloud mode behavior
+
+## 5.29.3
+
+### Patch Changes
+
+- b9efc95: Fix 404 pages after creating a new agent in cloud mode
+- 46b47f1: fix: update GitHub Copilot model names to match current API catalog
+
 ## 5.29.2
 
 ### Patch Changes
