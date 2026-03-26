@@ -310,7 +310,12 @@ describe('ProviderModelFetcherService', () => {
     fetchSpy.mockResolvedValue({
       ok: true,
       json: async () => ({
-        result: [{ id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', task: 'text-generation' }],
+        result: [
+          {
+            id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+            task: { name: 'Text Generation' },
+          },
+        ],
       }),
     });
 
@@ -331,10 +336,10 @@ describe('ProviderModelFetcherService', () => {
       ok: true,
       json: async () => ({
         result: [
-          { name: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', task: 'Text Generation' },
-          { name: '@cf/openai/whisper', task: 'Automatic Speech Recognition' },
-          { name: '@cf/baai/bge-m3', task: 'Text Embeddings' },
-          { name: '@cf/black-forest-labs/flux-1', task: 'Text-to-Image' },
+          { name: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', task: { name: 'Text Generation' } },
+          { name: '@cf/openai/whisper', task: { name: 'Automatic Speech Recognition' } },
+          { name: '@cf/baai/bge-m3', task: { name: 'Text Embeddings' } },
+          { name: '@cf/black-forest-labs/flux-1', task: { name: 'Text-to-Image' } },
           { name: '@cf/no-task-model' },
         ],
       }),
@@ -357,7 +362,7 @@ describe('ProviderModelFetcherService', () => {
           {
             id: 'f9f2250b-1048-4a52-9910-d0bf976616a1',
             name: '@cf/openai/gpt-oss-120b',
-            task: 'text-generation',
+            task: { name: 'Text Generation' },
           },
         ],
       }),

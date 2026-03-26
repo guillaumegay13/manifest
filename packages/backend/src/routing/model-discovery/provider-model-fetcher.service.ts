@@ -300,12 +300,12 @@ function parseHuggingFace(body: unknown, provider: string): DiscoveredModel[] {
 
 function extractCloudflareTaskNames(record: UnknownRecord | null): string[] {
   if (!record) return [];
-  const tasks = [
-    ...readStringList(record, 'tasks'),
-    ...readStringList(asRecord(record['task']), 'labels'),
-  ];
+  const taskRecord = asRecord(record['task']);
+  const tasks = [...readStringList(record, 'tasks'), ...readStringList(taskRecord, 'labels')];
   const directTask = readString(record, 'task', 'task_name', 'source_task');
   if (directTask) tasks.push(directTask);
+  const taskName = readString(taskRecord, 'name');
+  if (taskName) tasks.push(taskName);
   return tasks.map((task) => task.toLowerCase());
 }
 

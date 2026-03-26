@@ -36,18 +36,13 @@ function labelForModel(name: string, labels: Map<string, string>): string {
 }
 
 const isFreeModel = (m: AvailableModel): boolean =>
-  m.is_free === true ||
-  (m.input_price_per_token != null &&
-    m.output_price_per_token != null &&
-    Number(m.input_price_per_token) === 0 &&
-    Number(m.output_price_per_token) === 0);
+  m.input_price_per_token != null &&
+  m.output_price_per_token != null &&
+  Number(m.input_price_per_token) === 0 &&
+  Number(m.output_price_per_token) === 0;
 
-const priceLabel = (m: AvailableModel): string => {
-  if (isFreeModel(m) && (m.input_price_per_token == null || m.output_price_per_token == null)) {
-    return 'Free tier';
-  }
-  return `${pricePerM(m.input_price_per_token)} in · ${pricePerM(m.output_price_per_token)} out per 1M`;
-};
+const priceLabel = (m: AvailableModel): string =>
+  `${pricePerM(m.input_price_per_token)} in · ${pricePerM(m.output_price_per_token)} out per 1M`;
 
 const ModelPickerModal: Component<Props> = (props) => {
   const hasSubscription = () =>

@@ -517,7 +517,6 @@ export interface AvailableModel {
   capability_reasoning: boolean;
   capability_code: boolean;
   quality_score: number;
-  is_free?: boolean;
   display_name?: string;
   provider_display_name?: string;
 }
