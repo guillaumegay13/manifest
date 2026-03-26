@@ -541,6 +541,7 @@ describe('RoutingController', () => {
         capability_reasoning: false,
         capability_code: true,
         quality_score: 3,
+        is_free: false,
         display_name: 'GPT-4o',
       });
     });
@@ -559,11 +560,23 @@ describe('RoutingController', () => {
         'context_window',
         'display_name',
         'input_price_per_token',
+        'is_free',
         'model_name',
         'output_price_per_token',
         'provider',
         'quality_score',
       ]);
+    });
+
+    it('should expose is_free for free-tier models', async () => {
+      mockDiscoveryService.getModelsForAgent.mockResolvedValue([
+        makeDiscovered({ id: 'llama-3.1-8b-instant', provider: 'groq', isFree: true }),
+      ]);
+
+      const result = await controller.getAvailableModels(mockUser, mockAgentName);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].is_free).toBe(true);
     });
 
     it('should use null for display_name when displayName is empty', async () => {

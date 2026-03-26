@@ -166,6 +166,25 @@ describe("ModelPickerModal", () => {
     expect(screen.getByText("Free models only")).toBeDefined();
   });
 
+  it("treats explicit is_free models as free even when pricing is null", () => {
+    const models = [
+      { model_name: "paid-model", provider: "OpenAI", input_price_per_token: 0.0000025, output_price_per_token: 0.00001, context_window: 128000, capability_reasoning: false, capability_code: true, is_free: false },
+      { model_name: "free-tier-model", provider: "OpenAI", input_price_per_token: null, output_price_per_token: null, context_window: 128000, capability_reasoning: false, capability_code: true, is_free: true },
+      { model_name: "unknown-model", provider: "OpenAI", input_price_per_token: null, output_price_per_token: null, context_window: 128000, capability_reasoning: false, capability_code: true },
+    ];
+
+    render(() => (
+      <ModelPickerModal tierId="simple" models={models} tiers={baseTiers} onSelect={onSelect} onClose={onClose} />
+    ));
+
+    fireEvent.click(screen.getByText("Free models only"));
+
+    expect(screen.getByText("free-tier-model")).toBeDefined();
+    expect(screen.getByText("Free tier")).toBeDefined();
+    expect(screen.queryByText("paid-model")).toBeNull();
+    expect(screen.queryByText("unknown-model")).toBeNull();
+  });
+
   it("sorts openrouter/free to the top of its group", () => {
     const { container } = render(() => (
       <ModelPickerModal tierId="simple" models={baseModels} tiers={baseTiers} onSelect={onSelect} onClose={onClose} />

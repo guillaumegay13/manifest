@@ -17,6 +17,7 @@ import {
   buildSubscriptionFallbackModels,
   supplementWithKnownModels,
 } from './model-fallback';
+import { isFreeTierModel } from './free-tier-models';
 // Import static helpers directly to avoid circular dependency with RoutingModule
 const customProviderKey = (id: string) => `custom:${id}`;
 const customModelKey = (id: string, modelName: string) => `custom:${id}/${modelName}`;
@@ -112,7 +113,7 @@ export class ModelDiscoveryService {
 
     const authType = provider.auth_type === 'subscription' ? 'subscription' : 'api_key';
     const enriched = raw.map((model) => ({
-      ...this.enrichModel(model, provider.provider),
+      ...this.annotateFreeTier(this.enrichModel(model, provider.provider), authType),
       authType: authType as 'api_key' | 'subscription',
     }));
 
@@ -155,15 +156,16 @@ export class ModelDiscoveryService {
       if (!Array.isArray(cached)) continue;
       const providerAuthType = p.auth_type === 'subscription' ? 'subscription' : 'api_key';
       for (const m of cached) {
-        const effectiveAuthType = m.authType ?? providerAuthType;
+        const normalized = this.normalizeCachedModel(m, providerAuthType);
+        const effectiveAuthType = normalized.authType ?? providerAuthType;
         if (!seen.has(m.id)) {
           seen.set(m.id, models.length);
-          models.push(m);
+          models.push(normalized);
         } else if (
           effectiveAuthType === 'subscription' &&
           models[seen.get(m.id)!]?.authType !== 'subscription'
         ) {
-          models[seen.get(m.id)!] = m;
+          models[seen.get(m.id)!] = normalized;
         }
       }
     }
@@ -197,6 +199,12 @@ export class ModelDiscoveryService {
           capabilityReasoning: false,
           capabilityCode: false,
           qualityScore: 2,
+          isFree: isFreeTierModel({
+            provider: cpKey,
+            id: modelKey,
+            inputPricePerToken: inputPerToken,
+            outputPricePerToken: outputPerToken,
+          }),
         });
       }
     }
@@ -253,5 +261,32 @@ export class ModelDiscoveryService {
       context_window: model.contextWindow,
     });
     return { ...model, qualityScore: score };
+  }
+
+  private annotateFreeTier(
+    model: DiscoveredModel,
+    authType: 'api_key' | 'subscription',
+  ): DiscoveredModel {
+    return {
+      ...model,
+      isFree: isFreeTierModel({
+        provider: model.provider,
+        id: model.id,
+        inputPricePerToken: model.inputPricePerToken,
+        outputPricePerToken: model.outputPricePerToken,
+        authType,
+      }),
+    };
+  }
+
+  private normalizeCachedModel(
+    model: DiscoveredModel,
+    authType: 'api_key' | 'subscription',
+  ): DiscoveredModel {
+    const normalized = {
+      ...model,
+      authType: model.authType ?? authType,
+    };
+    return this.annotateFreeTier(normalized, normalized.authType);
   }
 }

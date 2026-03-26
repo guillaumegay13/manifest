@@ -270,6 +270,7 @@ export class RoutingController {
         capability_reasoning: m.capabilityReasoning,
         capability_code: m.capabilityCode,
         quality_score: m.qualityScore,
+        is_free: m.isFree ?? false,
         display_name: isCustom ? CustomProviderService.rawModelName(m.id) : m.displayName || null,
         ...(isCustom && {
           provider_display_name: cpNameMap.get(m.provider) ?? m.provider,

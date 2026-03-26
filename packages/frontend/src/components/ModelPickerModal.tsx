@@ -36,10 +36,18 @@ function labelForModel(name: string, labels: Map<string, string>): string {
 }
 
 const isFreeModel = (m: AvailableModel): boolean =>
-  m.input_price_per_token != null &&
-  m.output_price_per_token != null &&
-  Number(m.input_price_per_token) === 0 &&
-  Number(m.output_price_per_token) === 0;
+  m.is_free === true ||
+  (m.input_price_per_token != null &&
+    m.output_price_per_token != null &&
+    Number(m.input_price_per_token) === 0 &&
+    Number(m.output_price_per_token) === 0);
+
+const priceLabel = (m: AvailableModel): string => {
+  if (isFreeModel(m) && (m.input_price_per_token == null || m.output_price_per_token == null)) {
+    return 'Free tier';
+  }
+  return `${pricePerM(m.input_price_per_token)} in · ${pricePerM(m.output_price_per_token)} out per 1M`;
+};
 
 const ModelPickerModal: Component<Props> = (props) => {
   const hasSubscription = () =>
@@ -381,6 +389,11 @@ const ModelPickerModal: Component<Props> = (props) => {
                     >
                       <span class="routing-modal__model-label">
                         {model.label}
+                        <Show when={!isSub() && isFreeModel(model.pricing)}>
+                          <span class="routing-modal__role-tag routing-modal__role-tag--free">
+                            Free
+                          </span>
+                        </Show>
                         <Show when={isRecommended(model.value)}>
                           <span class="routing-modal__recommended"> (recommended)</span>
                         </Show>
@@ -397,12 +410,7 @@ const ModelPickerModal: Component<Props> = (props) => {
                         }
                       >
                         <Show when={model.pricing}>
-                          {(p) => (
-                            <span class="routing-modal__model-id">
-                              {pricePerM(p().input_price_per_token)} in ·{' '}
-                              {pricePerM(p().output_price_per_token)} out per 1M
-                            </span>
-                          )}
+                          {(p) => <span class="routing-modal__model-id">{priceLabel(p())}</span>}
                         </Show>
                       </Show>
                     </button>

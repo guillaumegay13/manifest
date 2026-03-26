@@ -768,6 +768,7 @@ describe("ModelPickerModal — custom providers and filtering", () => {
     const models: AvailableModel[] = [
       { model_name: "gpt-4o-mini", provider: "OpenAI", input_price_per_token: 0.00000015, output_price_per_token: 0.0000006, context_window: 128000, capability_reasoning: false, capability_code: true },
       { model_name: "free-model", provider: "OpenAI", input_price_per_token: 0, output_price_per_token: 0, context_window: 128000, capability_reasoning: false, capability_code: false },
+      { model_name: "free-tier-model", provider: "Groq", input_price_per_token: null, output_price_per_token: null, context_window: 128000, capability_reasoning: false, capability_code: false, is_free: true },
       { model_name: "null-price-model", provider: "OpenAI", input_price_per_token: null, output_price_per_token: null, context_window: 128000, capability_reasoning: false, capability_code: false },
     ];
 
@@ -786,8 +787,9 @@ describe("ModelPickerModal — custom providers and filtering", () => {
     const pill = container.querySelector('.routing-modal__filter-pill') as HTMLButtonElement;
     fireEvent.click(pill);
 
-    // free-model (price=0) should show, null-price-model (price=null) should NOT show
+    // free-model (price=0) and free-tier-model (explicit is_free) should show.
     expect(screen.getByText("free-model")).toBeDefined();
+    expect(screen.getByText("free-tier-model")).toBeDefined();
     expect(screen.queryByText("null-price-model")).toBeNull();
   });
 
