@@ -44,7 +44,7 @@ const RoutingInstructionModal: Component<Props> = (props) => {
   const enableCmd = () => {
     const providerJson = JSON.stringify({
       baseUrl: baseUrl(),
-      api: 'openai-completions',
+      api: 'openai-responses',
       apiKey: displayKey(),
       models: [{ id: 'auto', name: 'Manifest Auto' }],
     });

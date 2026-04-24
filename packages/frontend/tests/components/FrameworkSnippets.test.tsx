@@ -133,6 +133,8 @@ describe("FrameworkSnippets", () => {
   it("shows OpenAI Python SDK snippet by default", () => {
     const { container } = render(() => <FrameworkSnippets {...defaultProps} />);
     expect(container.textContent).toContain("from openai import OpenAI");
+    expect(container.textContent).toContain("client.responses.create");
+    expect(container.textContent).not.toContain("chat.completions.create");
   });
 
   it("shows language toggle on OpenAI SDK tab", () => {
@@ -149,6 +151,7 @@ describe("FrameworkSnippets", () => {
     const langBtns = container.querySelectorAll(".toolkit-lang-toggle__btn");
     fireEvent.click(langBtns[1]); // TypeScript
     expect(container.textContent).toContain('import OpenAI from "openai"');
+    expect(container.textContent).toContain("client.responses.create");
   });
 
   it("switches to Vercel AI SDK tab on click", () => {

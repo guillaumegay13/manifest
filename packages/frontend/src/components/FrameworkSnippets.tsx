@@ -1,6 +1,5 @@
 import { createEffect, createSignal, For, Show, type Component } from 'solid-js';
 import CopyButton from './CopyButton.jsx';
-import CodeBlock from './CodeBlock.jsx';
 import { highlight } from '../services/syntax-highlight.js';
 import {
   type ToolkitId,

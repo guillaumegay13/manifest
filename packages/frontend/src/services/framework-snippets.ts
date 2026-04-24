@@ -130,9 +130,10 @@ client = OpenAI(
     api_key="${apiKey}",${openaiHeaders}
 )
 
-response = client.chat.completions.create(
+response = client.responses.create(
     model="auto",
-    messages=[{"role": "user", "content": "Hello"}],
+    input="Hello",
+    store=False,
 )`,
     },
   ];
@@ -193,9 +194,10 @@ const client = new OpenAI({
   apiKey: "${apiKey}",${openaiHeaders}
 });
 
-const response = await client.chat.completions.create({
+const response = await client.responses.create({
   model: "auto",
-  messages: [{ role: "user", content: "Hello" }],
+  input: "Hello",
+  store: false,
 });`,
     },
   ];
@@ -204,7 +206,7 @@ const response = await client.chat.completions.create({
 export function getOpenClawSnippet(baseUrl: string, apiKey: string): string {
   const providerJson = JSON.stringify({
     baseUrl,
-    api: 'openai-completions',
+    api: 'openai-responses',
     apiKey,
     models: [{ id: 'auto', name: 'Manifest Auto' }],
   });
@@ -236,12 +238,13 @@ export function getCurlSnippet(
   return [
     {
       title: 'cURL',
-      code: `curl -X POST ${baseUrl}/chat/completions \\
+      code: `curl -X POST ${baseUrl}/responses \\
   -H "Authorization: Bearer ${apiKey}" \\
   -H "Content-Type: application/json" \\
 ${extraHeaders}  -d '{
     "model": "auto",
-    "messages": [{"role": "user", "content": "Hello"}]
+    "input": "Hello",
+    "store": false
   }'`,
     },
   ];
