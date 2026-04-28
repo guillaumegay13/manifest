@@ -260,7 +260,9 @@ export class ProviderService {
     existing.updated_at = new Date().toISOString();
     await this.providerRepo.save(existing);
 
-    const { invalidated } = await this.cleanupProviderReferences(agentId, [{ provider, authType }]);
+    const { invalidated } = await this.cleanupProviderReferences(agentId, [
+      { provider, authType: existing.auth_type },
+    ]);
     await this.autoAssign.recalculate(agentId);
     this.routingCache.invalidateAgent(agentId);
 

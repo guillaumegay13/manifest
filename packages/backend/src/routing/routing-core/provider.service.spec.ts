@@ -398,6 +398,36 @@ describe('ProviderService', () => {
       expect(routingCache.invalidateAgent).toHaveBeenCalledWith('agent-1');
     });
 
+    it('uses the matched provider row auth type when the remove request omits authType', async () => {
+      const existing = makeProvider({ is_active: true, auth_type: 'api_key' });
+      providerRepo.findOne.mockResolvedValue(existing);
+
+      const tier = makeTier({
+        tier: 'standard',
+        override_route: makeRoute('openai', 'api_key', 'gpt-4o'),
+        fallback_routes: [
+          makeRoute('openai', 'api_key', 'gpt-4o-mini'),
+          makeRoute('openai', 'subscription', 'gpt-5'),
+        ],
+      });
+      tierRepo.find
+        .mockResolvedValueOnce([tier])
+        .mockResolvedValueOnce([makeTier({ tier: 'standard', auto_assigned_route: null })]);
+      specificityRepo.find.mockResolvedValue([]);
+
+      await service.removeProvider('agent-1', 'openai');
+
+      expect(providerRepo.findOne).toHaveBeenCalledWith({
+        where: { agent_id: 'agent-1', provider: 'openai' },
+      });
+      expect(tierRepo.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          override_route: null,
+          fallback_routes: [makeRoute('openai', 'subscription', 'gpt-5')],
+        }),
+      ]);
+    });
+
     it('should clear tier assignments when no other active provider', async () => {
       const existing = makeProvider({ is_active: true });
       providerRepo.findOne.mockResolvedValue(existing);
