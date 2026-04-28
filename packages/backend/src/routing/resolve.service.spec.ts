@@ -5,12 +5,83 @@ import { ProviderKeyService } from './routing-core/provider-key.service';
 import { SpecificityService } from './routing-core/specificity.service';
 import { SpecificityPenaltyService } from './routing-core/specificity-penalty.service';
 import { HeaderTierService } from './header-tiers/header-tier.service';
-import { ModelPricingCacheService } from '../model-prices/model-pricing-cache.service';
-import { ModelDiscoveryService } from '../model-discovery/model-discovery.service';
 import { Agent } from '../entities/agent.entity';
+import type { AuthType, ModelRoute } from 'manifest-shared';
+
+function route(model: string, provider = 'OpenAI', authType: AuthType = 'api_key'): ModelRoute {
+  return { provider, authType, model };
+}
+
+function providerFromLegacyModel(model: string | null | undefined, fallback = 'OpenAI'): string {
+  if (!model) return fallback;
+  if (model.startsWith('custom:')) return model.split('/')[0] || fallback;
+  const [prefix] = model.split('/');
+  return prefix && prefix !== model ? prefix : fallback;
+}
+
+function tierRow(row: Record<string, any>): Record<string, any> {
+  const overrideRoute =
+    row.override_route ??
+    (row.override_model
+      ? route(
+          row.override_model,
+          row.override_provider ?? providerFromLegacyModel(row.override_model),
+          row.override_auth_type ?? 'api_key',
+        )
+      : null);
+  const autoRoute =
+    row.auto_assigned_route ??
+    (row.auto_assigned_model
+      ? route(
+          row.auto_assigned_model,
+          row.auto_provider ?? providerFromLegacyModel(row.auto_assigned_model),
+        )
+      : null);
+  const fallbackRoutes =
+    row.fallback_routes ??
+    row.fallback_models?.map((model: string) =>
+      route(model, row.fallback_provider ?? providerFromLegacyModel(model)),
+    ) ??
+    null;
+  return {
+    ...row,
+    override_route: overrideRoute,
+    auto_assigned_route: autoRoute,
+    fallback_routes: fallbackRoutes,
+  };
+}
+
+function tierMock(rows: Record<string, any>[]): jest.Mock {
+  const mock = jest.fn();
+  const original = mock.mockResolvedValue.bind(mock);
+  mock.mockResolvedValue = ((value: Record<string, any>[]) =>
+    original(value.map(tierRow))) as typeof mock.mockResolvedValue;
+  return mock.mockResolvedValue(rows);
+}
+
+function withLegacyAliases(response: any): any {
+  return {
+    ...response,
+    model: response.route?.model ?? null,
+    provider: response.route?.provider ?? null,
+    ...(response.route ? { auth_type: response.route.authType } : {}),
+    fallback_models: response.fallback_routes?.map((fallback: ModelRoute) => fallback.model),
+  };
+}
+
+function wrapResolveService(service: ResolveService): any {
+  const resolve = service.resolve.bind(service);
+  const resolveForTier = service.resolveForTier.bind(service);
+  return Object.assign(service, {
+    resolve: async (...args: Parameters<ResolveService['resolve']>) =>
+      withLegacyAliases(await resolve(...args)),
+    resolveForTier: async (...args: Parameters<ResolveService['resolveForTier']>) =>
+      withLegacyAliases(await resolveForTier(...args)),
+  });
+}
 
 describe('ResolveService', () => {
-  let service: ResolveService;
+  let service: any;
   let mockTierService: Record<string, jest.Mock>;
   let mockProviderKeyService: Record<string, jest.Mock>;
   let mockSpecificityService: Record<string, jest.Mock>;
@@ -21,12 +92,12 @@ describe('ResolveService', () => {
 
   beforeEach(() => {
     mockTierService = {
-      getTiers: jest.fn().mockResolvedValue([
-        { tier: 'simple', override_model: null, auto_assigned_model: 'gpt-4o-mini' },
-        { tier: 'standard', override_model: null, auto_assigned_model: 'gpt-4o' },
-        { tier: 'complex', override_model: null, auto_assigned_model: 'claude-sonnet-4' },
-        { tier: 'reasoning', override_model: null, auto_assigned_model: 'claude-opus-4-6' },
-        { tier: 'default', override_model: null, auto_assigned_model: 'gpt-4o' },
+      getTiers: tierMock([
+        tierRow({ tier: 'simple', auto_assigned_model: 'gpt-4o-mini' }),
+        tierRow({ tier: 'standard', auto_assigned_model: 'gpt-4o' }),
+        tierRow({ tier: 'complex', auto_assigned_model: 'claude-sonnet-4' }),
+        tierRow({ tier: 'reasoning', auto_assigned_model: 'claude-opus-4-6' }),
+        tierRow({ tier: 'default', auto_assigned_model: 'gpt-4o' }),
       ]),
     };
     mockProviderKeyService = {
@@ -34,9 +105,10 @@ describe('ResolveService', () => {
       getAuthType: jest.fn().mockResolvedValue('api_key'),
       hasActiveProvider: jest.fn().mockResolvedValue(true),
       isModelAvailable: jest.fn().mockResolvedValue(true),
+      isRouteAvailable: jest.fn().mockResolvedValue(true),
     };
     mockSpecificityService = {
-      getActiveAssignments: jest.fn().mockResolvedValue([]),
+      getActiveAssignments: tierMock([]),
     };
     mockPricingCache = {
       getByModel: jest.fn(),
@@ -51,15 +123,15 @@ describe('ResolveService', () => {
       findOne: jest.fn().mockResolvedValue({ complexity_routing_enabled: true }),
     };
 
-    service = new ResolveService(
-      mockTierService as unknown as TierService,
-      mockProviderKeyService as unknown as ProviderKeyService,
-      mockSpecificityService as unknown as SpecificityService,
-      mockPricingCache as unknown as ModelPricingCacheService,
-      mockDiscoveryService as unknown as ModelDiscoveryService,
-      mockPenaltyService as unknown as SpecificityPenaltyService,
-      { list: jest.fn().mockResolvedValue([]) } as unknown as HeaderTierService,
-      mockAgentRepo as unknown as Repository<Agent>,
+    service = wrapResolveService(
+      new ResolveService(
+        mockTierService as unknown as TierService,
+        mockProviderKeyService as unknown as ProviderKeyService,
+        mockSpecificityService as unknown as SpecificityService,
+        mockPenaltyService as unknown as SpecificityPenaltyService,
+        { list: jest.fn().mockResolvedValue([]) } as unknown as HeaderTierService,
+        mockAgentRepo as unknown as Repository<Agent>,
+      ),
     );
   });
 
@@ -77,7 +149,7 @@ describe('ResolveService', () => {
   });
 
   it('should return null model when no effective model available', async () => {
-    mockProviderKeyService.getEffectiveModel.mockResolvedValue(null);
+    mockProviderKeyService.isRouteAvailable.mockResolvedValue(false);
 
     const result = await service.resolve('agent-1', [{ role: 'user', content: 'hello' }]);
 
@@ -133,14 +205,15 @@ describe('ResolveService', () => {
     expect(result.tier).not.toBe('simple');
   });
 
-  it('should return null provider when pricing not found', async () => {
-    mockProviderKeyService.getEffectiveModel.mockResolvedValue('unknown-model');
-    mockPricingCache.getByModel.mockReturnValue(undefined);
+  it('should use the configured route when pricing is not available', async () => {
+    mockTierService.getTiers.mockResolvedValue([
+      { tier: 'simple', override_model: null, auto_assigned_model: 'unknown-model' },
+    ]);
 
     const result = await service.resolve('agent-1', [{ role: 'user', content: 'hello' }]);
 
     expect(result.model).toBe('unknown-model');
-    expect(result.provider).toBeNull();
+    expect(result.provider).toBe('OpenAI');
   });
 
   describe('resolveForTier', () => {
@@ -170,7 +243,9 @@ describe('ResolveService', () => {
     });
 
     it('should return null model when effective model is null', async () => {
-      mockProviderKeyService.getEffectiveModel.mockResolvedValue(null);
+      mockTierService.getTiers.mockResolvedValue([
+        { tier: 'simple', override_model: null, auto_assigned_model: null },
+      ]);
 
       const result = await service.resolveForTier('agent-1', 'simple');
 
@@ -261,13 +336,19 @@ describe('ResolveService', () => {
       const result = await service.resolve('agent-1', [{ role: 'user', content: 'hello' }]);
 
       expect(result.auth_type).toBe('api_key');
-      expect(mockProviderKeyService.getAuthType).toHaveBeenCalledWith('agent-1', 'OpenAI');
+      expect(mockProviderKeyService.getAuthType).not.toHaveBeenCalled();
     });
 
-    it('should return subscription from getAuthType when provider has subscription', async () => {
-      mockProviderKeyService.getEffectiveModel.mockResolvedValue('claude-sonnet-4');
-      mockPricingCache.getByModel.mockReturnValue({ provider: 'Anthropic' });
-      mockProviderKeyService.getAuthType.mockResolvedValue('subscription');
+    it('should return subscription from the stored route auth type', async () => {
+      mockTierService.getTiers.mockResolvedValue([
+        {
+          tier: 'simple',
+          override_model: 'claude-sonnet-4',
+          override_provider: 'Anthropic',
+          override_auth_type: 'subscription',
+          auto_assigned_model: null,
+        },
+      ]);
 
       const result = await service.resolve('agent-1', [{ role: 'user', content: 'hello' }]);
 
@@ -275,7 +356,7 @@ describe('ResolveService', () => {
     });
 
     it('should not include auth_type when provider is null', async () => {
-      mockProviderKeyService.getEffectiveModel.mockResolvedValue(null);
+      mockProviderKeyService.isRouteAvailable.mockResolvedValue(false);
 
       const result = await service.resolve('agent-1', [{ role: 'user', content: 'hello' }]);
 
@@ -302,16 +383,15 @@ describe('ResolveService', () => {
       expect(result.provider).toBe('OpenAI');
     });
 
-    it('should fall back to pricing.provider when no model name has a prefix', async () => {
+    it('should use the configured provider when no model name has a prefix', async () => {
       mockTierService.getTiers.mockResolvedValue([
-        { tier: 'simple', override_model: null, auto_assigned_model: 'custom-model' },
+        {
+          tier: 'simple',
+          override_model: null,
+          auto_assigned_model: 'custom-model',
+          auto_provider: 'CustomProvider',
+        },
       ]);
-      mockProviderKeyService.getEffectiveModel.mockResolvedValue('custom-model');
-      // Neither model nor pricing.model_name have a slash
-      mockPricingCache.getByModel.mockReturnValue({
-        model_name: 'custom-model',
-        provider: 'CustomProvider',
-      });
 
       const result = await service.resolveForTier('agent-1', 'simple');
 
@@ -354,7 +434,7 @@ describe('ResolveService', () => {
       const result = await service.resolveForTier('agent-1', 'simple');
 
       expect(result.auth_type).toBe('api_key');
-      expect(mockProviderKeyService.getAuthType).toHaveBeenCalledWith('agent-1', 'OpenAI');
+      expect(mockProviderKeyService.getAuthType).not.toHaveBeenCalled();
     });
 
     it('should not include auth_type in resolveForTier when model is null', async () => {
@@ -376,23 +456,15 @@ describe('ResolveService', () => {
   });
 
   describe('provider prefix validation (#1383)', () => {
-    it('should fall through to discovered models when inferred prefix provider is inactive', async () => {
+    it('should use the provider stored on the route even for prefixed models', async () => {
       mockTierService.getTiers.mockResolvedValue([
         { tier: 'simple', override_model: null, auto_assigned_model: 'anthropic/claude-sonnet-4' },
       ]);
-      mockProviderKeyService.getEffectiveModel.mockResolvedValue('anthropic/claude-sonnet-4');
-      // Anthropic is disabled — hasActiveProvider returns false
-      mockProviderKeyService.hasActiveProvider.mockResolvedValue(false);
-      // Discovery correctly maps the model to OpenRouter
-      mockDiscoveryService.getModelForAgent.mockResolvedValue({
-        id: 'anthropic/claude-sonnet-4',
-        provider: 'openrouter',
-      });
 
       const result = await service.resolveForTier('agent-1', 'simple');
 
-      expect(result.provider).toBe('openrouter');
-      expect(mockProviderKeyService.hasActiveProvider).toHaveBeenCalledWith('agent-1', 'anthropic');
+      expect(result.provider).toBe('anthropic');
+      expect(mockProviderKeyService.hasActiveProvider).not.toHaveBeenCalled();
     });
 
     it('should use prefix when inferred provider is active', async () => {
@@ -446,9 +518,15 @@ describe('ResolveService', () => {
       ]);
       mockProviderKeyService.hasActiveProvider.mockResolvedValue(true);
 
-      const result = await service.resolve('agent-1', [
-        { role: 'user', content: 'write a function to implement a sorting algorithm' },
-      ]);
+      const result = await service.resolve(
+        'agent-1',
+        [{ role: 'user', content: 'write a function to implement a sorting algorithm' }],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'coding',
+      );
 
       expect(result.tier).toBe('standard');
       expect(result.model).toBe('claude-sonnet-4');
@@ -505,9 +583,15 @@ describe('ResolveService', () => {
       mockPricingCache.getByModel.mockReturnValue({ provider: 'OpenAI' });
 
       // Send coding keywords but only web_browsing assignment is active
-      const result = await service.resolve('agent-1', [
-        { role: 'user', content: 'write a function to implement a sorting algorithm' },
-      ]);
+      const result = await service.resolve(
+        'agent-1',
+        [{ role: 'user', content: 'write a function to implement a sorting algorithm' }],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'coding',
+      );
 
       // Falls through to normal scoring since no coding assignment
       expect(result.reason).not.toBe('specificity');
@@ -526,9 +610,15 @@ describe('ResolveService', () => {
       mockProviderKeyService.getEffectiveModel.mockResolvedValue('gpt-4o-mini');
       mockPricingCache.getByModel.mockReturnValue({ provider: 'OpenAI' });
 
-      const result = await service.resolve('agent-1', [
-        { role: 'user', content: 'write a function to implement a sorting algorithm' },
-      ]);
+      const result = await service.resolve(
+        'agent-1',
+        [{ role: 'user', content: 'write a function to implement a sorting algorithm' }],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'coding',
+      );
 
       // Falls through to normal scoring since no model on assignment
       expect(result.reason).not.toBe('specificity');
@@ -546,9 +636,15 @@ describe('ResolveService', () => {
       ]);
       mockPricingCache.getByModel.mockReturnValue({ provider: 'OpenAI' });
 
-      const result = await service.resolve('agent-1', [
-        { role: 'user', content: 'write a function to implement a sorting algorithm' },
-      ]);
+      const result = await service.resolve(
+        'agent-1',
+        [{ role: 'user', content: 'write a function to implement a sorting algorithm' }],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'coding',
+      );
 
       expect(result.model).toBe('gpt-4o');
       expect(result.reason).toBe('specificity');
@@ -567,15 +663,21 @@ describe('ResolveService', () => {
       ]);
       mockProviderKeyService.hasActiveProvider.mockResolvedValue(true);
 
-      const result = await service.resolve('agent-1', [
-        { role: 'user', content: 'write a function to implement a sorting algorithm' },
-      ]);
+      const result = await service.resolve(
+        'agent-1',
+        [{ role: 'user', content: 'write a function to implement a sorting algorithm' }],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'coding',
+      );
 
       expect(result.auth_type).toBe('subscription');
       expect(mockProviderKeyService.getAuthType).not.toHaveBeenCalled();
     });
 
-    it('should fall back to getAuthType when specificity assignment has no override_auth_type', async () => {
+    it('should use the default route auth type when specificity has no override_auth_type', async () => {
       mockSpecificityService.getActiveAssignments.mockResolvedValue([
         {
           category: 'coding',
@@ -588,12 +690,18 @@ describe('ResolveService', () => {
       mockProviderKeyService.hasActiveProvider.mockResolvedValue(true);
       mockProviderKeyService.getAuthType.mockResolvedValue('api_key');
 
-      const result = await service.resolve('agent-1', [
-        { role: 'user', content: 'write a function to implement a sorting algorithm' },
-      ]);
+      const result = await service.resolve(
+        'agent-1',
+        [{ role: 'user', content: 'write a function to implement a sorting algorithm' }],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'coding',
+      );
 
       expect(result.auth_type).toBe('api_key');
-      expect(mockProviderKeyService.getAuthType).toHaveBeenCalledWith('agent-1', 'anthropic');
+      expect(mockProviderKeyService.getAuthType).not.toHaveBeenCalled();
     });
 
     it('should accept specificity override via header', async () => {
@@ -623,7 +731,7 @@ describe('ResolveService', () => {
       expect(result.specificity_category).toBe('coding');
     });
 
-    it('should return undefined auth_type when provider is null', async () => {
+    it('should return the stored route provider and auth type for specificity auto assignment', async () => {
       mockSpecificityService.getActiveAssignments.mockResolvedValue([
         {
           category: 'coding',
@@ -637,13 +745,19 @@ describe('ResolveService', () => {
       mockProviderKeyService.hasActiveProvider.mockResolvedValue(false);
       mockDiscoveryService.getModelForAgent.mockResolvedValue(undefined);
 
-      const result = await service.resolve('agent-1', [
-        { role: 'user', content: 'write a function to implement a sorting algorithm' },
-      ]);
+      const result = await service.resolve(
+        'agent-1',
+        [{ role: 'user', content: 'write a function to implement a sorting algorithm' }],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'coding',
+      );
 
       expect(result.reason).toBe('specificity');
-      expect(result.provider).toBeNull();
-      expect(result.auth_type).toBeUndefined();
+      expect(result.provider).toBe('OpenAI');
+      expect(result.auth_type).toBe('api_key');
     });
   });
 });

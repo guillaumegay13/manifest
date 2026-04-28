@@ -36,7 +36,8 @@ vi.mock("../../src/services/routing-utils.js", () => ({
 }));
 
 vi.mock("../../src/services/provider-utils.js", () => ({
-  getModelLabel: (_providerId: string, model: string) => model,
+  getModelLabel: (_providerId: string, model: string) =>
+    model.replace(/^custom:[^/]+\//, ""),
 }));
 
 import FallbackList from "../../src/components/FallbackList";
@@ -46,10 +47,27 @@ const models = [
   { model_name: "model-b", provider: "Anthropic" },
 ] as any[];
 
+const route = (model: string) => ({
+  model,
+  provider:
+    model === "model-b"
+      ? "Anthropic"
+      : model === "custom-model" || model === "qwen/qwen3.6-plus:free"
+        ? "custom:cp-1"
+        : model === "custom:prov/unknown-model"
+          ? "custom:prov"
+          : model === "model-x"
+            ? "Unknown"
+            : "OpenAI",
+  authType: model === "model-b" ? "subscription" : "api_key",
+});
+
+const routes = (...models: string[]) => models.map(route);
+
 const defaultProps = {
   agentName: "test-agent",
   tier: "tier-1",
-  fallbacks: [] as string[],
+  fallbacks: [] as ReturnType<typeof route>[],
   models,
   customProviders: [] as any[],
   connectedProviders: [
@@ -79,7 +97,7 @@ describe("FallbackList", () => {
 
   it("renders fallback items with model labels", () => {
     const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a", "model-b"]} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a", "model-b")} />
     ));
 
     const modelLabels = container.querySelectorAll(".fallback-list__model");
@@ -98,7 +116,7 @@ describe("FallbackList", () => {
   });
 
   it("hides add button when 5 fallbacks exist", () => {
-    const fiveFallbacks = ["m1", "m2", "m3", "m4", "m5"];
+    const fiveFallbacks = routes("m1", "m2", "m3", "m4", "m5");
     render(() => (
       <FallbackList {...defaultProps} fallbacks={fiveFallbacks} />
     ));
@@ -111,7 +129,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a", "model-b"]}
+        fallbacks={routes("model-a", "model-b")}
         onUpdate={onUpdate}
       />
     ));
@@ -122,7 +140,7 @@ describe("FallbackList", () => {
     fireEvent.click(removeButtons[0]);
 
     await waitFor(() => {
-      expect(mockSetFallbacks).toHaveBeenCalledWith("test-agent", "tier-1", ["model-b"]);
+      expect(mockSetFallbacks).toHaveBeenCalledWith("test-agent", "tier-1", routes("model-b"));
       expect(onUpdate).toHaveBeenCalled();
     });
     expect(mockClearFallbacks).not.toHaveBeenCalled();
@@ -133,7 +151,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a"]}
+        fallbacks={routes("model-a")}
         onUpdate={onUpdate}
       />
     ));
@@ -156,7 +174,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a", "model-b"]}
+        fallbacks={routes("model-a", "model-b")}
         onUpdate={onUpdate}
       />
     ));
@@ -169,8 +187,8 @@ describe("FallbackList", () => {
     });
     // First call: optimistic removal, second call: revert with original list
     expect(onUpdate).toHaveBeenCalledTimes(2);
-    expect(onUpdate).toHaveBeenNthCalledWith(1, ["model-b"]);
-    expect(onUpdate).toHaveBeenNthCalledWith(2, ["model-a", "model-b"]);
+    expect(onUpdate).toHaveBeenNthCalledWith(1, routes("model-b"));
+    expect(onUpdate).toHaveBeenNthCalledWith(2, routes("model-a", "model-b"));
   });
 
   it("reverts optimistic removal when clearFallbacks rejects", async () => {
@@ -179,7 +197,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a"]}
+        fallbacks={routes("model-a")}
         onUpdate={onUpdate}
       />
     ));
@@ -193,7 +211,7 @@ describe("FallbackList", () => {
     // First call: optimistic removal, second call: revert with original list
     expect(onUpdate).toHaveBeenCalledTimes(2);
     expect(onUpdate).toHaveBeenNthCalledWith(1, []);
-    expect(onUpdate).toHaveBeenNthCalledWith(2, ["model-a"]);
+    expect(onUpdate).toHaveBeenNthCalledWith(2, routes("model-a"));
   });
 
   it("displays display_name when model info has one", () => {
@@ -203,7 +221,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a"]}
+        fallbacks={routes("model-a")}
         models={modelsWithDisplay}
       />
     ));
@@ -219,7 +237,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a"]}
+        fallbacks={routes("model-a")}
         models={modelsNoDisplay}
       />
     ));
@@ -233,7 +251,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["custom:prov/unknown-model"]}
+        fallbacks={routes("custom:prov/unknown-model")}
         models={[]}
       />
     ));
@@ -250,7 +268,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["custom-model"]}
+        fallbacks={routes("custom-model")}
         models={modelsWithCustom}
         customProviders={customProviders}
       />
@@ -273,7 +291,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["qwen/qwen3.6-plus:free"]}
+        fallbacks={routes("qwen/qwen3.6-plus:free")}
         models={modelsWithCustom}
         customProviders={customProviders}
       />
@@ -291,7 +309,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["custom-model"]}
+        fallbacks={routes("custom-model")}
         models={modelsWithCustom}
         customProviders={[]}
       />
@@ -306,7 +324,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a"]}
+        fallbacks={routes("model-a")}
       />
     ));
 
@@ -318,7 +336,7 @@ describe("FallbackList", () => {
 
   it("shows add button when fewer than 5 fallbacks", () => {
     render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a", "model-b"]} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a", "model-b")} />
     ));
 
     expect(screen.getByText("Add fallback")).toBeDefined();
@@ -331,7 +349,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a"]}
+        fallbacks={routes("model-a")}
         models={modelsWithDisplay}
       />
     ));
@@ -351,7 +369,7 @@ describe("FallbackList", () => {
 
   it("shows add button with fallback-list__add class when fallbacks exist", () => {
     const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a"]} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a")} />
     ));
 
     const addBtn = container.querySelector(".fallback-list__add");
@@ -382,7 +400,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a", "model-b"]}
+        fallbacks={routes("model-a", "model-b")}
       />
     ));
 
@@ -415,7 +433,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a", "model-b"]}
+        fallbacks={routes("model-a", "model-b")}
       />
     ));
 
@@ -434,7 +452,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a"]}
+        fallbacks={routes("model-a")}
       />
     ));
 
@@ -448,7 +466,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-b"]}
+        fallbacks={routes("model-b")}
       />
     ));
 
@@ -463,7 +481,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-x"]}
+        fallbacks={routes("model-x")}
         models={modelsUnknown}
         connectedProviders={[]}
       />
@@ -478,7 +496,7 @@ describe("FallbackList", () => {
 
   it("sets dragIndex on dragStart and clears on dragEnd", () => {
     const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a", "model-b"]} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a", "model-b")} />
     ));
 
     const cards = container.querySelectorAll(".fallback-list__card");
@@ -498,7 +516,7 @@ describe("FallbackList", () => {
 
   it("handles dragStart without dataTransfer gracefully", () => {
     const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a", "model-b"]} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a", "model-b")} />
     ));
 
     const cards = container.querySelectorAll(".fallback-list__card");
@@ -509,7 +527,7 @@ describe("FallbackList", () => {
 
   it("shows drop indicator on dragOver and computes slot from cursor position", () => {
     const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a", "model-b", "model-c"]} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a", "model-b", "model-c")} />
     ));
 
     const cards = container.querySelectorAll(".fallback-list__card");
@@ -536,7 +554,7 @@ describe("FallbackList", () => {
 
   it("computes no-op slot when dragOver fires at dragged item position", () => {
     const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a", "model-b"]} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a", "model-b")} />
     ));
 
     const list = container.querySelector(".fallback-list__items")!;
@@ -558,7 +576,7 @@ describe("FallbackList", () => {
 
   it("handles dragOver without dataTransfer", () => {
     const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a", "model-b"]} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a", "model-b")} />
     ));
 
     const cards = container.querySelectorAll(".fallback-list__card");
@@ -578,7 +596,7 @@ describe("FallbackList", () => {
 
   it("clears drop slot on dragLeave when leaving container", () => {
     const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a", "model-b"]} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a", "model-b")} />
     ));
 
     const cards = container.querySelectorAll(".fallback-list__card");
@@ -605,7 +623,7 @@ describe("FallbackList", () => {
 
   it("preserves drop slot on dragLeave when relatedTarget is inside list", () => {
     const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a", "model-b", "model-c"]} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a", "model-b", "model-c")} />
     ));
 
     const list = container.querySelector(".fallback-list__items")!;
@@ -635,7 +653,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a", "model-b", "model-c"]}
+        fallbacks={routes("model-a", "model-b", "model-c")}
         onUpdate={onUpdate}
       />
     ));
@@ -660,8 +678,8 @@ describe("FallbackList", () => {
 
     await waitFor(() => {
       // model-a moved to the end: ["model-b", "model-c", "model-a"]
-      expect(onUpdate).toHaveBeenCalledWith(["model-b", "model-c", "model-a"]);
-      expect(mockSetFallbacks).toHaveBeenCalledWith("test-agent", "tier-1", ["model-b", "model-c", "model-a"]);
+      expect(onUpdate).toHaveBeenCalledWith(routes("model-b", "model-c", "model-a"));
+      expect(mockSetFallbacks).toHaveBeenCalledWith("test-agent", "tier-1", routes("model-b", "model-c", "model-a"));
     });
   });
 
@@ -671,7 +689,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a", "model-b", "model-c"]}
+        fallbacks={routes("model-a", "model-b", "model-c")}
         onUpdate={onUpdate}
       />
     ));
@@ -693,14 +711,14 @@ describe("FallbackList", () => {
     await waitFor(() => {
       // First call is the optimistic reorder, second call reverts to original
       expect(onUpdate).toHaveBeenCalledTimes(2);
-      expect(onUpdate).toHaveBeenLastCalledWith(["model-a", "model-b", "model-c"]);
+      expect(onUpdate).toHaveBeenLastCalledWith(routes("model-a", "model-b", "model-c"));
     });
   });
 
   it("ignores drop when dragIndex or dropSlot is null", () => {
     const onUpdate = vi.fn();
     const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a", "model-b"]} onUpdate={onUpdate} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a", "model-b")} onUpdate={onUpdate} />
     ));
 
     const list = container.querySelector(".fallback-list__items")!;
@@ -714,7 +732,7 @@ describe("FallbackList", () => {
   it("ignores drop when insertAt equals fromIndex (no-op reorder)", async () => {
     const onUpdate = vi.fn();
     const { container } = render(() => (
-      <FallbackList {...defaultProps} fallbacks={["model-a", "model-b", "model-c"]} onUpdate={onUpdate} />
+      <FallbackList {...defaultProps} fallbacks={routes("model-a", "model-b", "model-c")} onUpdate={onUpdate} />
     ));
 
     const cards = container.querySelectorAll(".fallback-list__card");
@@ -745,7 +763,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a", "model-b"]}
+        fallbacks={routes("model-a", "model-b")}
       />
     ));
 
@@ -769,7 +787,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a", "model-b"]}
+        fallbacks={routes("model-a", "model-b")}
         onUpdate={onUpdate}
         persistFallbacks={customPersist}
       />
@@ -779,7 +797,7 @@ describe("FallbackList", () => {
     fireEvent.click(removeButtons[0]);
 
     await waitFor(() => {
-      expect(customPersist).toHaveBeenCalledWith("test-agent", "tier-1", ["model-b"]);
+      expect(customPersist).toHaveBeenCalledWith("test-agent", "tier-1", routes("model-b"));
     });
     // Default setFallbacks should NOT have been called
     expect(mockSetFallbacks).not.toHaveBeenCalled();
@@ -791,7 +809,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a"]}
+        fallbacks={routes("model-a")}
         onUpdate={onUpdate}
         persistClearFallbacks={customClear}
       />
@@ -812,7 +830,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a", "model-b"]}
+        fallbacks={routes("model-a", "model-b")}
         onUpdate={onUpdate}
       />
     ));
@@ -822,7 +840,7 @@ describe("FallbackList", () => {
 
     await waitFor(() => {
       // Should use the default setFallbacks from api.js
-      expect(mockSetFallbacks).toHaveBeenCalledWith("test-agent", "tier-1", ["model-b"]);
+      expect(mockSetFallbacks).toHaveBeenCalledWith("test-agent", "tier-1", routes("model-b"));
     });
   });
 
@@ -846,7 +864,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a", "model-b"]}
+        fallbacks={routes("model-a", "model-b")}
         onFallbackDragStart={onFallbackDragStart}
       />
     ));
@@ -862,7 +880,7 @@ describe("FallbackList", () => {
     const { container } = render(() => (
       <FallbackList
         {...defaultProps}
-        fallbacks={["model-a", "model-b"]}
+        fallbacks={routes("model-a", "model-b")}
         onFallbackDragEnd={onFallbackDragEnd}
       />
     ));

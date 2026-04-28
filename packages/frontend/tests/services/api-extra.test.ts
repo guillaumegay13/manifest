@@ -145,14 +145,18 @@ describe('api/routing', () => {
 });
 
 describe('api/specificity', () => {
-  it('setSpecificityFallbacks PUTs the list of models', async () => {
-    mockOk(['m1', 'm2']);
-    const out = await setSpecificityFallbacks('demo-agent', 'coding', ['m1', 'm2']);
-    expect(out).toEqual(['m1', 'm2']);
+  it('setSpecificityFallbacks PUTs the list of routes', async () => {
+    const routes = [
+      { provider: 'openai', authType: 'api_key' as const, model: 'm1' },
+      { provider: 'anthropic', authType: 'subscription' as const, model: 'm2' },
+    ];
+    mockOk(routes);
+    const out = await setSpecificityFallbacks('demo-agent', 'coding', routes);
+    expect(out).toEqual(routes);
     const [url, init] = mockFetch.mock.calls[0];
     expect(url).toBe('/api/v1/routing/demo-agent/specificity/coding/fallbacks');
     expect(init.method).toBe('PUT');
-    expect(JSON.parse(init.body)).toEqual({ models: ['m1', 'm2'] });
+    expect(JSON.parse(init.body)).toEqual({ routes });
   });
 
   it('clearSpecificityFallbacks DELETEs the fallbacks collection', async () => {

@@ -683,7 +683,12 @@ describe('disconnectProvider', () => {
 describe('getTierAssignments', () => {
   it('fetches /routing/:agentName/tiers', async () => {
     const payload = [
-      { id: '1', tier: 'tier-1', override_model: null, auto_assigned_model: 'gpt-4' },
+      {
+        id: '1',
+        tier: 'tier-1',
+        override_route: null,
+        auto_assigned_route: { provider: 'openai', authType: 'api_key', model: 'gpt-4' },
+      },
     ];
     mockOk(payload);
 
@@ -698,16 +703,17 @@ describe('getTierAssignments', () => {
 
 describe('overrideTier', () => {
   it('PUTs to /routing/:agentName/tiers/:tier with JSON body', async () => {
+    const route = { provider: 'openai', authType: 'api_key' as const, model: 'gpt-4o' };
     const payload = {
       id: '1',
       tier: 'tier-1',
-      override_model: 'gpt-4o',
-      auto_assigned_model: null,
+      override_route: route,
+      auto_assigned_route: null,
       updated_at: '2026-01-01',
     };
     mockMutateOk(payload);
 
-    const result = await overrideTier('my-agent', 'tier-1', 'gpt-4o', 'openai');
+    const result = await overrideTier('my-agent', 'tier-1', route);
     expect(result).toEqual(payload);
     expect(mockFetch).toHaveBeenCalledWith(
       '/api/v1/routing/my-agent/tiers/tier-1',
@@ -715,7 +721,7 @@ describe('overrideTier', () => {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'gpt-4o', provider: 'openai' }),
+        body: JSON.stringify({ route }),
       }),
     );
   });
@@ -723,24 +729,29 @@ describe('overrideTier', () => {
   it('encodes tier name in URL', async () => {
     mockMutateOk({});
 
-    await overrideTier('my-agent', 'tier 1', 'gpt-4o', 'openai');
+    await overrideTier('my-agent', 'tier 1', {
+      provider: 'openai',
+      authType: 'api_key',
+      model: 'gpt-4o',
+    });
     const url = mockFetch.mock.calls[0]?.[0] as string;
     expect(url).toContain('/routing/my-agent/tiers/tier%201');
   });
 
-  it('includes authType in body when provided', async () => {
+  it('sends the authType in the route body', async () => {
+    const route = {
+      provider: 'anthropic',
+      authType: 'subscription' as const,
+      model: 'claude-sonnet-4',
+    };
     mockMutateOk({});
 
-    await overrideTier('my-agent', 'simple', 'claude-sonnet-4', 'anthropic', 'subscription');
+    await overrideTier('my-agent', 'simple', route);
     expect(mockFetch).toHaveBeenCalledWith(
       '/api/v1/routing/my-agent/tiers/simple',
       expect.objectContaining({
         method: 'PUT',
-        body: JSON.stringify({
-          model: 'claude-sonnet-4',
-          provider: 'anthropic',
-          authType: 'subscription',
-        }),
+        body: JSON.stringify({ route }),
       }),
     );
   });
@@ -1190,15 +1201,16 @@ describe('fallback API functions', () => {
     );
   });
 
-  it('setFallbacks sends PUT with models array', async () => {
-    mockMutateOk(['model-a']);
-    const result = await setFallbacks('my-agent', 'standard', ['model-a']);
-    expect(result).toEqual(['model-a']);
+  it('setFallbacks sends PUT with routes array', async () => {
+    const routes = [{ provider: 'openai', authType: 'api_key' as const, model: 'model-a' }];
+    mockMutateOk(routes);
+    const result = await setFallbacks('my-agent', 'standard', routes);
+    expect(result).toEqual(routes);
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('/routing/my-agent/tiers/standard/fallbacks'),
       expect.objectContaining({
         method: 'PUT',
-        body: JSON.stringify({ models: ['model-a'] }),
+        body: JSON.stringify({ routes }),
       }),
     );
   });

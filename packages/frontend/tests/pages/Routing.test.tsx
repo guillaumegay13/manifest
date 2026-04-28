@@ -35,11 +35,88 @@ vi.mock('../../src/services/api/header-tiers.js', () => ({
   listHeaderTiers: vi.fn().mockResolvedValue([]),
 }));
 
-const mockGetProviders = vi.fn();
-const mockGetCustomProviders = vi.fn();
+const {
+  mockGetProviders,
+  mockGetCustomProviders,
+  mockResolvedApi,
+} = vi.hoisted(() => {
+  const providerForModel = (model: string, provider?: string | null) =>
+    provider ??
+    (model.startsWith("claude")
+      ? "anthropic"
+      : model.startsWith("custom:")
+        ? model.split("/")[0]
+        : "openai");
+
+  const route = (
+    model: string,
+    provider?: string | null,
+    authType?: "api_key" | "subscription" | "local" | null,
+  ) => ({
+    model,
+    provider: providerForModel(model, provider),
+    authType: authType ?? (model.startsWith("claude") ? "subscription" : "api_key"),
+  });
+
+  const normalizeRoutes = (routes: unknown[] | null | undefined) =>
+    routes?.map((item) => (typeof item === "string" ? route(item) : item)) ?? null;
+
+  const normalizeAssignment = (assignment: any) => ({
+    ...assignment,
+    override_route:
+      assignment.override_route !== undefined
+        ? assignment.override_route
+        : assignment.override_model
+          ? route(
+              assignment.override_model,
+              assignment.override_provider,
+              assignment.override_auth_type,
+            )
+          : null,
+    auto_assigned_route:
+      assignment.auto_assigned_route !== undefined
+        ? assignment.auto_assigned_route
+        : assignment.auto_assigned_model
+          ? route(
+              assignment.auto_assigned_model,
+              assignment.auto_assigned_provider_id,
+              assignment.auto_assigned_auth_type,
+            )
+          : null,
+    fallback_routes:
+      assignment.fallback_routes !== undefined
+        ? assignment.fallback_routes
+        : normalizeRoutes(assignment.fallback_models),
+  });
+
+  const normalizeApiValue = (value: unknown) =>
+    Array.isArray(value)
+      ? value.map((item) =>
+          item && typeof item === "object" ? normalizeAssignment(item) : item,
+        )
+      : value;
+
+  const resolvedApi = (value: unknown) => {
+    const fn = vi.fn();
+    const originalMockResolvedValue = fn.mockResolvedValue.bind(fn);
+    const originalMockResolvedValueOnce = fn.mockResolvedValueOnce.bind(fn);
+    fn.mockResolvedValue = (next: unknown) =>
+      originalMockResolvedValue(normalizeApiValue(next));
+    fn.mockResolvedValueOnce = (next: unknown) =>
+      originalMockResolvedValueOnce(normalizeApiValue(next));
+    fn.mockResolvedValue(value);
+    return fn;
+  };
+
+  return {
+    mockGetProviders: vi.fn(),
+    mockGetCustomProviders: vi.fn(),
+    mockResolvedApi: resolvedApi,
+  };
+});
 
 vi.mock("../../src/services/api.js", () => ({
-  getTierAssignments: vi.fn().mockResolvedValue([
+  getTierAssignments: mockResolvedApi([
     { id: "1", user_id: "u1", tier: "simple", override_model: null, override_provider: null, auto_assigned_model: "gpt-4o-mini", fallback_models: null, updated_at: "2025-01-01" },
     { id: "2", user_id: "u1", tier: "standard", override_model: null, override_provider: null, auto_assigned_model: "gpt-4o-mini", fallback_models: null, updated_at: "2025-01-01" },
     { id: "3", user_id: "u1", tier: "complex", override_model: "claude-opus-4-6", override_provider: "anthropic", auto_assigned_model: "gpt-4o-mini", fallback_models: null, updated_at: "2025-01-01" },
@@ -67,7 +144,7 @@ vi.mock("../../src/services/api.js", () => ({
   getModelPrices: vi.fn().mockResolvedValue([]),
   getAgentKey: vi.fn().mockResolvedValue({ keyPrefix: "mnfst_abc", apiKey: "mnfst_abc123" }),
   getHealth: vi.fn().mockResolvedValue({ mode: "cloud" }),
-  getSpecificityAssignments: vi.fn().mockResolvedValue([]),
+  getSpecificityAssignments: mockResolvedApi([]),
   overrideSpecificity: vi.fn().mockResolvedValue({}),
   resetSpecificity: vi.fn().mockResolvedValue({}),
   setSpecificityFallbacks: vi.fn().mockResolvedValue({}),
@@ -335,7 +412,11 @@ describe("Routing — enabled state (providers active)", () => {
     fireEvent.click(modelButtons[modelButtons.length - 1]);
 
     await waitFor(() => {
-      expect(overrideTier).toHaveBeenCalledWith("test-agent", "simple", "claude-opus-4-6", "anthropic", "api_key");
+      expect(overrideTier).toHaveBeenCalledWith("test-agent", "simple", {
+        model: "claude-opus-4-6",
+        provider: "anthropic",
+        authType: "api_key",
+      });
     });
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith("Routing updated");
@@ -1269,14 +1350,16 @@ describe("Routing — fallback management", () => {
     fireEvent.click(modalButtons[0]);
 
     await waitFor(() => {
-      expect(setFallbacks).toHaveBeenCalledWith("test-agent", "simple", ["claude-opus-4-6"]);
+      expect(setFallbacks).toHaveBeenCalledWith("test-agent", "simple", [
+        { model: "claude-opus-4-6", provider: "anthropic", authType: "api_key" },
+      ]);
     });
     await waitFor(() => {
       expect(toast.success).toHaveBeenCalledWith("Fallback added");
     });
   });
 
-  it("does not duplicate existing fallback model", async () => {
+  it("allows the same fallback model through a different auth route", async () => {
     const { getTierAssignments } = await import("../../src/services/api.js");
     vi.mocked(getTierAssignments).mockResolvedValueOnce([
       { id: "1", user_id: "u1", tier: "simple", override_model: null, auto_assigned_model: "gpt-4o-mini", fallback_models: ["claude-opus-4-6"], updated_at: "2025-01-01" },
@@ -1294,9 +1377,9 @@ describe("Routing — fallback management", () => {
     fireEvent.click(standaloneAddBtn);
     await screen.findByText("Select a model");
 
-    // Both gpt-4o-mini (primary) and claude-opus-4-6 (existing fallback) are filtered out
+    // The existing fallback is the subscription route; the api_key route remains selectable.
     const modalButtons = document.querySelectorAll<HTMLButtonElement>(".routing-modal__model");
-    expect(modalButtons.length).toBe(0);
+    expect(modalButtons.length).toBeGreaterThan(0);
   });
 
   it("shows Adding... on the add button while setFallbacks is in progress", async () => {
@@ -1605,7 +1688,7 @@ describe("Routing — specificity routing", () => {
     expect(setSpecificityFallbacks).not.toHaveBeenCalled();
   });
 
-  it("handleAddFallback does not duplicate existing specificity fallback", async () => {
+  it("handleAddFallback allows an existing specificity fallback model through another auth route", async () => {
     vi.mocked(getSpecificityAssignments).mockResolvedValue([
       { category: "coding", auto_assigned_model: "gpt-4o-mini", override_model: null, fallback_models: ["claude-opus-4-6"], is_active: true } as any,
     ]);
@@ -1621,9 +1704,9 @@ describe("Routing — specificity routing", () => {
     fireEvent.click(addButtons[addButtons.length - 1]);
     await screen.findByText("Select a model");
 
-    // Both models filtered out (gpt-4o-mini is primary, claude-opus-4-6 is existing fallback)
+    // The existing fallback is the subscription route; the api_key route remains selectable.
     const modalButtons = document.querySelectorAll<HTMLButtonElement>(".routing-modal__model");
-    expect(modalButtons.length).toBe(0);
+    expect(modalButtons.length).toBeGreaterThan(0);
   });
 
   it("handleAddFallback error for specificity shows toast", async () => {
@@ -1781,7 +1864,15 @@ describe("Routing — specificity routing", () => {
     fireEvent.click(modalButtons[0]);
 
     await waitFor(() => {
-      expect(overrideSpecificity).toHaveBeenCalledWith("test-agent", "coding", expect.any(String), expect.any(String), expect.any(String));
+      expect(overrideSpecificity).toHaveBeenCalledWith(
+        "test-agent",
+        "coding",
+        expect.objectContaining({
+          model: expect.any(String),
+          provider: expect.any(String),
+          authType: expect.any(String),
+        }),
+      );
     });
   });
 

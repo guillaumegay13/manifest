@@ -32,7 +32,15 @@ vi.mock("../../src/services/routing-utils.js", () => ({
 import ModelPickerModal from "../../src/components/ModelPickerModal";
 
 const baseTiers = [
-  { id: "1", user_id: "u1", tier: "simple", override_model: null, override_provider: null, auto_assigned_model: "gpt-4o-mini", updated_at: "2025-01-01" },
+  {
+    id: "1",
+    user_id: "u1",
+    tier: "simple",
+    override_route: null,
+    auto_assigned_route: { model: "gpt-4o-mini", provider: "openai", authType: "api_key" },
+    fallback_routes: [],
+    updated_at: "2025-01-01",
+  },
 ];
 
 const baseModels = [

@@ -64,9 +64,10 @@ vi.mock('../../src/services/toast-store.js', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 
-import RoutingTierCard from '../../src/pages/RoutingTierCard';
+import RoutingTierCardImpl from '../../src/pages/RoutingTierCard';
 import { setFallbacks as mockSetFallbacksApi } from '../../src/services/api.js';
 import { toast as mockToast } from '../../src/services/toast-store.js';
+import type { ModelRoute } from '../../src/services/api.js';
 
 const stage = { id: 'premium', label: 'Premium', desc: 'Best models' };
 
@@ -77,6 +78,68 @@ const baseTier = {
   fallback_models: [],
   auto_assigned_provider_id: 'anthropic',
 };
+
+const providerFor = (model: string, explicit: string | undefined, models: any[]): string => {
+  if (explicit) return explicit;
+  const listed = models.find((m) => m.model_name === model)?.provider;
+  if (listed) return listed;
+  const inferred = mockInferProviderFromModel.current(model);
+  if (inferred) return inferred;
+  const registryMatch = mockProvidersRef.current.find((provider) =>
+    (provider.models ?? []).some((entry: { value: string }) =>
+      model.startsWith(entry.value) || entry.value.startsWith(model),
+    ),
+  );
+  return registryMatch?.id ?? (model.startsWith('claude') ? 'Anthropic' : 'OpenAI');
+};
+
+const routeFor = (
+  model: string,
+  provider = model.startsWith('claude') ? 'Anthropic' : 'OpenAI',
+  authType: ModelRoute['authType'] = 'api_key',
+): ModelRoute => ({ model, provider, authType });
+
+const normalizeRoutes = (items: unknown[]): ModelRoute[] =>
+  items.map((item) =>
+    typeof item === 'string'
+      ? routeFor(item)
+      : (item as ModelRoute),
+  );
+
+const normalizeTier = (tier: any, models: any[]) => ({
+  ...tier,
+  override_route:
+    tier.override_route !== undefined
+      ? tier.override_route
+      : tier.override_model
+        ? routeFor(
+            tier.override_model,
+            providerFor(tier.override_model, tier.override_provider ?? undefined, models),
+            tier.override_auth_type ?? 'api_key',
+          )
+        : null,
+  auto_assigned_route:
+    tier.auto_assigned_route !== undefined
+      ? tier.auto_assigned_route
+      : tier.auto_assigned_model
+        ? routeFor(
+            tier.auto_assigned_model,
+            providerFor(tier.auto_assigned_model, tier.auto_assigned_provider_id ?? undefined, models),
+          )
+        : null,
+  fallback_routes:
+    tier.fallback_routes !== undefined
+      ? tier.fallback_routes
+      : normalizeRoutes(tier.fallback_models ?? []),
+});
+
+const RoutingTierCard = (props: any) => (
+  <RoutingTierCardImpl
+    {...props}
+    tier={() => normalizeTier(props.tier(), props.models?.() ?? [])}
+    getFallbacksFor={(tierId: string) => normalizeRoutes(props.getFallbacksFor(tierId))}
+  />
+);
 
 const baseProps = {
   stage,

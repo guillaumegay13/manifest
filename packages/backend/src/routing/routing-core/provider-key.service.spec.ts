@@ -1,10 +1,7 @@
 import { ProviderKeyService } from './provider-key.service';
 import { RoutingCacheService } from './routing-cache.service';
 import { ProviderService } from './provider.service';
-import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
-import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { UserProvider } from '../../entities/user-provider.entity';
-import { TierAssignment } from '../../entities/tier-assignment.entity';
 
 jest.mock('../../common/utils/crypto.util', () => ({
   decrypt: jest.fn().mockReturnValue('decrypted-key-value'),
@@ -46,8 +43,6 @@ function makeProvider(overrides: Partial<UserProvider> = {}): UserProvider {
 describe('ProviderKeyService', () => {
   let service: ProviderKeyService;
   let providerRepo: ReturnType<typeof makeMockRepo>;
-  let pricingCache: { getByModel: jest.Mock };
-  let discoveryService: { getModelForAgent: jest.Mock };
   let routingCache: {
     getApiKey: jest.Mock;
     setApiKey: jest.Mock;
@@ -60,8 +55,6 @@ describe('ProviderKeyService', () => {
     jest.clearAllMocks();
     mockDecrypt.mockReturnValue('decrypted-key-value');
     providerRepo = makeMockRepo();
-    pricingCache = { getByModel: jest.fn().mockReturnValue(undefined) };
-    discoveryService = { getModelForAgent: jest.fn().mockResolvedValue(null) };
     routingCache = {
       getApiKey: jest.fn().mockReturnValue(undefined),
       setApiKey: jest.fn(),
@@ -72,8 +65,6 @@ describe('ProviderKeyService', () => {
 
     service = new ProviderKeyService(
       providerRepo as unknown as any,
-      pricingCache as unknown as ModelPricingCacheService,
-      discoveryService as unknown as ModelDiscoveryService,
       routingCache as unknown as RoutingCacheService,
       providerService as unknown as ProviderService,
     );
@@ -494,140 +485,49 @@ describe('ProviderKeyService', () => {
     });
   });
 
-  /* ── getEffectiveModel ── */
+  /* ── isRouteAvailable ── */
 
-  describe('getEffectiveModel', () => {
-    it('should return override model when available and model is available', async () => {
-      discoveryService.getModelForAgent.mockResolvedValue({ id: 'gpt-4o' });
-      const assignment = {
-        override_model: 'gpt-4o',
-        auto_assigned_model: 'gpt-3.5',
-        tier: 'simple',
-      } as TierAssignment;
+  describe('isRouteAvailable', () => {
+    it('returns true when provider/auth pair is active and cached model matches', async () => {
+      providerService.getProviders.mockResolvedValue([
+        makeProvider({ cached_models: [{ id: 'gpt-4o' }] as any[] }),
+      ]);
 
-      const result = await service.getEffectiveModel('agent-1', assignment);
-
-      expect(result).toBe('gpt-4o');
-    });
-
-    it('should fall through to auto when override model is not available', async () => {
-      discoveryService.getModelForAgent.mockResolvedValue(null);
-      providerRepo.find.mockResolvedValue([]);
-      pricingCache.getByModel.mockReturnValue(undefined);
-      const assignment = {
-        override_model: 'gpt-4o',
-        auto_assigned_model: 'gpt-3.5',
-        tier: 'simple',
-      } as TierAssignment;
-
-      const result = await service.getEffectiveModel('agent-1', assignment);
-
-      expect(result).toBe('gpt-3.5');
-    });
-
-    it('should return auto_assigned_model when no override', async () => {
-      const assignment = {
-        override_model: null,
-        auto_assigned_model: 'gpt-3.5',
-        tier: 'simple',
-      } as TierAssignment;
-
-      const result = await service.getEffectiveModel('agent-1', assignment);
-
-      expect(result).toBe('gpt-3.5');
-    });
-
-    it('should return null when auto_assigned_model is null', async () => {
-      const assignment = {
-        override_model: null,
-        auto_assigned_model: null,
-        tier: 'simple',
-      } as TierAssignment;
-
-      const result = await service.getEffectiveModel('agent-1', assignment);
-
-      expect(result).toBeNull();
-    });
-  });
-
-  /* ── isModelAvailable (private, via getEffectiveModel) ── */
-
-  describe('isModelAvailable (via getEffectiveModel)', () => {
-    it('should return true when model is discovered', async () => {
-      discoveryService.getModelForAgent.mockResolvedValue({ id: 'gpt-4o' });
-      const assignment = {
-        override_model: 'gpt-4o',
-        auto_assigned_model: null,
-        tier: 'simple',
-      } as TierAssignment;
-
-      const result = await service.getEffectiveModel('agent-1', assignment);
-
-      expect(result).toBe('gpt-4o');
-    });
-
-    it('should match via pricing provider names', async () => {
-      discoveryService.getModelForAgent.mockResolvedValue(null);
-      pricingCache.getByModel.mockReturnValue({ provider: 'OpenAI', model_name: 'gpt-4o' });
-      providerRepo.find.mockResolvedValue([makeProvider({ provider: 'openai' })]);
-      const assignment = {
-        override_model: 'gpt-4o',
-        auto_assigned_model: null,
-        tier: 'simple',
-      } as TierAssignment;
-
-      const result = await service.getEffectiveModel('agent-1', assignment);
-
-      expect(result).toBe('gpt-4o');
-    });
-
-    it('should match via model name prefix inference from pricing', async () => {
-      discoveryService.getModelForAgent.mockResolvedValue(null);
-      pricingCache.getByModel.mockReturnValue({
-        provider: 'SomeProvider',
-        model_name: 'openai/gpt-4o',
+      const result = await service.isRouteAvailable('agent-1', {
+        provider: 'openai',
+        authType: 'api_key',
+        model: 'gpt-4o',
       });
-      // No direct match on "someprovider"
-      providerRepo.find.mockResolvedValue([makeProvider({ provider: 'openai' })]);
-      const assignment = {
-        override_model: 'gpt-4o',
-        auto_assigned_model: null,
-        tier: 'simple',
-      } as TierAssignment;
 
-      const result = await service.getEffectiveModel('agent-1', assignment);
-
-      expect(result).toBe('gpt-4o');
+      expect(result).toBe(true);
     });
 
-    it('should match via model name prefix inference when no pricing exists', async () => {
-      discoveryService.getModelForAgent.mockResolvedValue(null);
-      pricingCache.getByModel.mockReturnValue(undefined);
-      providerRepo.find.mockResolvedValue([makeProvider({ provider: 'anthropic' })]);
-      const assignment = {
-        override_model: 'anthropic/claude-sonnet-4',
-        auto_assigned_model: null,
-        tier: 'simple',
-      } as TierAssignment;
+    it('returns false when auth type differs', async () => {
+      providerService.getProviders.mockResolvedValue([
+        makeProvider({ auth_type: 'subscription', cached_models: [{ id: 'gpt-4o' }] as any[] }),
+      ]);
 
-      const result = await service.getEffectiveModel('agent-1', assignment);
+      const result = await service.isRouteAvailable('agent-1', {
+        provider: 'openai',
+        authType: 'api_key',
+        model: 'gpt-4o',
+      });
 
-      expect(result).toBe('anthropic/claude-sonnet-4');
+      expect(result).toBe(false);
     });
 
-    it('should return false (fall to auto) when model not available anywhere', async () => {
-      discoveryService.getModelForAgent.mockResolvedValue(null);
-      pricingCache.getByModel.mockReturnValue(undefined);
-      providerRepo.find.mockResolvedValue([makeProvider({ provider: 'anthropic' })]);
-      const assignment = {
-        override_model: 'nonexistent-model',
-        auto_assigned_model: 'claude-3-haiku',
-        tier: 'simple',
-      } as TierAssignment;
+    it('returns false when cached models do not contain the route model', async () => {
+      providerService.getProviders.mockResolvedValue([
+        makeProvider({ cached_models: [{ id: 'gpt-3.5' }] as any[] }),
+      ]);
 
-      const result = await service.getEffectiveModel('agent-1', assignment);
+      const result = await service.isRouteAvailable('agent-1', {
+        provider: 'openai',
+        authType: 'api_key',
+        model: 'gpt-4o',
+      });
 
-      expect(result).toBe('claude-3-haiku');
+      expect(result).toBe(false);
     });
   });
 });

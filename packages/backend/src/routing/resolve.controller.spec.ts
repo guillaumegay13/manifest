@@ -19,8 +19,7 @@ describe('ResolveController', () => {
 
   const mockResponse: ResolveResponse = {
     tier: 'simple',
-    model: 'gpt-4o-mini',
-    provider: 'OpenAI',
+    route: { provider: 'OpenAI', authType: 'api_key', model: 'gpt-4o-mini' },
     confidence: 0.9,
     score: -0.3,
     reason: 'short_message',

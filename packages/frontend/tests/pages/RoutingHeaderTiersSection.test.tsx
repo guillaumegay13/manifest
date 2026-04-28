@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, waitFor } from '@solidjs/testing-library';
 import type { HeaderTier } from '../../src/services/api/header-tiers';
+import type { ModelRoute } from '../../src/services/api';
 
 const listHeaderTiersMock = vi.fn();
 const deleteHeaderTierMock = vi.fn();
@@ -26,7 +27,7 @@ vi.mock('../../src/components/HeaderTierCard.js', () => ({
     models: unknown[];
     customProviders: unknown[];
     connectedProviders: unknown[];
-    onOverride: (m: string, p: string) => void;
+    onOverride: (route: ModelRoute) => void;
     onReset?: () => void;
     onFallbacksUpdate: () => void;
     onEdit?: () => void;
@@ -39,7 +40,12 @@ vi.mock('../../src/components/HeaderTierCard.js', () => ({
       data-connected-len={props.connectedProviders.length}
     >
       <span>{props.tier.name}</span>
-      <button data-testid={`override-${props.tier.id}`} onClick={() => props.onOverride('gpt-4o', 'OpenAI')}>
+      <button
+        data-testid={`override-${props.tier.id}`}
+        onClick={() =>
+          props.onOverride({ model: 'gpt-4o', provider: 'OpenAI', authType: 'api_key' })
+        }
+      >
         override
       </button>
       {props.onEdit && (
@@ -96,10 +102,8 @@ vi.mock('../../src/components/HeaderTierModal.js', () => ({
             badge_color: 'indigo',
             sort_order: 0,
             enabled: true,
-            override_model: null,
-            override_provider: null,
-            override_auth_type: null,
-            fallback_models: null,
+            override_route: null,
+            fallback_routes: null,
             created_at: '',
             updated_at: '',
           })
@@ -135,10 +139,8 @@ const baseTier: HeaderTier = {
   badge_color: 'violet',
   sort_order: 0,
   enabled: true,
-  override_model: 'gpt-4o',
-  override_provider: 'openai',
-  override_auth_type: null,
-  fallback_models: null,
+  override_route: { model: 'gpt-4o', provider: 'openai', authType: 'api_key' },
+  fallback_routes: null,
   created_at: '',
   updated_at: '',
 };
@@ -224,7 +226,11 @@ describe('RoutingHeaderTiersSection', () => {
 
     fireEvent.click(getByTestId('override-ht-1'));
     await waitFor(() =>
-      expect(overrideHeaderTierMock).toHaveBeenCalledWith('my-agent', 'ht-1', 'gpt-4o', 'OpenAI', undefined),
+      expect(overrideHeaderTierMock).toHaveBeenCalledWith('my-agent', 'ht-1', {
+        model: 'gpt-4o',
+        provider: 'OpenAI',
+        authType: 'api_key',
+      }),
     );
   });
 

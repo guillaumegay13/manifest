@@ -32,6 +32,12 @@ function makeService(options: {
   return { svc, getModelsForAgent, find, save, insert };
 }
 
+function routeModel(row: unknown): string | null {
+  return (
+    (row as { auto_assigned_route?: { model: string } | null }).auto_assigned_route?.model ?? null
+  );
+}
+
 describe('TierAutoAssignService', () => {
   describe('pickBest', () => {
     const svc = new TierAutoAssignService(
@@ -60,7 +66,7 @@ describe('TierAutoAssignService', () => {
           qualityScore: 1,
         }),
       ];
-      expect(svc.pickBest(models, 'simple')?.model_name).toBe('cheap');
+      expect(svc.pickBest(models, 'simple')?.id).toBe('cheap');
     });
 
     it('STANDARD prefers tool-capable quality>=2 models over raw cheapest', () => {
@@ -83,7 +89,7 @@ describe('TierAutoAssignService', () => {
           capabilityCode: true,
         }),
       ];
-      expect(svc.pickBest(models, 'standard')?.model_name).toBe('std');
+      expect(svc.pickBest(models, 'standard')?.id).toBe('std');
     });
 
     it('STANDARD falls back to the cheapest when no model meets quality>=2', () => {
@@ -103,7 +109,7 @@ describe('TierAutoAssignService', () => {
           qualityScore: 1,
         }),
       ];
-      expect(svc.pickBest(models, 'standard')?.model_name).toBe('a');
+      expect(svc.pickBest(models, 'standard')?.id).toBe('a');
     });
 
     it('COMPLEX picks highest quality, breaking ties with a tool-capable preference', () => {
@@ -131,7 +137,7 @@ describe('TierAutoAssignService', () => {
           qualityScore: 2,
         }),
       ];
-      expect(svc.pickBest(models, 'complex')?.model_name).toBe('tool-smart');
+      expect(svc.pickBest(models, 'complex')?.id).toBe('tool-smart');
     });
 
     it('REASONING prefers reasoning-capable models even over higher-quality non-reasoning', () => {
@@ -153,7 +159,7 @@ describe('TierAutoAssignService', () => {
           qualityScore: 9,
         }),
       ];
-      expect(svc.pickBest(models, 'reasoning')?.model_name).toBe('reason');
+      expect(svc.pickBest(models, 'reasoning')?.id).toBe('reason');
     });
 
     it('REASONING falls back to the COMPLEX ordering when no reasoning models exist', () => {
@@ -166,7 +172,7 @@ describe('TierAutoAssignService', () => {
           qualityScore: 9,
         }),
       ];
-      expect(svc.pickBest(models, 'reasoning')?.model_name).toBe('smart');
+      expect(svc.pickBest(models, 'reasoning')?.id).toBe('smart');
     });
 
     it('treats missing prices as Infinity so fully-priced models sort first', () => {
@@ -174,7 +180,7 @@ describe('TierAutoAssignService', () => {
         m({ id: 'unknown', provider: 'x', inputPricePerToken: null, outputPricePerToken: null }),
         m({ id: 'priced', provider: 'x', inputPricePerToken: 1, outputPricePerToken: 1 }),
       ];
-      expect(svc.pickBest(models, 'simple')?.model_name).toBe('priced');
+      expect(svc.pickBest(models, 'simple')?.id).toBe('priced');
     });
   });
 
@@ -201,7 +207,7 @@ describe('TierAutoAssignService', () => {
       ];
       // Only one existing tier row — the other three get inserted.
       const existing: Partial<TierAssignment>[] = [
-        { tier: 'simple', agent_id: 'agent-1', auto_assigned_model: null },
+        { tier: 'simple', agent_id: 'agent-1', auto_assigned_route: null },
       ];
       const { svc, save, insert } = makeService({ models, existingTiers: existing });
       await svc.recalculate('agent-1');
@@ -209,7 +215,7 @@ describe('TierAutoAssignService', () => {
       expect(save).toHaveBeenCalledTimes(1);
       expect(save.mock.calls[0][0]).toHaveLength(1);
       expect(save.mock.calls[0][0][0].tier).toBe('simple');
-      expect(save.mock.calls[0][0][0].auto_assigned_model).toBe('openai/gpt-5');
+      expect(routeModel(save.mock.calls[0][0][0])).toBe('openai/gpt-5');
 
       expect(insert).toHaveBeenCalledTimes(1);
       const inserted = insert.mock.calls[0][0] as Record<string, unknown>[];
@@ -222,7 +228,7 @@ describe('TierAutoAssignService', () => {
       for (const row of inserted) {
         expect(row.agent_id).toBe('agent-1');
         // Every tier should have picked something (non-null).
-        expect(row.auto_assigned_model).not.toBeNull();
+        expect(routeModel(row)).not.toBeNull();
       }
     });
 
@@ -250,7 +256,7 @@ describe('TierAutoAssignService', () => {
       await svc.recalculate('agent-1');
       const inserted = insert.mock.calls[0][0] as Record<string, unknown>[];
       for (const row of inserted) {
-        expect(row.auto_assigned_model).toBe('openai/codex-mini');
+        expect(routeModel(row)).toBe('openai/codex-mini');
       }
     });
 
@@ -270,7 +276,7 @@ describe('TierAutoAssignService', () => {
       await svc.recalculate('agent-1');
       const inserted = insert.mock.calls[0][0] as Record<string, unknown>[];
       for (const row of inserted) {
-        expect(row.auto_assigned_model).toBe('anthropic/claude-opus-4');
+        expect(routeModel(row)).toBe('anthropic/claude-opus-4');
       }
     });
 
@@ -279,7 +285,7 @@ describe('TierAutoAssignService', () => {
       await svc.recalculate('agent-1');
       const inserted = insert.mock.calls[0][0] as Record<string, unknown>[];
       for (const row of inserted) {
-        expect(row.auto_assigned_model).toBeNull();
+        expect(routeModel(row)).toBeNull();
       }
     });
   });

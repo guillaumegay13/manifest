@@ -14,8 +14,70 @@ import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { HeaderTierService } from '../header-tiers/header-tier.service';
 import { Agent } from '../../entities/agent.entity';
+import type { AuthType, ModelRoute } from 'manifest-shared';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const scoring = require('../../scoring');
+
+function route(model: string, provider = 'OpenAI', authType: AuthType = 'api_key'): ModelRoute {
+  return { provider, authType, model };
+}
+
+function providerFromLegacyModel(model: string | null | undefined, fallback = 'OpenAI'): string {
+  if (!model) return fallback;
+  if (model.startsWith('custom:')) return model.split('/')[0] || fallback;
+  const [prefix] = model.split('/');
+  return prefix && prefix !== model ? prefix : fallback;
+}
+
+function tierRow(row: Record<string, any>): Record<string, any> {
+  return {
+    ...row,
+    override_route:
+      row.override_route ??
+      (row.override_model
+        ? route(
+            row.override_model,
+            row.override_provider ?? providerFromLegacyModel(row.override_model),
+            row.override_auth_type ?? 'api_key',
+          )
+        : null),
+    auto_assigned_route:
+      row.auto_assigned_route ??
+      (row.auto_assigned_model
+        ? route(
+            row.auto_assigned_model,
+            row.auto_provider ?? providerFromLegacyModel(row.auto_assigned_model),
+          )
+        : null),
+    fallback_routes:
+      row.fallback_routes ??
+      row.fallback_models?.map((model: string) =>
+        route(model, row.fallback_provider ?? providerFromLegacyModel(model)),
+      ) ??
+      null,
+  };
+}
+
+function withLegacyAliases(response: any): any {
+  return {
+    ...response,
+    model: response.route?.model ?? null,
+    provider: response.route?.provider ?? null,
+    ...(response.route ? { auth_type: response.route.authType } : {}),
+    fallback_models: response.fallback_routes?.map((fallback: ModelRoute) => fallback.model),
+  };
+}
+
+function wrapResolveService(service: ResolveService): any {
+  const resolve = service.resolve.bind(service);
+  const resolveForTier = service.resolveForTier.bind(service);
+  return Object.assign(service, {
+    resolve: async (...args: Parameters<ResolveService['resolve']>) =>
+      withLegacyAliases(await resolve(...args)),
+    resolveForTier: async (...args: Parameters<ResolveService['resolveForTier']>) =>
+      withLegacyAliases(await resolveForTier(...args)),
+  });
+}
 
 function makeService(overrides: {
   tiers?: unknown[];
@@ -23,13 +85,16 @@ function makeService(overrides: {
   getAuthType?: jest.Mock;
   hasActiveProvider?: jest.Mock;
   isModelAvailable?: jest.Mock;
+  isRouteAvailable?: jest.Mock;
   activeSpecificity?: unknown[];
   getModelForAgent?: jest.Mock;
   getByModel?: jest.Mock;
   headerTiers?: unknown[];
 }) {
   const tierService: TierService = {
-    getTiers: jest.fn().mockResolvedValue(overrides.tiers ?? []),
+    getTiers: jest
+      .fn()
+      .mockResolvedValue((overrides.tiers ?? []).map((row) => tierRow(row as any))),
   } as unknown as TierService;
 
   const providerKeyService: ProviderKeyService = {
@@ -37,10 +102,19 @@ function makeService(overrides: {
     getAuthType: overrides.getAuthType ?? jest.fn().mockResolvedValue('api_key'),
     hasActiveProvider: overrides.hasActiveProvider ?? jest.fn().mockResolvedValue(false),
     isModelAvailable: overrides.isModelAvailable ?? jest.fn().mockResolvedValue(true),
+    isRouteAvailable:
+      overrides.isRouteAvailable ??
+      (overrides.isModelAvailable
+        ? jest.fn((agentId: string, modelRoute: ModelRoute) =>
+            overrides.isModelAvailable!(agentId, modelRoute.model),
+          )
+        : jest.fn().mockResolvedValue(true)),
   } as unknown as ProviderKeyService;
 
   const specificityService: SpecificityService = {
-    getActiveAssignments: jest.fn().mockResolvedValue(overrides.activeSpecificity ?? []),
+    getActiveAssignments: jest
+      .fn()
+      .mockResolvedValue((overrides.activeSpecificity ?? []).map((row) => tierRow(row as any))),
   } as unknown as SpecificityService;
 
   const discoveryService: ModelDiscoveryService = {
@@ -56,22 +130,24 @@ function makeService(overrides: {
   } as unknown as SpecificityPenaltyService;
 
   const headerTierService: HeaderTierService = {
-    list: jest.fn().mockResolvedValue(overrides.headerTiers ?? []),
+    list: jest
+      .fn()
+      .mockResolvedValue((overrides.headerTiers ?? []).map((row) => tierRow(row as any))),
   } as unknown as HeaderTierService;
 
   const agentRepo: Repository<Agent> = {
     findOne: jest.fn().mockResolvedValue({ complexity_routing_enabled: true }),
   } as unknown as Repository<Agent>;
 
-  const svc = new ResolveService(
-    tierService,
-    providerKeyService,
-    specificityService,
-    pricingCache,
-    discoveryService,
-    penaltyService,
-    headerTierService,
-    agentRepo,
+  const svc = wrapResolveService(
+    new ResolveService(
+      tierService,
+      providerKeyService,
+      specificityService,
+      penaltyService,
+      headerTierService,
+      agentRepo,
+    ),
   );
   return {
     svc,
@@ -172,7 +248,10 @@ describe('ResolveService', () => {
         reason: 'scored',
       });
       scoring.scanMessages.mockReturnValue({ category: 'coding', confidence: 0.9 });
-      const isModelAvailable = jest.fn().mockResolvedValue(false);
+      const isRouteAvailable = jest.fn(
+        (_agentId: string, modelRoute: ModelRoute) =>
+          !modelRoute.model.startsWith('custom:deleted-uuid/'),
+      );
       const { svc } = makeService({
         activeSpecificity: [
           {
@@ -191,14 +270,14 @@ describe('ResolveService', () => {
             override_auth_type: null,
           },
         ],
-        isModelAvailable,
+        isRouteAvailable,
         getEffectiveModel: jest.fn().mockResolvedValue('openai/gpt-5-mini'),
         hasActiveProvider: jest.fn().mockResolvedValue(true),
       });
       const out = await svc.resolve('agent-1', [{ role: 'user', content: 'write code' }]);
-      expect(isModelAvailable).toHaveBeenCalledWith(
+      expect(isRouteAvailable).toHaveBeenCalledWith(
         'agent-1',
-        'custom:deleted-uuid/gemini-2.5-flash-lite',
+        route('custom:deleted-uuid/gemini-2.5-flash-lite', 'custom:deleted-uuid', 'api_key'),
       );
       expect(out.reason).toBe('scored');
       expect(out.model).toBe('openai/gpt-5-mini');
@@ -223,10 +302,7 @@ describe('ResolveService', () => {
       expect(out.model).toBe('openai/gpt-5');
     });
 
-    it('returns a specificity response with provider=null and no auth_type when the model cannot be attributed to any provider', async () => {
-      // Exercises the `provider ? ... : undefined` branch in resolveSpecificity where
-      // resolveProvider returns null — the call still surfaces the specificity category
-      // + model, but auth_type is omitted because there's no provider to look it up for.
+    it('returns a specificity response with the stored route provider and auth type', async () => {
       scoring.scanMessages.mockReturnValue({ category: 'coding', confidence: 0.9 });
       const getAuthType = jest.fn().mockResolvedValue('api_key');
       const { svc } = makeService({
@@ -239,7 +315,6 @@ describe('ResolveService', () => {
             override_auth_type: null,
           },
         ],
-        // no prefix match, no discovered model, no pricing entry → provider resolves to null
         hasActiveProvider: jest.fn().mockResolvedValue(false),
         getModelForAgent: jest.fn().mockResolvedValue(null),
         getByModel: jest.fn().mockReturnValue(null),
@@ -248,8 +323,8 @@ describe('ResolveService', () => {
       const out = await svc.resolve('agent-1', [{ role: 'user', content: 'code' }]);
       expect(out.reason).toBe('specificity');
       expect(out.model).toBe('unresolvable-model');
-      expect(out.provider).toBeNull();
-      expect(out.auth_type).toBeUndefined();
+      expect(out.provider).toBe('OpenAI');
+      expect(out.auth_type).toBe('api_key');
       expect(getAuthType).not.toHaveBeenCalled();
     });
 
@@ -383,6 +458,7 @@ describe('ResolveService', () => {
             override_model: 'anthropic/claude-opus-4',
             auto_assigned_model: null,
             override_provider: null,
+            override_auth_type: 'subscription',
             fallback_models: ['anthropic/claude-sonnet-4'],
           },
         ],
@@ -509,7 +585,7 @@ describe('ResolveService', () => {
       expect(out.provider).toBe('openrouter');
     });
 
-    it('falls back to discovered models when prefix inference misses or provider not connected', async () => {
+    it('uses the provider stored on the route instead of re-inferring it', async () => {
       scoring.scoreRequest.mockReturnValue({
         tier: 'simple',
         confidence: 1,
@@ -522,6 +598,7 @@ describe('ResolveService', () => {
             tier: 'simple',
             override_model: null,
             auto_assigned_model: 'weird-model',
+            auto_provider: 'xyz',
             override_provider: null,
             override_auth_type: null,
           },
@@ -535,7 +612,7 @@ describe('ResolveService', () => {
       expect(out.provider).toBe('xyz');
     });
 
-    it('falls back to pricing cache (ignoring OpenRouter entries) as a last resort', async () => {
+    it('keeps an attributed provider stored on the route', async () => {
       scoring.scoreRequest.mockReturnValue({
         tier: 'simple',
         confidence: 1,
@@ -548,6 +625,7 @@ describe('ResolveService', () => {
             tier: 'simple',
             override_model: null,
             auto_assigned_model: 'rare-model',
+            auto_provider: 'Anthropic',
             override_provider: null,
             override_auth_type: null,
           },
@@ -562,7 +640,7 @@ describe('ResolveService', () => {
       expect(out.provider).toBe('Anthropic');
     });
 
-    it('returns provider=null when pricing cache only has an OpenRouter entry (ambiguous attribution)', async () => {
+    it('keeps OpenRouter when it is explicitly stored on the route', async () => {
       scoring.scoreRequest.mockReturnValue({
         tier: 'simple',
         confidence: 1,
@@ -575,6 +653,7 @@ describe('ResolveService', () => {
             tier: 'simple',
             override_model: null,
             auto_assigned_model: 'only-on-openrouter',
+            auto_provider: 'OpenRouter',
             override_provider: null,
             override_auth_type: null,
           },
@@ -585,8 +664,8 @@ describe('ResolveService', () => {
         getByModel: jest.fn().mockReturnValue({ provider: 'OpenRouter' }),
       });
       const out = await svc.resolve('agent-1', [{ role: 'user', content: 'x' }]);
-      expect(out.provider).toBeNull();
-      expect(out.auth_type).toBeUndefined();
+      expect(out.provider).toBe('OpenRouter');
+      expect(out.auth_type).toBe('api_key');
     });
   });
 
@@ -598,8 +677,10 @@ describe('ResolveService', () => {
       const out = await svc.resolveForTier('agent-1', 'simple');
       expect(out).toEqual({
         tier: 'simple',
+        route: null,
         model: null,
         provider: null,
+        fallback_models: undefined,
         confidence: 1,
         score: 0,
         reason: 'heartbeat',

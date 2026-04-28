@@ -1,6 +1,7 @@
 import { SpecificityService } from '../specificity.service';
 import { RoutingCacheService } from '../routing-cache.service';
 import { SpecificityAssignment } from '../../../entities/specificity-assignment.entity';
+import type { AuthType, ModelRoute } from 'manifest-shared';
 
 function makeMockRepo() {
   return {
@@ -12,6 +13,10 @@ function makeMockRepo() {
   };
 }
 
+function route(model: string, provider = 'openai', authType: AuthType = 'api_key'): ModelRoute {
+  return { provider, authType, model };
+}
+
 function makeAssignment(overrides: Partial<SpecificityAssignment> = {}): SpecificityAssignment {
   return Object.assign(new SpecificityAssignment(), {
     id: 'sa-1',
@@ -19,11 +24,9 @@ function makeAssignment(overrides: Partial<SpecificityAssignment> = {}): Specifi
     agent_id: 'agent-1',
     category: 'coding',
     is_active: true,
-    override_model: null,
-    override_provider: null,
-    override_auth_type: null,
-    auto_assigned_model: null,
-    fallback_models: null,
+    override_route: null,
+    auto_assigned_route: null,
+    fallback_routes: null,
     updated_at: '2025-01-01T00:00:00Z',
     ...overrides,
   });
@@ -126,9 +129,7 @@ describe('SpecificityService', () => {
       expect(result.user_id).toBe('user-1');
       expect(result.category).toBe('coding');
       expect(result.is_active).toBe(true);
-      expect(result.override_model).toBeNull();
-      expect(result.override_provider).toBeNull();
-      expect(result.override_auth_type).toBeNull();
+      expect(result.override_route).toBeNull();
       expect(repo.insert).toHaveBeenCalled();
       expect(cache.invalidateAgent).toHaveBeenCalledWith('agent-1');
     });
@@ -168,68 +169,52 @@ describe('SpecificityService', () => {
   describe('setOverride', () => {
     it('should update existing record with override fields', async () => {
       const existing = makeAssignment({ is_active: false });
+      const overrideRoute = route('gpt-4o');
       repo.findOne.mockResolvedValue(existing);
 
-      const result = await service.setOverride(
-        'agent-1',
-        'user-1',
-        'coding',
-        'gpt-4o',
-        'openai',
-        'api_key',
-      );
+      const result = await service.setOverride('agent-1', 'user-1', 'coding', overrideRoute);
 
-      expect(result.override_model).toBe('gpt-4o');
-      expect(result.override_provider).toBe('openai');
-      expect(result.override_auth_type).toBe('api_key');
+      expect(result.override_route).toEqual(overrideRoute);
       expect(result.is_active).toBe(true);
       expect(repo.save).toHaveBeenCalledWith(existing);
       expect(cache.invalidateAgent).toHaveBeenCalledWith('agent-1');
     });
 
-    it('should default provider and authType to null when not provided', async () => {
+    it('should preserve provider and authType from the route', async () => {
       const existing = makeAssignment();
+      const overrideRoute = route('gpt-4o');
       repo.findOne.mockResolvedValue(existing);
 
-      const result = await service.setOverride('agent-1', 'user-1', 'coding', 'gpt-4o');
+      const result = await service.setOverride('agent-1', 'user-1', 'coding', overrideRoute);
 
-      expect(result.override_provider).toBeNull();
-      expect(result.override_auth_type).toBeNull();
+      expect(result.override_route).toEqual(overrideRoute);
     });
 
     it('should create new record with is_active=true when none exists', async () => {
       repo.findOne.mockResolvedValue(null);
+      const overrideRoute = route('gpt-4o', 'openai', 'subscription');
 
-      const result = await service.setOverride(
-        'agent-1',
-        'user-1',
-        'web_browsing',
-        'gpt-4o',
-        'openai',
-        'subscription',
-      );
+      const result = await service.setOverride('agent-1', 'user-1', 'web_browsing', overrideRoute);
 
       expect(result.agent_id).toBe('agent-1');
       expect(result.category).toBe('web_browsing');
       expect(result.is_active).toBe(true);
-      expect(result.override_model).toBe('gpt-4o');
-      expect(result.override_provider).toBe('openai');
-      expect(result.override_auth_type).toBe('subscription');
+      expect(result.override_route).toEqual(overrideRoute);
       expect(repo.insert).toHaveBeenCalled();
       expect(cache.invalidateAgent).toHaveBeenCalledWith('agent-1');
     });
 
-    it('should default provider and authType to null on new record', async () => {
+    it('should preserve provider and authType on new record', async () => {
       repo.findOne.mockResolvedValue(null);
+      const overrideRoute = route('claude-3', 'anthropic');
 
-      const result = await service.setOverride('agent-1', 'user-1', 'coding', 'claude-3');
+      const result = await service.setOverride('agent-1', 'user-1', 'coding', overrideRoute);
 
-      expect(result.override_provider).toBeNull();
-      expect(result.override_auth_type).toBeNull();
+      expect(result.override_route).toEqual(overrideRoute);
     });
 
     it('should handle concurrent insert by retrying via findOne', async () => {
-      const retried = makeAssignment({ override_model: 'old-model' });
+      const retried = makeAssignment({ override_route: route('old-model') });
       repo.findOne
         .mockResolvedValueOnce(null) // first call: no existing
         .mockResolvedValueOnce(retried) // catch: finds concurrently-inserted row
@@ -240,13 +225,10 @@ describe('SpecificityService', () => {
         'agent-1',
         'user-1',
         'coding',
-        'new-model',
-        'anthropic',
-        'api_key',
+        route('new-model', 'anthropic'),
       );
 
-      expect(result.override_model).toBe('new-model');
-      expect(result.override_provider).toBe('anthropic');
+      expect(result.override_route).toEqual(route('new-model', 'anthropic'));
       expect(repo.save).toHaveBeenCalled();
     });
 
@@ -254,9 +236,10 @@ describe('SpecificityService', () => {
       repo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
       repo.insert.mockRejectedValueOnce(new Error('other error'));
 
-      const result = await service.setOverride('agent-1', 'user-1', 'coding', 'model-x');
+      const overrideRoute = route('model-x');
+      const result = await service.setOverride('agent-1', 'user-1', 'coding', overrideRoute);
 
-      expect(result.override_model).toBe('model-x');
+      expect(result.override_route).toEqual(overrideRoute);
       expect(result.category).toBe('coding');
       expect(cache.invalidateAgent).toHaveBeenCalledWith('agent-1');
     });
@@ -267,19 +250,15 @@ describe('SpecificityService', () => {
   describe('clearOverride', () => {
     it('should null out override fields and fallbacks on existing record', async () => {
       const existing = makeAssignment({
-        override_model: 'gpt-4o',
-        override_provider: 'openai',
-        override_auth_type: 'api_key',
-        fallback_models: ['gpt-3.5-turbo'],
+        override_route: route('gpt-4o'),
+        fallback_routes: [route('gpt-3.5-turbo')],
       });
       repo.findOne.mockResolvedValue(existing);
 
       await service.clearOverride('agent-1', 'coding');
 
-      expect(existing.override_model).toBeNull();
-      expect(existing.override_provider).toBeNull();
-      expect(existing.override_auth_type).toBeNull();
-      expect(existing.fallback_models).toBeNull();
+      expect(existing.override_route).toBeNull();
+      expect(existing.fallback_routes).toBeNull();
       expect(repo.save).toHaveBeenCalledWith(existing);
       expect(cache.invalidateAgent).toHaveBeenCalledWith('agent-1');
     });
@@ -304,10 +283,8 @@ describe('SpecificityService', () => {
         { agent_id: 'agent-1' },
         expect.objectContaining({
           is_active: false,
-          override_model: null,
-          override_provider: null,
-          override_auth_type: null,
-          fallback_models: null,
+          override_route: null,
+          fallback_routes: null,
         }),
       );
       expect(cache.invalidateAgent).toHaveBeenCalledWith('agent-1');
@@ -315,42 +292,43 @@ describe('SpecificityService', () => {
   });
 
   describe('setFallbacks', () => {
-    it('sets fallback_models on existing assignment', async () => {
+    it('sets fallback_routes on existing assignment', async () => {
       const existing = makeAssignment();
+      const fallbacks = [route('model-a'), route('model-b', 'anthropic')];
       repo.findOne.mockResolvedValue(existing);
 
-      const result = await service.setFallbacks('agent-1', 'coding', ['model-a', 'model-b']);
-      expect(result).toEqual(['model-a', 'model-b']);
-      expect(existing.fallback_models).toEqual(['model-a', 'model-b']);
+      const result = await service.setFallbacks('agent-1', 'coding', fallbacks);
+      expect(result).toEqual(fallbacks);
+      expect(existing.fallback_routes).toEqual(fallbacks);
       expect(repo.save).toHaveBeenCalledWith(existing);
       expect(cache.invalidateAgent).toHaveBeenCalledWith('agent-1');
     });
 
-    it('clears fallback_models when empty array', async () => {
-      const existing = makeAssignment({ fallback_models: ['model-a'] });
+    it('clears fallback_routes when empty array', async () => {
+      const existing = makeAssignment({ fallback_routes: [route('model-a')] });
       repo.findOne.mockResolvedValue(existing);
 
       const result = await service.setFallbacks('agent-1', 'coding', []);
       expect(result).toEqual([]);
-      expect(existing.fallback_models).toBeNull();
+      expect(existing.fallback_routes).toBeNull();
       expect(repo.save).toHaveBeenCalledWith(existing);
     });
 
     it('returns empty array when assignment not found', async () => {
       repo.findOne.mockResolvedValue(null);
-      const result = await service.setFallbacks('agent-1', 'coding', ['model-a']);
+      const result = await service.setFallbacks('agent-1', 'coding', [route('model-a')]);
       expect(result).toEqual([]);
       expect(repo.save).not.toHaveBeenCalled();
     });
   });
 
   describe('clearFallbacks', () => {
-    it('clears fallback_models on existing assignment', async () => {
-      const existing = makeAssignment({ fallback_models: ['model-a'] });
+    it('clears fallback_routes on existing assignment', async () => {
+      const existing = makeAssignment({ fallback_routes: [route('model-a')] });
       repo.findOne.mockResolvedValue(existing);
 
       await service.clearFallbacks('agent-1', 'coding');
-      expect(existing.fallback_models).toBeNull();
+      expect(existing.fallback_routes).toBeNull();
       expect(repo.save).toHaveBeenCalledWith(existing);
       expect(cache.invalidateAgent).toHaveBeenCalledWith('agent-1');
     });

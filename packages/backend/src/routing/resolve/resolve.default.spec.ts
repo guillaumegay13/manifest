@@ -11,11 +11,61 @@ import { ProviderKeyService } from '../routing-core/provider-key.service';
 import { SpecificityService } from '../routing-core/specificity.service';
 import { SpecificityPenaltyService } from '../routing-core/specificity-penalty.service';
 import { HeaderTierService } from '../header-tiers/header-tier.service';
-import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
-import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { Agent } from '../../entities/agent.entity';
+import type { AuthType, ModelRoute } from 'manifest-shared';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const scoring = require('../../scoring');
+
+function route(model: string, provider = 'OpenAI', authType: AuthType = 'api_key'): ModelRoute {
+  return { provider, authType, model };
+}
+
+function tierRow(row: Record<string, any>): Record<string, any> {
+  return {
+    ...row,
+    override_route:
+      row.override_route ??
+      (row.override_model
+        ? route(
+            row.override_model,
+            row.override_provider ?? 'OpenAI',
+            row.override_auth_type ?? 'api_key',
+          )
+        : null),
+    auto_assigned_route:
+      row.auto_assigned_route ??
+      (row.auto_assigned_model
+        ? route(row.auto_assigned_model, row.auto_provider ?? 'OpenAI')
+        : null),
+    fallback_routes:
+      row.fallback_routes ??
+      row.fallback_models?.map((model: string) =>
+        route(model, row.fallback_provider ?? 'OpenAI'),
+      ) ??
+      null,
+  };
+}
+
+function withLegacyAliases(response: any): any {
+  return {
+    ...response,
+    model: response.route?.model ?? null,
+    provider: response.route?.provider ?? null,
+    auth_type: response.route?.authType ?? null,
+    fallback_models: response.fallback_routes?.map((fallback: ModelRoute) => fallback.model),
+  };
+}
+
+function wrapResolveService(service: ResolveService): any {
+  const resolve = service.resolve.bind(service);
+  const resolveForTier = service.resolveForTier.bind(service);
+  return Object.assign(service, {
+    resolve: async (...args: Parameters<ResolveService['resolve']>) =>
+      withLegacyAliases(await resolve(...args)),
+    resolveForTier: async (...args: Parameters<ResolveService['resolveForTier']>) =>
+      withLegacyAliases(await resolveForTier(...args)),
+  });
+}
 
 function buildService(opts: {
   tiers?: Record<string, unknown>[];
@@ -27,7 +77,7 @@ function buildService(opts: {
   ];
 
   const tierService = {
-    getTiers: jest.fn().mockResolvedValue(tierRows),
+    getTiers: jest.fn().mockResolvedValue(tierRows.map(tierRow)),
   } as unknown as TierService;
 
   const providerKeyService = {
@@ -35,31 +85,28 @@ function buildService(opts: {
     getAuthType: jest.fn().mockResolvedValue('api_key'),
     hasActiveProvider: jest.fn().mockResolvedValue(true),
     isModelAvailable: jest.fn().mockResolvedValue(true),
+    isRouteAvailable: jest.fn().mockResolvedValue(true),
   } as unknown as ProviderKeyService;
 
   const specificityService = {
     getActiveAssignments: jest.fn().mockResolvedValue([]),
   } as unknown as SpecificityService;
 
-  return new ResolveService(
-    tierService,
-    providerKeyService,
-    specificityService,
-    {
-      getByModel: jest.fn().mockReturnValue({ provider: 'OpenAI' }),
-    } as unknown as ModelPricingCacheService,
-    {
-      getModelForAgent: jest.fn().mockResolvedValue(null),
-    } as unknown as ModelDiscoveryService,
-    {
-      getPenaltiesForAgent: jest.fn().mockResolvedValue(new Map()),
-    } as unknown as SpecificityPenaltyService,
-    {
-      list: jest.fn().mockResolvedValue([]),
-    } as unknown as HeaderTierService,
-    {
-      findOne: jest.fn().mockResolvedValue({ complexity_routing_enabled: true }),
-    } as unknown as Repository<Agent>,
+  return wrapResolveService(
+    new ResolveService(
+      tierService,
+      providerKeyService,
+      specificityService,
+      {
+        getPenaltiesForAgent: jest.fn().mockResolvedValue(new Map()),
+      } as unknown as SpecificityPenaltyService,
+      {
+        list: jest.fn().mockResolvedValue([]),
+      } as unknown as HeaderTierService,
+      {
+        findOne: jest.fn().mockResolvedValue({ complexity_routing_enabled: true }),
+      } as unknown as Repository<Agent>,
+    ),
   );
 }
 
@@ -162,13 +209,13 @@ describe('ResolveService — default tier catch-all', () => {
 
     const tierService = {
       getTiers: jest.fn().mockResolvedValue([
-        {
+        tierRow({
           tier: 'default',
           override_model: 'openai/gpt-4o-mini',
           auto_assigned_model: null,
           override_provider: null,
           override_auth_type: null,
-        },
+        }),
       ]),
     } as unknown as TierService;
 
@@ -177,23 +224,22 @@ describe('ResolveService — default tier catch-all', () => {
       getAuthType: jest.fn().mockResolvedValue('api_key'),
       hasActiveProvider: jest.fn().mockResolvedValue(true),
       isModelAvailable: jest.fn().mockResolvedValue(true),
+      isRouteAvailable: jest.fn().mockResolvedValue(true),
     } as unknown as ProviderKeyService;
 
-    const svc = new ResolveService(
-      tierService,
-      providerKeyService,
-      { getActiveAssignments: jest.fn().mockResolvedValue([]) } as unknown as SpecificityService,
-      {
-        getByModel: jest.fn().mockReturnValue({ provider: 'OpenAI' }),
-      } as unknown as ModelPricingCacheService,
-      { getModelForAgent: jest.fn().mockResolvedValue(null) } as unknown as ModelDiscoveryService,
-      {
-        getPenaltiesForAgent: jest.fn().mockResolvedValue(new Map()),
-      } as unknown as SpecificityPenaltyService,
-      { list: jest.fn().mockResolvedValue([]) } as unknown as HeaderTierService,
-      {
-        findOne: jest.fn().mockResolvedValue({ complexity_routing_enabled: false }),
-      } as unknown as Repository<Agent>,
+    const svc = wrapResolveService(
+      new ResolveService(
+        tierService,
+        providerKeyService,
+        { getActiveAssignments: jest.fn().mockResolvedValue([]) } as unknown as SpecificityService,
+        {
+          getPenaltiesForAgent: jest.fn().mockResolvedValue(new Map()),
+        } as unknown as SpecificityPenaltyService,
+        { list: jest.fn().mockResolvedValue([]) } as unknown as HeaderTierService,
+        {
+          findOne: jest.fn().mockResolvedValue({ complexity_routing_enabled: false }),
+        } as unknown as Repository<Agent>,
+      ),
     );
 
     const out = await svc.resolve('agent-1', [

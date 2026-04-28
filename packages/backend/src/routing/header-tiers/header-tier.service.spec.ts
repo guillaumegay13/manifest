@@ -337,39 +337,41 @@ describe('HeaderTierService', () => {
   });
 
   describe('override + fallbacks', () => {
-    it('setOverride writes model/provider/auth and saves', async () => {
+    const apiKeyRoute = { provider: 'OpenAI', authType: 'api_key' as const, model: 'gpt-4o' };
+    const subscriptionRoute = {
+      provider: 'Anthropic',
+      authType: 'subscription' as const,
+      model: 'claude',
+    };
+
+    it('setOverride writes route and saves', async () => {
       const { svc, repo, cache } = makeService();
       repo.findOne.mockResolvedValue({ id: 'h1', agent_id: 'a1' } as HeaderTier);
-      const out = await svc.setOverride('a1', 'h1', 'gpt-4o', 'OpenAI', 'api_key');
-      expect(out.override_model).toBe('gpt-4o');
-      expect(out.override_provider).toBe('OpenAI');
-      expect(out.override_auth_type).toBe('api_key');
+      const out = await svc.setOverride('a1', 'h1', apiKeyRoute);
+      expect(out.override_route).toEqual(apiKeyRoute);
       expect(cache.invalidateAgent).toHaveBeenCalled();
     });
 
-    it('setOverride accepts missing optional fields', async () => {
+    it('setOverride preserves auth-specific routes', async () => {
       const { svc, repo } = makeService();
       repo.findOne.mockResolvedValue({ id: 'h1', agent_id: 'a1' } as HeaderTier);
-      const out = await svc.setOverride('a1', 'h1', 'gpt-4o');
-      expect(out.override_provider).toBeNull();
-      expect(out.override_auth_type).toBeNull();
+      const out = await svc.setOverride('a1', 'h1', subscriptionRoute);
+      expect(out.override_route).toEqual(subscriptionRoute);
     });
 
-    it('clearOverride nulls model/provider/auth/fallbacks', async () => {
+    it('clearOverride nulls route/fallbacks', async () => {
       const { svc, repo } = makeService();
       repo.findOne.mockResolvedValue({
         id: 'h1',
         agent_id: 'a1',
-        override_model: 'gpt-4o',
-        fallback_models: ['claude'],
+        override_route: apiKeyRoute,
+        fallback_routes: [subscriptionRoute],
       } as HeaderTier);
       await svc.clearOverride('a1', 'h1');
       expect(repo.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          override_model: null,
-          override_provider: null,
-          override_auth_type: null,
-          fallback_models: null,
+          override_route: null,
+          fallback_routes: null,
         }),
       );
     });
@@ -377,24 +379,24 @@ describe('HeaderTierService', () => {
     it('setFallbacks stores array and returns it', async () => {
       const { svc, repo } = makeService();
       repo.findOne.mockResolvedValue({ id: 'h1', agent_id: 'a1' } as HeaderTier);
-      const out = await svc.setFallbacks('a1', 'h1', ['a', 'b']);
-      expect(out).toEqual(['a', 'b']);
+      const out = await svc.setFallbacks('a1', 'h1', [apiKeyRoute, subscriptionRoute]);
+      expect(out).toEqual([apiKeyRoute, subscriptionRoute]);
     });
 
     it('setFallbacks([]) stores null', async () => {
       const { svc, repo } = makeService();
-      const row = { id: 'h1', agent_id: 'a1', fallback_models: ['a'] } as HeaderTier;
+      const row = { id: 'h1', agent_id: 'a1', fallback_routes: [apiKeyRoute] } as HeaderTier;
       repo.findOne.mockResolvedValue(row);
       await svc.setFallbacks('a1', 'h1', []);
-      expect(row.fallback_models).toBeNull();
+      expect(row.fallback_routes).toBeNull();
     });
 
-    it('clearFallbacks nulls fallback_models', async () => {
+    it('clearFallbacks nulls fallback_routes', async () => {
       const { svc, repo } = makeService();
-      const row = { id: 'h1', agent_id: 'a1', fallback_models: ['a'] } as HeaderTier;
+      const row = { id: 'h1', agent_id: 'a1', fallback_routes: [apiKeyRoute] } as HeaderTier;
       repo.findOne.mockResolvedValue(row);
       await svc.clearFallbacks('a1', 'h1');
-      expect(row.fallback_models).toBeNull();
+      expect(row.fallback_routes).toBeNull();
     });
   });
 });

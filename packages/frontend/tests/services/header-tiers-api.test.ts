@@ -84,18 +84,21 @@ describe('header-tiers API client', () => {
     expect(JSON.parse(init.body)).toEqual({ ids: ['a', 'b'] });
   });
 
-  it('overrideHeaderTier includes authType only when provided', async () => {
+  it('overrideHeaderTier sends the route body', async () => {
     const fetchMock = setupFetch({});
-    await api.overrideHeaderTier('my-agent', 'ht-1', 'gpt-4o', 'OpenAI');
+    const apiKeyRoute = { provider: 'OpenAI', authType: 'api_key' as const, model: 'gpt-4o' };
+    const subscriptionRoute = {
+      provider: 'OpenAI',
+      authType: 'subscription' as const,
+      model: 'gpt-4o',
+    };
+    await api.overrideHeaderTier('my-agent', 'ht-1', apiKeyRoute);
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
-      model: 'gpt-4o',
-      provider: 'OpenAI',
+      route: apiKeyRoute,
     });
-    await api.overrideHeaderTier('my-agent', 'ht-1', 'gpt-4o', 'OpenAI', 'api_key');
+    await api.overrideHeaderTier('my-agent', 'ht-1', subscriptionRoute);
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
-      model: 'gpt-4o',
-      provider: 'OpenAI',
-      authType: 'api_key',
+      route: subscriptionRoute,
     });
   });
 
@@ -107,13 +110,17 @@ describe('header-tiers API client', () => {
     expect(init.method).toBe('DELETE');
   });
 
-  it('setHeaderTierFallbacks PUTs the models list', async () => {
-    const fetchMock = setupFetch(['m']);
-    await api.setHeaderTierFallbacks('my-agent', 'ht-1', ['m1', 'm2']);
+  it('setHeaderTierFallbacks PUTs the routes list', async () => {
+    const routes = [
+      { provider: 'openai', authType: 'api_key' as const, model: 'm1' },
+      { provider: 'anthropic', authType: 'subscription' as const, model: 'm2' },
+    ];
+    const fetchMock = setupFetch(routes);
+    await api.setHeaderTierFallbacks('my-agent', 'ht-1', routes);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain('/header-tiers/ht-1/fallbacks');
     expect(init.method).toBe('PUT');
-    expect(JSON.parse(init.body)).toEqual({ models: ['m1', 'm2'] });
+    expect(JSON.parse(init.body)).toEqual({ routes });
   });
 
   it('clearHeaderTierFallbacks DELETEs fallbacks', async () => {

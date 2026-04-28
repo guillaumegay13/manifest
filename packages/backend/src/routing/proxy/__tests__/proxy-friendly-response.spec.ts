@@ -77,8 +77,8 @@ describe('proxy-friendly-response', () => {
       expect(result.forward.isGoogle).toBe(false);
       expect(result.forward.isAnthropic).toBe(false);
       expect(result.forward.isChatGpt).toBe(false);
-      expect(result.meta.model).toBe('manifest');
-      expect(result.meta.provider).toBe('manifest');
+      expect(result.meta.route.model).toBe('manifest');
+      expect(result.meta.route.provider).toBe('manifest');
       expect(result.meta.confidence).toBe(1);
       expect(result.meta.reason).toBe('friendly_error');
 

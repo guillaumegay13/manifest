@@ -16,10 +16,11 @@ import { LimitCheckService } from '../../../notifications/services/limit-check.s
 import { ModelPricingCacheService } from '../../../model-prices/model-pricing-cache.service';
 import { ThoughtSignatureCache } from '../thought-signature-cache';
 import { ThinkingBlockCache } from '../thinking-block-cache';
+import type { AuthType, ModelRoute } from 'manifest-shared';
 
 describe('ProxyService', () => {
   let service: ProxyService;
-  let resolveService: jest.Mocked<ResolveService>;
+  let resolveService: { resolve: jest.Mock; resolveForTier: jest.Mock };
   let providerKeyService: jest.Mocked<ProviderKeyService>;
   let tierService: jest.Mocked<TierService>;
   let customProviderRepo: jest.Mocked<Repository<CustomProvider>>;
@@ -35,8 +36,9 @@ describe('ProxyService', () => {
 
   beforeEach(() => {
     resolveService = {
-      resolve: jest.fn(),
-    } as unknown as jest.Mocked<ResolveService>;
+      resolve: makeResolveMock(),
+      resolveForTier: makeResolveMock(),
+    };
 
     providerKeyService = {
       getProviderApiKey: jest.fn(),
@@ -47,7 +49,7 @@ describe('ProxyService', () => {
     } as unknown as jest.Mocked<ProviderKeyService>;
 
     tierService = {
-      getTiers: jest.fn().mockResolvedValue([]),
+      getTiers: makeGetTiersMock(),
     } as unknown as jest.Mocked<TierService>;
 
     providerClient = {
@@ -103,11 +105,10 @@ describe('ProxyService', () => {
       minimaxOauth,
       providerClient,
       copilotToken,
-      pricingCache,
     );
 
     service = new ProxyService(
-      resolveService,
+      resolveService as unknown as ResolveService,
       providerKeyService,
       tierService,
       openaiOauth,
@@ -129,6 +130,114 @@ describe('ProxyService', () => {
     messages: [{ role: 'user', content: 'Hello' }],
     stream: false,
   };
+
+  function route(model: string, provider = 'OpenAI', authType: AuthType = 'api_key'): ModelRoute {
+    return { provider, authType, model };
+  }
+
+  function providerForModel(model: string, fallback = 'OpenAI'): string {
+    return (
+      inferProviderFromModel(model) ??
+      (pricingCache.getByModel(model) as { provider?: string } | null | undefined)?.provider ??
+      fallback
+    );
+  }
+
+  function inferProviderFromModel(model: string): string | null {
+    if (model.startsWith('custom:')) {
+      const [providerId] = model.split('/');
+      return providerId || null;
+    }
+    const [prefix] = model.split('/');
+    if (!prefix || prefix === model) return null;
+    return prefix;
+  }
+
+  async function providerForLegacyFallback(agentId: string, model: string): Promise<string | null> {
+    const inferred = inferProviderFromModel(model);
+    if (inferred) return inferred;
+    const priced = pricingCache.getByModel(model) as { provider?: string } | null | undefined;
+    if (priced?.provider) return priced.provider;
+    const discovered = await providerKeyService.findProviderForModel(agentId, model);
+    return discovered ?? null;
+  }
+
+  async function fallbackRouteForLegacyModel(
+    agentId: string,
+    model: string,
+    authType: AuthType = 'api_key',
+  ): Promise<ModelRoute | null> {
+    const provider = await providerForLegacyFallback(agentId, model);
+    return provider ? route(model, provider, authType) : null;
+  }
+
+  async function normalizeFallbackRoutes(
+    agentId: string,
+    fallbackModels: string[] | undefined,
+  ): Promise<ModelRoute[] | undefined> {
+    if (!fallbackModels) return undefined;
+    const routes = await Promise.all(
+      fallbackModels.map((fallbackModel) => fallbackRouteForLegacyModel(agentId, fallbackModel)),
+    );
+    return routes.filter((fallbackRoute): fallbackRoute is ModelRoute => fallbackRoute !== null);
+  }
+
+  async function normalizeResolveResponse(value: any, agentId = 'agent-1'): Promise<any> {
+    if (
+      !value ||
+      (!Object.prototype.hasOwnProperty.call(value, 'model') &&
+        !Object.prototype.hasOwnProperty.call(value, 'provider') &&
+        !Object.prototype.hasOwnProperty.call(value, 'auth_type') &&
+        !Object.prototype.hasOwnProperty.call(value, 'fallback_models'))
+    ) {
+      return value;
+    }
+
+    const {
+      model,
+      provider,
+      auth_type: authType,
+      fallback_models: fallbackModels,
+      ...rest
+    } = value;
+    return {
+      ...rest,
+      route: model
+        ? route(model, provider ?? providerForModel(model), authType ?? 'api_key')
+        : null,
+      fallback_routes:
+        value.fallback_routes ?? (await normalizeFallbackRoutes(agentId, fallbackModels)),
+    };
+  }
+
+  async function normalizeTierRows(agentId: string, rows: any[]): Promise<any[]> {
+    return Promise.all(
+      rows.map(async (row) => ({
+        ...row,
+        fallback_routes:
+          row.fallback_routes ?? (await normalizeFallbackRoutes(agentId, row.fallback_models)),
+      })),
+    );
+  }
+
+  function makeResolveMock(): jest.Mock {
+    const mock = jest.fn();
+    mock.mockResolvedValue = ((value: unknown) =>
+      mock.mockImplementation(async (agentId: string) =>
+        normalizeResolveResponse(value, agentId),
+      )) as typeof mock.mockResolvedValue;
+    return mock;
+  }
+
+  function makeGetTiersMock(): jest.Mock {
+    const mock = jest.fn();
+    mock.mockResolvedValue = ((value: unknown) =>
+      mock.mockImplementation(async (agentId: string) =>
+        normalizeTierRows(agentId, value as any[]),
+      )) as typeof mock.mockResolvedValue;
+    mock.mockResolvedValue([]);
+    return mock;
+  }
 
   it('throws BadRequestException when messages are missing', async () => {
     await expect(
@@ -359,8 +468,7 @@ describe('ProxyService', () => {
     expect(choices[0].message.content).toContain('no providers are set up yet');
     expect(result.meta).toEqual({
       tier: 'simple',
-      model: 'manifest',
-      provider: 'manifest',
+      route: route('manifest', 'manifest'),
       confidence: 1,
       reason: 'no_provider',
     });
@@ -524,10 +632,13 @@ describe('ProxyService', () => {
 
     expect(result.meta).toEqual({
       tier: 'standard',
-      model: 'gpt-4o',
-      provider: 'OpenAI',
+      route: route('gpt-4o'),
       confidence: 0.8,
       reason: 'scored',
+      specificity_category: undefined,
+      header_tier_id: undefined,
+      header_tier_name: undefined,
+      header_tier_color: undefined,
     });
 
     // Check momentum was recorded
@@ -637,7 +748,7 @@ describe('ProxyService', () => {
       sessionKey: 'sess-1',
     });
 
-    expect(result.meta.model).toBe('claude-sonnet-4-6');
+    expect(result.meta.route.model).toBe('claude-sonnet-4.6');
     expect(providerClient.forward).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: 'Anthropic',
@@ -759,7 +870,7 @@ describe('ProxyService', () => {
     };
 
     it('routes heartbeat prompts to simple tier via resolveForTier', async () => {
-      resolveService.resolveForTier = jest.fn().mockResolvedValue({
+      resolveService.resolveForTier.mockResolvedValue({
         tier: 'simple',
         model: 'gpt-4o-mini',
         provider: 'OpenAI',
@@ -785,11 +896,11 @@ describe('ProxyService', () => {
       expect(resolveService.resolveForTier).toHaveBeenCalledWith('agent-1', 'simple');
       expect(resolveService.resolve).not.toHaveBeenCalled();
       expect(result.meta.tier).toBe('simple');
-      expect(result.meta.model).toBe('gpt-4o-mini');
+      expect(result.meta.route.model).toBe('gpt-4o-mini');
     });
 
     it('forwards the full unmodified body for heartbeat requests', async () => {
-      resolveService.resolveForTier = jest.fn().mockResolvedValue({
+      resolveService.resolveForTier.mockResolvedValue({
         tier: 'simple',
         model: 'gpt-4o-mini',
         provider: 'OpenAI',
@@ -879,7 +990,7 @@ describe('ProxyService', () => {
         stream: false,
       };
 
-      resolveService.resolveForTier = jest.fn().mockResolvedValue({
+      resolveService.resolveForTier.mockResolvedValue({
         tier: 'simple',
         model: 'gpt-4o-mini',
         provider: 'OpenAI',
@@ -925,7 +1036,7 @@ describe('ProxyService', () => {
         stream: false,
       };
 
-      resolveService.resolveForTier = jest.fn().mockResolvedValue({
+      resolveService.resolveForTier.mockResolvedValue({
         tier: 'simple',
         model: 'gpt-4o-mini',
         provider: 'OpenAI',
@@ -1257,7 +1368,7 @@ describe('ProxyService', () => {
       });
 
       expect(limitCheck.checkLimits).toHaveBeenCalledWith('tenant-1', 'my-agent');
-      expect(result.meta.model).toBe('gpt-4o');
+      expect(result.meta.route.model).toBe('gpt-4o');
     });
 
     it('formats cost limit with dollar sign and 2 decimal places', async () => {
@@ -1534,7 +1645,7 @@ describe('ProxyService', () => {
           }),
         }),
       );
-      expect(result.meta.provider).toBe('custom:cp-uuid');
+      expect(result.meta.route.provider).toBe('custom:cp-uuid');
     });
 
     it('falls back to normal forwarding when custom provider not found in DB', async () => {
@@ -1710,7 +1821,7 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      expect(result.meta.provider).toBe('Ollama');
+      expect(result.meta.route.provider).toBe('Ollama');
       expect(providerClient.forward).toHaveBeenCalledWith(
         expect.objectContaining({
           provider: 'Ollama',
@@ -1749,7 +1860,7 @@ describe('ProxyService', () => {
         sessionKey: 'sess-1',
       });
 
-      expect(result.meta.provider).toBe('Anthropic');
+      expect(result.meta.route.provider).toBe('Anthropic');
       expect(providerClient.forward).toHaveBeenCalledWith(
         expect.objectContaining({
           provider: 'Anthropic',
@@ -1815,7 +1926,7 @@ describe('ProxyService', () => {
       });
 
       expect(tierService.getTiers).not.toHaveBeenCalled();
-      expect(result.meta.fallbackFromModel).toBeUndefined();
+      expect(result.meta.fallbackFromRoute?.model).toBeUndefined();
       expect(result.meta.fallbackIndex).toBeUndefined();
     });
 
@@ -1858,10 +1969,10 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      expect(result.meta.fallbackFromModel).toBe('gpt-5.4');
+      expect(result.meta.fallbackFromRoute?.model).toBe('gpt-5.4');
       expect(result.meta.fallbackIndex).toBe(0);
       expect(result.meta.primaryErrorStatus).toBe(429);
-      expect(result.meta.model).toBe('claude-sonnet-4');
+      expect(result.meta.route.model).toBe('claude-sonnet-4');
       expect(result.meta.specificity_category).toBe('coding');
     });
 
@@ -1902,11 +2013,11 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      expect(result.meta.fallbackFromModel).toBe('gpt-4o');
+      expect(result.meta.fallbackFromRoute?.model).toBe('gpt-4o');
       expect(result.meta.fallbackIndex).toBe(0);
       expect(result.meta.primaryErrorStatus).toBe(429);
       expect(result.meta.primaryErrorBody).toBe('error');
-      expect(result.meta.model).toBe('claude-sonnet-4');
+      expect(result.meta.route.model).toBe('claude-sonnet-4');
     });
 
     it('tries fallback model when primary throws a transport error', async () => {
@@ -1944,11 +2055,11 @@ describe('ProxyService', () => {
         error?: { message?: string };
       };
 
-      expect(result.meta.fallbackFromModel).toBe('gpt-4o');
+      expect(result.meta.fallbackFromRoute?.model).toBe('gpt-4o');
       expect(result.meta.fallbackIndex).toBe(0);
       expect(result.meta.primaryErrorStatus).toBe(503);
       expect(primaryError.error?.message).toBe('Failed to reach upstream provider');
-      expect(result.meta.model).toBe('claude-sonnet-4');
+      expect(result.meta.route.model).toBe('claude-sonnet-4');
     });
 
     it('sanitizes transport error details when no fallback models are configured', async () => {
@@ -2024,12 +2135,12 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      expect(result.meta.fallbackFromModel).toBe('gpt-5.1-codex-mini');
+      expect(result.meta.fallbackFromRoute?.model).toBe('gpt-5.1-codex-mini');
       expect(result.meta.fallbackIndex).toBe(0);
       expect(result.meta.primaryErrorStatus).toBe(400);
       expect(result.meta.primaryErrorBody).toBe('{"detail":"Instructions are required"}');
-      expect(result.meta.model).toBe('deepseek-chat');
-      expect(result.meta.provider).toBe('DeepSeek');
+      expect(result.meta.route.model).toBe('deepseek-chat');
+      expect(result.meta.route.provider).toBe('DeepSeek');
       expect(providerClient.forward).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({
@@ -2123,8 +2234,8 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      expect(result.meta.model).toBe('claude-sonnet-4');
-      expect(result.meta.fallbackIndex).toBe(1);
+      expect(result.meta.route.model).toBe('claude-sonnet-4');
+      expect(result.meta.fallbackIndex).toBe(0);
     });
 
     it('skips fallback model when provider has no API key configured', async () => {
@@ -2170,7 +2281,7 @@ describe('ProxyService', () => {
 
       // First fallback (claude-sonnet-4) skipped because getProviderApiKey returned null
       // Second fallback (deepseek-chat) succeeded
-      expect(result.meta.model).toBe('deepseek-chat');
+      expect(result.meta.route.model).toBe('deepseek-chat');
       expect(result.meta.fallbackIndex).toBe(1);
       // forward was called only twice: primary + second fallback (first was skipped)
       expect(providerClient.forward).toHaveBeenCalledTimes(2);
@@ -2221,13 +2332,12 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      expect(result.meta.model).toBe('model-b');
+      expect(result.meta.route.model).toBe('model-b');
       expect(result.meta.fallbackIndex).toBe(1);
       expect(providerClient.forward).toHaveBeenCalledTimes(3);
       expect(result.failedFallbacks).toHaveLength(1);
       expect(result.failedFallbacks![0]).toEqual({
-        model: 'model-a',
-        provider: 'ProvA',
+        route: route('model-a', 'ProvA'),
         fallbackIndex: 0,
         status: 429,
         errorBody: 'rate limited',
@@ -2279,7 +2389,7 @@ describe('ProxyService', () => {
         error?: { message?: string };
       };
 
-      expect(result.meta.model).toBe('model-b');
+      expect(result.meta.route.model).toBe('model-b');
       expect(result.meta.fallbackIndex).toBe(1);
       expect(result.failedFallbacks).toHaveLength(1);
       expect(result.failedFallbacks?.[0].status).toBe(504);
@@ -2443,7 +2553,10 @@ describe('ProxyService', () => {
           isChatGpt: false,
         });
       tierService.getTiers.mockResolvedValue([
-        { tier: 'standard', fallback_models: ['claude-sonnet-4'] },
+        {
+          tier: 'standard',
+          fallback_routes: [route('claude-sonnet-4', 'Anthropic', 'subscription')],
+        },
       ] as never);
       pricingCache.getByModel.mockReturnValue({ provider: 'Anthropic' } as never);
 
@@ -2454,9 +2567,9 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      expect(result.meta.fallbackFromModel).toBe('gpt-4o');
-      expect(result.meta.model).toBe('claude-sonnet-4');
-      expect(result.meta.provider).toBe('Anthropic');
+      expect(result.meta.fallbackFromRoute?.model).toBe('gpt-4o');
+      expect(result.meta.route.model).toBe('claude-sonnet-4');
+      expect(result.meta.route.provider).toBe('Anthropic');
       expect(result.meta.primaryErrorStatus).toBe(429);
       // Primary was called with api_key auth_type
       expect(providerClient.forward).toHaveBeenNthCalledWith(
@@ -2470,7 +2583,7 @@ describe('ProxyService', () => {
           authType: 'api_key',
         }),
       );
-      // Fallback resolves auth_type via getAuthType and passes subscription
+      // Fallback uses the explicit auth type stored on the route
       expect(providerClient.forward).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
@@ -2481,12 +2594,6 @@ describe('ProxyService', () => {
           stream: false,
           authType: 'subscription',
         }),
-      );
-      // getAuthType was called for the fallback provider (different provider, no exclusions)
-      expect(providerKeyService.getAuthType).toHaveBeenCalledWith(
-        'agent-1',
-        'Anthropic',
-        undefined,
       );
       // getProviderApiKey was called with subscription for the fallback
       expect(providerKeyService.getProviderApiKey).toHaveBeenNthCalledWith(
@@ -2525,7 +2632,10 @@ describe('ProxyService', () => {
           isChatGpt: false,
         });
       tierService.getTiers.mockResolvedValue([
-        { tier: 'standard', fallback_models: ['claude-sonnet-4.6'] },
+        {
+          tier: 'standard',
+          fallback_routes: [route('claude-sonnet-4.6', 'Anthropic', 'subscription')],
+        },
       ] as never);
       pricingCache.getByModel.mockReturnValue({ provider: 'Anthropic' } as never);
 
@@ -2536,7 +2646,7 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      expect(result.meta.model).toBe('claude-sonnet-4-6');
+      expect(result.meta.route.model).toBe('claude-sonnet-4.6');
       expect(providerClient.forward).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
@@ -2590,9 +2700,9 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      expect(result.meta.fallbackFromModel).toBe('claude-sonnet-4');
-      expect(result.meta.model).toBe('gpt-4o');
-      expect(result.meta.provider).toBe('OpenAI');
+      expect(result.meta.fallbackFromRoute?.model).toBe('claude-sonnet-4');
+      expect(result.meta.route.model).toBe('gpt-4o');
+      expect(result.meta.route.provider).toBe('OpenAI');
       // Primary forwarded with subscription auth_type
       expect(providerClient.forward).toHaveBeenNthCalledWith(
         1,
@@ -2648,7 +2758,10 @@ describe('ProxyService', () => {
           isChatGpt: false,
         });
       tierService.getTiers.mockResolvedValue([
-        { tier: 'standard', fallback_models: ['gemini-2.5-flash'] },
+        {
+          tier: 'standard',
+          fallback_routes: [route('gemini-2.5-flash', 'Google', 'subscription')],
+        },
       ] as never);
       pricingCache.getByModel.mockReturnValue({ provider: 'Google' } as never);
 
@@ -2659,9 +2772,9 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      expect(result.meta.fallbackFromModel).toBe('claude-sonnet-4');
-      expect(result.meta.model).toBe('gemini-2.5-flash');
-      expect(result.meta.provider).toBe('Google');
+      expect(result.meta.fallbackFromRoute?.model).toBe('claude-sonnet-4');
+      expect(result.meta.route.model).toBe('gemini-2.5-flash');
+      expect(result.meta.route.provider).toBe('Google');
       expect(result.meta.fallbackIndex).toBe(0);
       // Fallback forwarded with subscription auth_type
       expect(providerClient.forward).toHaveBeenNthCalledWith(
@@ -2687,10 +2800,6 @@ describe('ProxyService', () => {
         reason: 'scored',
         auth_type: 'api_key',
       });
-      // getAuthType returns subscription for Anthropic, api_key for DeepSeek
-      providerKeyService.getAuthType
-        .mockResolvedValueOnce('subscription')
-        .mockResolvedValueOnce('api_key');
       providerKeyService.getProviderApiKey
         .mockResolvedValueOnce('sk-openai') // primary
         .mockResolvedValueOnce(null) // first fallback: subscription with no token
@@ -2709,7 +2818,13 @@ describe('ProxyService', () => {
           isChatGpt: false,
         });
       tierService.getTiers.mockResolvedValue([
-        { tier: 'standard', fallback_models: ['claude-sonnet-4', 'deepseek-chat'] },
+        {
+          tier: 'standard',
+          fallback_routes: [
+            route('claude-sonnet-4', 'Anthropic', 'subscription'),
+            route('deepseek-chat', 'DeepSeek'),
+          ],
+        },
       ] as never);
       pricingCache.getByModel
         .mockReturnValueOnce({ provider: 'Anthropic' } as never)
@@ -2723,19 +2838,13 @@ describe('ProxyService', () => {
       });
 
       // Anthropic fallback skipped (subscription with no token), DeepSeek succeeded
-      expect(result.meta.model).toBe('deepseek-chat');
-      expect(result.meta.provider).toBe('DeepSeek');
+      expect(result.meta.route.model).toBe('deepseek-chat');
+      expect(result.meta.route.provider).toBe('DeepSeek');
       expect(result.meta.fallbackIndex).toBe(1);
       // forward called twice: primary + second fallback (first was skipped)
       expect(providerClient.forward).toHaveBeenCalledTimes(2);
       expect(result.failedFallbacks).toHaveLength(0);
-      // Verify getAuthType was called for both fallback providers (different from primary, no exclusions)
-      expect(providerKeyService.getAuthType).toHaveBeenCalledWith(
-        'agent-1',
-        'Anthropic',
-        undefined,
-      );
-      expect(providerKeyService.getAuthType).toHaveBeenCalledWith('agent-1', 'DeepSeek', undefined);
+      expect(providerKeyService.getAuthType).not.toHaveBeenCalled();
     });
 
     it('resolves fallback provider via findProviderForModel when pricing and name inference fail', async () => {
@@ -2783,9 +2892,9 @@ describe('ProxyService', () => {
         'agent-1',
         'niche-model-v1',
       );
-      expect(result.meta.model).toBe('niche-model-v1');
-      expect(result.meta.provider).toBe('niche-provider');
-      expect(result.meta.fallbackFromModel).toBe('gpt-4o');
+      expect(result.meta.route.model).toBe('niche-model-v1');
+      expect(result.meta.route.provider).toBe('niche-provider');
+      expect(result.meta.fallbackFromRoute?.model).toBe('gpt-4o');
       expect(result.meta.fallbackIndex).toBe(0);
       expect(result.meta.primaryErrorStatus).toBe(401);
     });
@@ -2829,8 +2938,8 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      expect(result.meta.model).toBe('custom:cp-abc/my-model');
-      expect(result.meta.fallbackFromModel).toBe('gpt-4o');
+      expect(result.meta.route.model).toBe('custom:cp-abc/my-model');
+      expect(result.meta.fallbackFromRoute?.model).toBe('gpt-4o');
     });
 
     it('returns all failed fallbacks when all fail', async () => {
@@ -2874,8 +2983,7 @@ describe('ProxyService', () => {
       expect(result.forward.response.status).toBe(500);
       expect(result.failedFallbacks).toHaveLength(1);
       expect(result.failedFallbacks![0]).toEqual({
-        model: 'deepseek-chat',
-        provider: 'DeepSeek',
+        route: route('deepseek-chat', 'DeepSeek'),
         fallbackIndex: 0,
         status: 504,
         errorBody: 'gateway timeout',
@@ -2953,7 +3061,10 @@ describe('ProxyService', () => {
       });
 
       tierService.getTiers.mockResolvedValue([
-        { tier: 'standard', fallback_models: ['claude-haiku-3.5'] },
+        {
+          tier: 'standard',
+          fallback_routes: [route('claude-haiku-3.5', 'Anthropic')],
+        },
       ] as never);
 
       // Fallback also fails so we get the primary's 401 status
@@ -2973,11 +3084,10 @@ describe('ProxyService', () => {
         sessionKey: 'default',
       });
 
-      // Verify tryFallbacks receives primary context so it can exclude auth_type
-      expect(providerKeyService.getAuthType).toHaveBeenCalledWith(
+      expect(providerKeyService.getProviderApiKey).toHaveBeenCalledWith(
         'agent-1',
         'Anthropic',
-        new Set(['subscription']),
+        'api_key',
       );
     });
   });
@@ -3099,7 +3209,10 @@ describe('ProxyService', () => {
         .mockResolvedValueOnce('{"t":"fb-tok","r":"fb-ref","e":9999999999999}'); // fallback
       providerKeyService.getAuthType.mockResolvedValueOnce('subscription');
       tierService.getTiers.mockResolvedValue([
-        { tier: 'standard', fallback_models: ['gpt-4o'] } as never,
+        {
+          tier: 'standard',
+          fallback_routes: [route('gpt-4o', 'OpenAI', 'subscription')],
+        } as never,
       ]);
 
       providerClient.forward
@@ -3135,7 +3248,7 @@ describe('ProxyService', () => {
         'agent-1',
         'user-1',
       );
-      expect(result.meta.model).toBe('gpt-4o');
+      expect(result.meta.route.model).toBe('gpt-4o');
     });
 
     it('unwraps JSON token blob for MiniMax subscription and forwards resource URL', async () => {
@@ -3199,7 +3312,7 @@ describe('ProxyService', () => {
       ]);
 
       const svcWithCache = new ProxyService(
-        resolveService,
+        resolveService as unknown as ResolveService,
         providerKeyService,
         tierService,
         openaiOauth,
@@ -3369,7 +3482,7 @@ describe('ProxyService', () => {
       cache.store('sess-sig', 'tc-42', 'cached-sig-value');
 
       const svcWithCache = new ProxyService(
-        resolveService,
+        resolveService as unknown as ResolveService,
         providerKeyService,
         tierService,
         openaiOauth,

@@ -23,10 +23,9 @@ const baseTier: HeaderTier = {
   header_value: 'premium',
   badge_color: 'violet',
   sort_order: 0,
-  override_model: 'gpt-4o',
-  override_provider: 'openai',
-  override_auth_type: 'api_key',
-  fallback_models: null,
+  enabled: true,
+  override_route: { model: 'gpt-4o', provider: 'openai', authType: 'api_key' },
+  fallback_routes: null,
   created_at: '',
   updated_at: '',
 };
@@ -65,8 +64,8 @@ describe('HeaderTierSnippetModal', () => {
     expect(container.textContent).toContain('gpt-4o');
   });
 
-  it('shows a fallback explainer when no override_model is set', () => {
-    const empty: HeaderTier = { ...baseTier, override_model: null };
+  it('shows a fallback explainer when no override route is set', () => {
+    const empty: HeaderTier = { ...baseTier, override_route: null };
     const { container } = mount({ tier: empty });
     expect(container.textContent).toContain('no model assigned');
   });

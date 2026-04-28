@@ -12,7 +12,7 @@ const ctx: IngestionContext = {
 };
 
 describe('ProxyMessageRecorder', () => {
-  let recorder: ProxyMessageRecorder;
+  let recorder: any;
   let insertMock: jest.Mock;
   let getByModelMock: jest.Mock;
   let emitMock: jest.Mock;
@@ -38,6 +38,32 @@ describe('ProxyMessageRecorder', () => {
         ),
     } as never;
     recorder = new ProxyMessageRecorder(repo, pricingCache, dedup, eventBus, customProviders);
+    const originalRecordFailedFallbacks = recorder.recordFailedFallbacks.bind(recorder);
+    recorder.recordFailedFallbacks = (
+      callCtx: IngestionContext,
+      tier: string,
+      primaryModel: string,
+      failures: any[],
+      opts?: unknown,
+    ) =>
+      originalRecordFailedFallbacks(
+        callCtx,
+        tier,
+        primaryModel,
+        failures.map((failure) =>
+          failure.route
+            ? failure
+            : {
+                ...failure,
+                route: {
+                  provider: failure.provider,
+                  authType: 'api_key',
+                  model: failure.model,
+                },
+              },
+        ),
+        opts,
+      );
   });
 
   afterEach(() => {

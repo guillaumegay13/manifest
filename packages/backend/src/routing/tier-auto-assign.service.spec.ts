@@ -26,6 +26,12 @@ function makeMockRepo() {
   };
 }
 
+function routeModel(row: unknown): string | null {
+  return (
+    (row as { auto_assigned_route?: { model: string } | null }).auto_assigned_route?.model ?? null
+  );
+}
+
 describe('TierAutoAssignService', () => {
   let service: TierAutoAssignService;
   let mockDiscoveryService: { getModelsForAgent: jest.Mock };
@@ -51,7 +57,7 @@ describe('TierAutoAssignService', () => {
         inputPricePerToken: 0,
         outputPricePerToken: 0,
       });
-      expect(service.pickBest([free], 'simple')!.model_name).toBe('free');
+      expect(service.pickBest([free], 'simple')!.id).toBe('free');
     });
 
     // ── SIMPLE: cheapest wins ──
@@ -70,7 +76,7 @@ describe('TierAutoAssignService', () => {
         qualityScore: 5,
       });
 
-      expect(service.pickBest([cheap, expensive], 'simple')!.model_name).toBe('cheap');
+      expect(service.pickBest([cheap, expensive], 'simple')!.id).toBe('cheap');
     });
 
     it('simple: quality does not matter', () => {
@@ -87,7 +93,7 @@ describe('TierAutoAssignService', () => {
         qualityScore: 5,
       });
 
-      expect(service.pickBest([lowQ, highQ], 'simple')!.model_name).toBe('low-q');
+      expect(service.pickBest([lowQ, highQ], 'simple')!.id).toBe('low-q');
     });
 
     // ── STANDARD: cheapest among quality >= 2 ──
@@ -106,7 +112,7 @@ describe('TierAutoAssignService', () => {
         qualityScore: 2,
       });
 
-      expect(service.pickBest([ultraCheap, decent], 'standard')!.model_name).toBe('decent');
+      expect(service.pickBest([ultraCheap, decent], 'standard')!.id).toBe('decent');
     });
 
     it('standard: should fallback to cheapest if all are quality 1', () => {
@@ -123,7 +129,7 @@ describe('TierAutoAssignService', () => {
         qualityScore: 1,
       });
 
-      expect(service.pickBest([a, b], 'standard')!.model_name).toBe('a');
+      expect(service.pickBest([a, b], 'standard')!.id).toBe('a');
     });
 
     // ── COMPLEX: best quality, price as tiebreaker ──
@@ -142,7 +148,7 @@ describe('TierAutoAssignService', () => {
         qualityScore: 5,
       });
 
-      expect(service.pickBest([cheap, expensive], 'complex')!.model_name).toBe('expensive');
+      expect(service.pickBest([cheap, expensive], 'complex')!.id).toBe('expensive');
     });
 
     it('complex: should use price as tiebreaker at same quality', () => {
@@ -159,7 +165,7 @@ describe('TierAutoAssignService', () => {
         qualityScore: 4,
       });
 
-      expect(service.pickBest([expensiveQ4, cheapQ4], 'complex')!.model_name).toBe('cheap-q4');
+      expect(service.pickBest([expensiveQ4, cheapQ4], 'complex')!.id).toBe('cheap-q4');
     });
 
     // ── REASONING: best quality among reasoning models ──
@@ -180,7 +186,7 @@ describe('TierAutoAssignService', () => {
         capabilityReasoning: true,
       });
 
-      expect(service.pickBest([cheap, reasoning], 'reasoning')!.model_name).toBe('reasoning');
+      expect(service.pickBest([cheap, reasoning], 'reasoning')!.id).toBe('reasoning');
     });
 
     it('reasoning: should fallback to complex logic when no reasoning models', () => {
@@ -199,7 +205,7 @@ describe('TierAutoAssignService', () => {
         capabilityReasoning: false,
       });
 
-      expect(service.pickBest([lowQ, highQ], 'reasoning')!.model_name).toBe('high-q');
+      expect(service.pickBest([lowQ, highQ], 'reasoning')!.id).toBe('high-q');
     });
 
     it('reasoning: should pick cheapest reasoning model at same quality', () => {
@@ -218,7 +224,7 @@ describe('TierAutoAssignService', () => {
         capabilityReasoning: true,
       });
 
-      expect(service.pickBest([expensiveR, cheapR], 'reasoning')!.model_name).toBe('cheap-r');
+      expect(service.pickBest([expensiveR, cheapR], 'reasoning')!.id).toBe('cheap-r');
     });
 
     // ── Real-world: single provider with multiple tiers ──
@@ -251,10 +257,10 @@ describe('TierAutoAssignService', () => {
 
       const models = [flashLite, flash, pro];
 
-      expect(service.pickBest(models, 'simple')!.model_name).toBe('gemini-2.5-flash-lite');
-      expect(service.pickBest(models, 'standard')!.model_name).toBe('gemini-2.5-flash');
-      expect(service.pickBest(models, 'complex')!.model_name).toBe('gemini-2.5-pro');
-      expect(service.pickBest(models, 'reasoning')!.model_name).toBe('gemini-2.5-pro');
+      expect(service.pickBest(models, 'simple')!.id).toBe('gemini-2.5-flash-lite');
+      expect(service.pickBest(models, 'standard')!.id).toBe('gemini-2.5-flash');
+      expect(service.pickBest(models, 'complex')!.id).toBe('gemini-2.5-pro');
+      expect(service.pickBest(models, 'reasoning')!.id).toBe('gemini-2.5-pro');
     });
 
     it('should assign different models per tier (multi-provider catalog)', () => {
@@ -294,10 +300,10 @@ describe('TierAutoAssignService', () => {
 
       const models = [nano, deepseekChat, opus, sonnet];
 
-      expect(service.pickBest(models, 'simple')!.model_name).toBe('gpt-4.1-nano');
-      expect(service.pickBest(models, 'standard')!.model_name).toBe('deepseek-chat');
-      expect(service.pickBest(models, 'complex')!.model_name).toBe('claude-opus-4');
-      expect(service.pickBest(models, 'reasoning')!.model_name).toBe('claude-opus-4');
+      expect(service.pickBest(models, 'simple')!.id).toBe('gpt-4.1-nano');
+      expect(service.pickBest(models, 'standard')!.id).toBe('deepseek-chat');
+      expect(service.pickBest(models, 'complex')!.id).toBe('claude-opus-4');
+      expect(service.pickBest(models, 'reasoning')!.id).toBe('claude-opus-4');
     });
 
     it('should default qualityScore to 3 when null', () => {
@@ -316,8 +322,8 @@ describe('TierAutoAssignService', () => {
 
       // For complex tier: highest quality wins, null defaults to 3
       const result = service.pickBest([noQuality, highQ], 'complex');
-      expect(result!.model_name).toBe('high-q');
-      expect(result!.score).toBe(5);
+      expect(result!.id).toBe('high-q');
+      expect(result!.qualityScore).toBe(5);
     });
 
     it('should treat null qualityScore as 3 for standard tier filtering', () => {
@@ -330,8 +336,8 @@ describe('TierAutoAssignService', () => {
 
       // Standard filters quality >= 2. null defaults to 3, so it should be eligible.
       const result = service.pickBest([nullQ], 'standard');
-      expect(result!.model_name).toBe('null-q');
-      expect(result!.score).toBe(3);
+      expect(result!.id).toBe('null-q');
+      expect(result!.qualityScore).toBeNull();
     });
 
     it('should deprioritize null inputPricePerToken (unknown cost)', () => {
@@ -349,7 +355,7 @@ describe('TierAutoAssignService', () => {
       });
 
       // null pricing = unknown cost, priced model wins cheapest-first
-      expect(service.pickBest([nullInput, priced], 'simple')!.model_name).toBe('priced');
+      expect(service.pickBest([nullInput, priced], 'simple')!.id).toBe('priced');
     });
 
     it('should deprioritize null outputPricePerToken (unknown cost)', () => {
@@ -367,7 +373,7 @@ describe('TierAutoAssignService', () => {
       });
 
       // null pricing = unknown cost, priced model wins cheapest-first
-      expect(service.pickBest([nullOutput, priced], 'simple')!.model_name).toBe('priced');
+      expect(service.pickBest([nullOutput, priced], 'simple')!.id).toBe('priced');
     });
 
     it('should still pick null-priced model when it is the only option', () => {
@@ -378,7 +384,7 @@ describe('TierAutoAssignService', () => {
         qualityScore: 3,
       });
 
-      expect(service.pickBest([nullPriced], 'simple')!.model_name).toBe('null-priced');
+      expect(service.pickBest([nullPriced], 'simple')!.id).toBe('null-priced');
     });
 
     it('should prefer priced model over null-priced for simple tier', () => {
@@ -396,7 +402,7 @@ describe('TierAutoAssignService', () => {
         capabilityCode: true,
       });
 
-      expect(service.pickBest([gemma, flash], 'simple')!.model_name).toBe('gemini-2.0-flash');
+      expect(service.pickBest([gemma, flash], 'simple')!.id).toBe('gemini-2.0-flash');
     });
   });
 
@@ -414,7 +420,7 @@ describe('TierAutoAssignService', () => {
       }[];
       expect(inserted).toHaveLength(5);
       for (const record of inserted) {
-        expect(record.auto_assigned_model).toBe('gpt-4o');
+        expect(routeModel(record)).toBe('gpt-4o');
       }
     });
 
@@ -430,7 +436,7 @@ describe('TierAutoAssignService', () => {
       }[];
       expect(inserted).toHaveLength(5);
       for (const record of inserted) {
-        expect(record.auto_assigned_model).toBeNull();
+        expect(routeModel(record)).toBeNull();
       }
     });
 
@@ -458,7 +464,7 @@ describe('TierAutoAssignService', () => {
       }[];
       expect(saved).toHaveLength(5);
       for (const record of saved) {
-        expect(record.auto_assigned_model).toBe('gpt-4o');
+        expect(routeModel(record)).toBe('gpt-4o');
       }
     });
 
@@ -484,7 +490,7 @@ describe('TierAutoAssignService', () => {
       }[];
       expect(saved).toHaveLength(5);
       for (const record of saved) {
-        expect(record.auto_assigned_model).toBeNull();
+        expect(routeModel(record)).toBeNull();
       }
     });
 
@@ -517,7 +523,7 @@ describe('TierAutoAssignService', () => {
       }[];
       expect(inserted).toHaveLength(5);
       for (const record of inserted) {
-        expect(record.auto_assigned_model).toBe('claude-sonnet-4');
+        expect(routeModel(record)).toBe('claude-sonnet-4');
       }
     });
 
@@ -539,7 +545,7 @@ describe('TierAutoAssignService', () => {
       }[];
       expect(inserted).toHaveLength(5);
       for (const record of inserted) {
-        expect(record.auto_assigned_model).toBe('gpt-4o');
+        expect(routeModel(record)).toBe('gpt-4o');
       }
     });
 
@@ -571,7 +577,7 @@ describe('TierAutoAssignService', () => {
       }[];
       expect(inserted).toHaveLength(5);
       for (const record of inserted) {
-        expect(record.auto_assigned_model).toBe('claude-sonnet-4');
+        expect(routeModel(record)).toBe('claude-sonnet-4');
       }
     });
 
@@ -606,12 +612,12 @@ describe('TierAutoAssignService', () => {
       // Simple tier picks cheapest subscription model = gemini-2.5-flash
       const simpleTier = inserted.find((t) => t.tier === 'simple');
       expect(simpleTier).toBeDefined();
-      expect(simpleTier!.auto_assigned_model).toBe('gemini-2.5-flash');
+      expect(routeModel(simpleTier!)).toBe('gemini-2.5-flash');
 
       // Complex tier picks highest quality subscription model = claude-sonnet-4
       const complexTier = inserted.find((t) => t.tier === 'complex');
       expect(complexTier).toBeDefined();
-      expect(complexTier!.auto_assigned_model).toBe('claude-sonnet-4');
+      expect(routeModel(complexTier!)).toBe('claude-sonnet-4');
     });
 
     it('should treat models without authType as api_key', async () => {
@@ -633,7 +639,7 @@ describe('TierAutoAssignService', () => {
       // But there are no api_key providers, so subModels picks from empty set = null
       // keyModels has the OR model, so it falls back there
       for (const record of inserted) {
-        expect(record.auto_assigned_model).toBe('anthropic/claude-sonnet-4');
+        expect(routeModel(record)).toBe('anthropic/claude-sonnet-4');
       }
     });
 
@@ -648,7 +654,7 @@ describe('TierAutoAssignService', () => {
         auto_assigned_model: string | null;
       }[];
       for (const record of inserted) {
-        expect(record.auto_assigned_model).toBeNull();
+        expect(routeModel(record)).toBeNull();
       }
     });
 
@@ -669,7 +675,7 @@ describe('TierAutoAssignService', () => {
         auto_assigned_model: string;
       }[];
       for (const record of inserted) {
-        expect(record.auto_assigned_model).toBe('anthropic/claude-sonnet-4');
+        expect(routeModel(record)).toBe('anthropic/claude-sonnet-4');
       }
     });
 
@@ -684,8 +690,8 @@ describe('TierAutoAssignService', () => {
           id: 'tier-1',
           agent_id: 'agent-1',
           tier: 'complex',
-          override_model: 'claude-opus-4-6',
-          auto_assigned_model: 'gpt-4o',
+          override_route: { provider: 'Anthropic', authType: 'api_key', model: 'claude-opus-4-6' },
+          auto_assigned_route: { provider: 'OpenAI', authType: 'api_key', model: 'gpt-4o' },
           updated_at: '2024-01-01',
         },
       ]);
@@ -698,8 +704,8 @@ describe('TierAutoAssignService', () => {
       const complexTier = saved.find((t: Record<string, unknown>) => t['tier'] === 'complex');
       expect(complexTier).toEqual(
         expect.objectContaining({
-          override_model: 'claude-opus-4-6',
-          auto_assigned_model: 'gpt-4o',
+          override_route: { provider: 'Anthropic', authType: 'api_key', model: 'claude-opus-4-6' },
+          auto_assigned_route: { provider: 'OpenAI', authType: 'api_key', model: 'gpt-4o' },
         }),
       );
     });
@@ -733,7 +739,7 @@ describe('TierAutoAssignService', () => {
       }[];
       // All tiers should use Codex model (zero cost), not gpt-4.1-nano (paid)
       for (const record of inserted) {
-        expect(record.auto_assigned_model).toBe('gpt-5.3-codex');
+        expect(routeModel(record)).toBe('gpt-5.3-codex');
       }
     });
 
@@ -767,7 +773,7 @@ describe('TierAutoAssignService', () => {
       }[];
       // Simple tier should pick gemini-2.5-flash (known price), not gemma-3-1b (null price)
       const simpleTier = inserted.find((t) => t.tier === 'simple');
-      expect(simpleTier!.auto_assigned_model).toBe('gemini-2.5-flash');
+      expect(routeModel(simpleTier!)).toBe('gemini-2.5-flash');
     });
 
     it('should keep all models for providers without zero-cost models (Anthropic)', async () => {
@@ -789,7 +795,7 @@ describe('TierAutoAssignService', () => {
         auto_assigned_model: string;
       }[];
       for (const record of inserted) {
-        expect(record.auto_assigned_model).toBe('claude-sonnet-4');
+        expect(routeModel(record)).toBe('claude-sonnet-4');
       }
     });
 
@@ -817,7 +823,7 @@ describe('TierAutoAssignService', () => {
       }[];
       // Subscription models are prioritized — claude-sonnet-4 should win all tiers
       for (const record of inserted) {
-        expect(record.auto_assigned_model).toBe('claude-sonnet-4');
+        expect(routeModel(record)).toBe('claude-sonnet-4');
       }
     });
   });

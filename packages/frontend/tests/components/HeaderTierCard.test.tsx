@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, waitFor } from '@solidjs/testing-library';
 import type { HeaderTier } from '../../src/services/api/header-tiers';
+import type { ModelRoute } from '../../src/services/api';
 
 const setHeaderTierFallbacksMock = vi.fn();
 const clearHeaderTierFallbacksMock = vi.fn();
@@ -51,13 +52,13 @@ vi.mock('../../src/components/FallbackList.js', () => ({
   default: (props: {
     agentName: string;
     tier: string;
-    fallbacks: string[];
+    fallbacks: ModelRoute[];
     models: unknown[];
     customProviders: unknown[];
     connectedProviders: unknown[];
     onAddFallback: () => void;
-    onUpdate: (next: string[]) => void;
-    persistFallbacks: (agent: string, tierId: string, models: string[]) => Promise<unknown>;
+    onUpdate: (next: ModelRoute[]) => void;
+    persistFallbacks: (agent: string, tierId: string, models: ModelRoute[]) => Promise<unknown>;
     persistClearFallbacks: (agent: string, tierId: string) => Promise<unknown>;
   }) => (
     <div
@@ -66,18 +67,28 @@ vi.mock('../../src/components/FallbackList.js', () => ({
       data-tier={props.tier}
       data-models-len={props.models.length}
       data-custom-len={props.customProviders.length}
-      data-connected-len={props.connectedProviders.length}
+      data-connected-len={props.connectedProviders?.length ?? 0}
     >
       <span data-testid="fallback-count">{props.fallbacks.length}</span>
       <button data-testid="add-fallback" onClick={props.onAddFallback}>
         + Add fallback
       </button>
-      <button data-testid="fallback-update" onClick={() => props.onUpdate(['mock-removed'])}>
+      <button
+        data-testid="fallback-update"
+        onClick={() =>
+          props.onUpdate([{ model: 'mock-removed', provider: 'OpenAI', authType: 'api_key' }])
+        }
+      >
         update
       </button>
       <button
         data-testid="invoke-persist"
-        onClick={() => void props.persistFallbacks('cb-agent', 'cb-tier', ['m1', 'm2'])}
+        onClick={() =>
+          void props.persistFallbacks('cb-agent', 'cb-tier', [
+            { model: 'm1', provider: 'OpenAI', authType: 'api_key' },
+            { model: 'm2', provider: 'OpenAI', authType: 'api_key' },
+          ])
+        }
       >
         persist
       </button>
@@ -114,9 +125,36 @@ vi.mock('../../src/components/HeaderTierSnippetModal.js', () => ({
   ),
 }));
 
-import HeaderTierCard from '../../src/components/HeaderTierCard';
+import HeaderTierCardImpl from '../../src/components/HeaderTierCard';
 
-const baseTier: HeaderTier = {
+const route = (
+  model: string,
+  provider = model.startsWith('claude') ? 'Anthropic' : 'OpenAI',
+  authType: ModelRoute['authType'] = 'api_key',
+): ModelRoute => ({ model, provider, authType });
+
+const normalizeFallbacks = (items: unknown[] | null | undefined): ModelRoute[] | null =>
+  items?.map((item) => (typeof item === 'string' ? route(item) : (item as ModelRoute))) ?? null;
+
+const normalizeTier = (tier: any): HeaderTier => ({
+  ...tier,
+  override_route:
+    tier.override_route !== undefined
+      ? tier.override_route
+      : tier.override_model
+        ? route(tier.override_model, tier.override_provider ?? undefined, tier.override_auth_type ?? 'api_key')
+        : null,
+  fallback_routes:
+    tier.fallback_routes !== undefined
+      ? tier.fallback_routes
+      : normalizeFallbacks(tier.fallback_models),
+});
+
+const HeaderTierCard = (props: any) => (
+  <HeaderTierCardImpl {...props} tier={normalizeTier(props.tier)} />
+);
+
+const baseTier = {
   id: 'ht-1',
   agent_id: 'a1',
   name: 'Premium',
@@ -131,10 +169,10 @@ const baseTier: HeaderTier = {
   fallback_models: null,
   created_at: '2026-04-21',
   updated_at: '2026-04-21',
-};
+} as any;
 
 interface MountOptions {
-  tier?: HeaderTier;
+  tier?: any;
   models?: never[];
   customProviders?: never[];
   connectedProviders?: never[];
@@ -199,7 +237,7 @@ describe('HeaderTierCard', () => {
   });
 
   it('renders "+ Add model" when override_model is null', () => {
-    const emptyTier: HeaderTier = { ...baseTier, override_model: null };
+    const emptyTier = { ...baseTier, override_model: null };
     const { getByText } = mount({ tier: emptyTier });
     expect(getByText('+ Add model')).toBeDefined();
   });
@@ -209,7 +247,7 @@ describe('HeaderTierCard', () => {
     fireEvent.click(container.querySelector('.routing-card__model-chip')!);
     expect(getByTestId('mock-picker')).toBeDefined();
     fireEvent.click(getByTestId('mock-pick'));
-    expect(onOverride).toHaveBeenCalledWith('gpt-4o-mini', 'OpenAI', 'api_key');
+    expect(onOverride).toHaveBeenCalledWith(route('gpt-4o-mini', 'OpenAI', 'api_key'));
   });
 
   it('renders gear icon button that opens a dropdown menu', () => {
@@ -226,13 +264,13 @@ describe('HeaderTierCard', () => {
   });
 
   it('does not render the FallbackList when no primary model is set', () => {
-    const emptyTier: HeaderTier = { ...baseTier, override_model: null };
+    const emptyTier = { ...baseTier, override_model: null };
     const { queryByTestId } = mount({ tier: emptyTier });
     expect(queryByTestId('mock-fallback-list')).toBeNull();
   });
 
   it('reflects fallback_models length to the FallbackList', () => {
-    const tierWithFallbacks: HeaderTier = {
+    const tierWithFallbacks = {
       ...baseTier,
       fallback_models: ['claude-sonnet-4', 'gemini-2.5-pro'],
     };
@@ -247,19 +285,21 @@ describe('HeaderTierCard', () => {
     expect(getByTestId('mock-picker')).toBeDefined();
     fireEvent.click(getByTestId('mock-pick'));
     await waitFor(() =>
-      expect(setHeaderTierFallbacksMock).toHaveBeenCalledWith('my-agent', 'ht-1', ['gpt-4o-mini']),
+      expect(setHeaderTierFallbacksMock).toHaveBeenCalledWith('my-agent', 'ht-1', [
+        route('gpt-4o-mini', 'OpenAI', 'api_key'),
+      ]),
     );
-    expect(onFallbacksUpdate).toHaveBeenCalledWith(['gpt-4o-mini']);
+    expect(onFallbacksUpdate).toHaveBeenCalledWith([route('gpt-4o-mini', 'OpenAI', 'api_key')]);
   });
 
   it('FallbackList onUpdate forwards to onFallbacksUpdate', () => {
     const { getByTestId, onFallbacksUpdate } = mount();
     fireEvent.click(getByTestId('fallback-update'));
-    expect(onFallbacksUpdate).toHaveBeenCalledWith(['mock-removed']);
+    expect(onFallbacksUpdate).toHaveBeenCalledWith([route('mock-removed')]);
   });
 
   it('infers the provider id from the model prefix when override_provider is absent', () => {
-    const prefixTier: HeaderTier = {
+    const prefixTier = {
       ...baseTier,
       override_provider: null,
       override_model: 'anthropic/claude-sonnet-4',
@@ -269,7 +309,7 @@ describe('HeaderTierCard', () => {
   });
 
   it('renders the custom-provider swatch when the tier points at custom:{id}', () => {
-    const customTier: HeaderTier = {
+    const customTier = {
       ...baseTier,
       override_provider: 'custom:cp-1',
       override_model: 'custom:cp-1/llama3',
@@ -281,8 +321,8 @@ describe('HeaderTierCard', () => {
     expect(container.querySelector('[data-testid="custom-logo"]')).not.toBeNull();
   });
 
-  it('falls back to subscription auth when no override_auth_type and provider is subscription', () => {
-    const subTier: HeaderTier = { ...baseTier, override_auth_type: null };
+  it('renders subscription auth from the override route', () => {
+    const subTier = { ...baseTier, override_route: route('gpt-4o', 'OpenAI', 'subscription') };
     const { container } = mount({
       tier: subTier,
       connectedProviders: [{ provider: 'OpenAI', auth_type: 'subscription' }] as never,
@@ -290,8 +330,8 @@ describe('HeaderTierCard', () => {
     expect(container.textContent).toContain('Included in subscription');
   });
 
-  it('falls back to api_key auth when no override_auth_type and provider is api_key only', () => {
-    const apiTier: HeaderTier = { ...baseTier, override_auth_type: null };
+  it('renders api_key auth from the override route', () => {
+    const apiTier = { ...baseTier, override_route: route('gpt-4o', 'OpenAI', 'api_key') };
     const { container } = mount({
       tier: apiTier,
       connectedProviders: [{ provider: 'openai', auth_type: 'api_key' }] as never,
@@ -299,15 +339,15 @@ describe('HeaderTierCard', () => {
     expect(container.querySelector('[data-testid="auth-api_key"]')).not.toBeNull();
   });
 
-  it('renders no auth badge when override_auth_type is null and no providers match', () => {
-    const noAuthTier: HeaderTier = { ...baseTier, override_auth_type: null };
+  it('renders no auth badge when no route is selected', () => {
+    const noAuthTier = { ...baseTier, override_model: null, auto_assigned_model: null };
     const { container } = mount({ tier: noAuthTier });
     // No connected providers → effectiveAuth() returns null → no badge.
     expect(container.querySelector('[data-testid^="auth-"]')).toBeNull();
   });
 
-  it('falls back to local auth when the only connected provider is local (Ollama)', () => {
-    const tier: HeaderTier = { ...baseTier, override_auth_type: null, override_provider: 'ollama' };
+  it('renders local auth from the override route', () => {
+    const tier = { ...baseTier, override_route: route('llama3.1', 'ollama', 'local') };
     const { container } = mount({
       tier,
       connectedProviders: [{ provider: 'ollama', auth_type: 'local' }] as never,
@@ -315,8 +355,8 @@ describe('HeaderTierCard', () => {
     expect(container.querySelector('[data-testid="auth-local"]')).not.toBeNull();
   });
 
-  it('prefers subscription over local when both are connected (precedence sub > api_key > local)', () => {
-    const tier: HeaderTier = { ...baseTier, override_auth_type: null };
+  it('renders subscription auth even when other auth types are connected', () => {
+    const tier = { ...baseTier, override_route: route('gpt-4o', 'OpenAI', 'subscription') };
     const { container } = mount({
       tier,
       connectedProviders: [
@@ -328,8 +368,8 @@ describe('HeaderTierCard', () => {
     expect(container.querySelector('[data-testid="auth-local"]')).toBeNull();
   });
 
-  it('prefers api_key over local when both are connected', () => {
-    const tier: HeaderTier = { ...baseTier, override_auth_type: null };
+  it('renders api_key auth even when local auth is connected', () => {
+    const tier = { ...baseTier, override_route: route('gpt-4o', 'OpenAI', 'api_key') };
     const { container } = mount({
       tier,
       connectedProviders: [
@@ -348,7 +388,7 @@ describe('HeaderTierCard', () => {
     fireEvent.click(chipAction);
     expect(getByTestId('mock-picker')).toBeDefined();
     fireEvent.click(getByTestId('mock-pick'));
-    expect(onOverride).toHaveBeenCalledWith('gpt-4o-mini', 'OpenAI', 'api_key');
+    expect(onOverride).toHaveBeenCalledWith(route('gpt-4o-mini', 'OpenAI', 'api_key'));
   });
 
   it('persistFallbacks closure forwards the card agentName and tier id to the API', async () => {
@@ -356,7 +396,10 @@ describe('HeaderTierCard', () => {
     const { getByTestId } = mount();
     fireEvent.click(getByTestId('invoke-persist'));
     await waitFor(() =>
-      expect(setHeaderTierFallbacksMock).toHaveBeenCalledWith('my-agent', 'cb-tier', ['m1', 'm2']),
+      expect(setHeaderTierFallbacksMock).toHaveBeenCalledWith('my-agent', 'cb-tier', [
+        route('m1'),
+        route('m2'),
+      ]),
     );
   });
 
@@ -379,22 +422,21 @@ describe('HeaderTierCard', () => {
   });
 
   it('resolves the provider from the models list when override_provider is null', () => {
-    const inferTier: HeaderTier = { ...baseTier, override_provider: null };
+    const inferTier = { ...baseTier, override_provider: null };
     const { container } = mount({ tier: inferTier });
     // gpt-4o is in the default models with provider 'OpenAI'; we should still
     // get a non-custom provider icon for the chip.
     expect(container.querySelector('[data-testid="provider-icon"]')).not.toBeNull();
   });
 
-  it('falls back to undefined provider when the model prefix is unknown', () => {
-    const unknownTier: HeaderTier = {
+  it('uses the route provider even when the model prefix is unknown', () => {
+    const unknownTier = {
       ...baseTier,
       override_provider: null,
       override_model: 'totally-made-up-model',
     };
     const { container } = mount({ tier: unknownTier, models: [] as never });
-    // No matching model and no recognizable prefix → no provider icon.
-    expect(container.querySelector('[data-testid="provider-icon"]')).toBeNull();
+    expect(container.querySelector('[data-testid="provider-icon"]')).not.toBeNull();
   });
 
   it('gear icon button opens the SDK snippet modal via "Send this header" menu item', async () => {
@@ -444,7 +486,7 @@ describe('HeaderTierCard', () => {
   });
 
   it('does not render Reset button when no model is assigned', () => {
-    const emptyTier: HeaderTier = { ...baseTier, override_model: null };
+    const emptyTier = { ...baseTier, override_model: null };
     const { queryByText } = mount({ tier: emptyTier });
     expect(queryByText('Reset')).toBeNull();
   });
@@ -485,7 +527,7 @@ describe('HeaderTierCard', () => {
   it('falls back to the provider db-id when the model name has no recognizable prefix', () => {
     // model name has no known vendor prefix but the model entry still resolves
     // to a known provider via its `provider` field — we should fall back to it.
-    const oddTier: HeaderTier = {
+    const oddTier = {
       ...baseTier,
       override_provider: null,
       override_model: 'odd-name',

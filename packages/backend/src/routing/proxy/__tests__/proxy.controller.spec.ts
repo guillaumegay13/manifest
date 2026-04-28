@@ -5,6 +5,7 @@ import { ProxyMessageDedup } from '../proxy-message-dedup';
 import { IngestEventBusService } from '../../../common/services/ingest-event-bus.service';
 import { ThoughtSignatureCache } from '../thought-signature-cache';
 import { ThinkingBlockCache } from '../thinking-block-cache';
+import type { ModelRoute } from 'manifest-shared';
 
 /**
  * Flush enough microtasks for the recorder's fire-and-forget chain to
@@ -71,6 +72,84 @@ function mockRequest(
   };
 }
 
+interface LegacyRouteFixture {
+  model?: string;
+  provider?: string;
+  authType?: ModelRoute['authType'];
+  auth_type?: ModelRoute['authType'];
+}
+
+function routeFromFixture(fixture: LegacyRouteFixture): ModelRoute {
+  return {
+    model: fixture.model ?? 'gpt-4o',
+    provider: fixture.provider ?? 'OpenAI',
+    authType: fixture.authType ?? fixture.auth_type ?? 'api_key',
+  };
+}
+
+function normalizeProxyFixture(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+
+  const result = value as {
+    meta?: LegacyRouteFixture & {
+      route?: ModelRoute;
+      fallbackFromRoute?: ModelRoute;
+      fallbackFromModel?: string;
+      fallbackFromProvider?: string;
+      fallbackFromAuthType?: ModelRoute['authType'];
+    };
+    failedFallbacks?: Array<
+      LegacyRouteFixture & {
+        route?: ModelRoute;
+      }
+    >;
+  };
+
+  if (result.meta) {
+    result.meta.route ??= routeFromFixture(result.meta);
+
+    if (!result.meta.fallbackFromRoute && result.meta.fallbackFromModel) {
+      result.meta.fallbackFromRoute = routeFromFixture({
+        model: result.meta.fallbackFromModel,
+        provider: result.meta.fallbackFromProvider ?? result.meta.route.provider,
+        authType: result.meta.fallbackFromAuthType ?? result.meta.route.authType,
+      });
+    }
+  }
+
+  if (result.failedFallbacks) {
+    result.failedFallbacks = result.failedFallbacks.map((fallback) => ({
+      ...fallback,
+      route: fallback.route ?? routeFromFixture(fallback),
+    }));
+  }
+
+  return result;
+}
+
+function createProxyRequestMock(): jest.Mock {
+  const mock = jest.fn();
+  const originalMockResolvedValue = mock.mockResolvedValue.bind(mock);
+  const originalMockResolvedValueOnce = mock.mockResolvedValueOnce.bind(mock);
+  const originalMockImplementation = mock.mockImplementation.bind(mock);
+  const originalMockImplementationOnce = mock.mockImplementationOnce.bind(mock);
+
+  mock.mockResolvedValue = (value: unknown) =>
+    originalMockResolvedValue(normalizeProxyFixture(value));
+  mock.mockResolvedValueOnce = (value: unknown) =>
+    originalMockResolvedValueOnce(normalizeProxyFixture(value));
+  mock.mockImplementation = (fn: (...args: unknown[]) => unknown) =>
+    originalMockImplementation(async (...args: unknown[]) =>
+      normalizeProxyFixture(await fn(...args)),
+    );
+  mock.mockImplementationOnce = (fn: (...args: unknown[]) => unknown) =>
+    originalMockImplementationOnce(async (...args: unknown[]) =>
+      normalizeProxyFixture(await fn(...args)),
+    );
+
+  return mock;
+}
+
 describe('ProxyController', () => {
   let controller: ProxyController;
   let proxyService: { proxyRequest: jest.Mock };
@@ -104,7 +183,7 @@ describe('ProxyController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    proxyService = { proxyRequest: jest.fn() };
+    proxyService = { proxyRequest: createProxyRequestMock() };
     rateLimiter = {
       checkLimit: jest.fn(),
       checkIpLimit: jest.fn(),
@@ -2743,6 +2822,7 @@ describe('ProxyController', () => {
         {
           model: 'deepseek-chat',
           provider: 'DeepSeek',
+          authType: 'subscription',
           fallbackIndex: 0,
           status: 500,
           errorBody: 'fail 1',
@@ -2817,11 +2897,16 @@ describe('ProxyController', () => {
       error: expect.objectContaining({
         type: 'fallback_exhausted',
         status: 502,
-        primary_model: 'gpt-4o',
-        primary_provider: 'OpenAI',
+        primary_route: { model: 'gpt-4o', provider: 'OpenAI', authType: 'api_key' },
         attempted_fallbacks: [
-          { model: 'claude-sonnet-4', provider: 'Anthropic', status: 503 },
-          { model: 'deepseek-chat', provider: 'DeepSeek', status: 500 },
+          {
+            route: { model: 'claude-sonnet-4', provider: 'Anthropic', authType: 'api_key' },
+            status: 503,
+          },
+          {
+            route: { model: 'deepseek-chat', provider: 'DeepSeek', authType: 'api_key' },
+            status: 500,
+          },
         ],
       }),
     });

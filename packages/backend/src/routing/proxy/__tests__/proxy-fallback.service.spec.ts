@@ -11,6 +11,7 @@ import { MinimaxOauthService } from '../../oauth/minimax-oauth.service';
 import { ProviderClient } from '../provider-client';
 import { CopilotTokenService } from '../copilot-token.service';
 import { ModelPricingCacheService } from '../../../model-prices/model-pricing-cache.service';
+import type { AuthType, ModelRoute } from 'manifest-shared';
 
 describe('ProxyFallbackService', () => {
   let service: ProxyFallbackService;
@@ -62,11 +63,18 @@ describe('ProxyFallbackService', () => {
       minimaxOauth,
       providerClient,
       copilotToken,
-      pricingCache,
     );
   });
 
   const body = { messages: [{ role: 'user', content: 'Hello' }], stream: false };
+
+  function route(
+    model: string,
+    provider = 'Anthropic',
+    authType: AuthType = 'api_key',
+  ): ModelRoute {
+    return { provider, authType, model };
+  }
 
   describe('tryForwardToProvider', () => {
     it('returns forward result on success', async () => {
@@ -349,16 +357,16 @@ describe('ProxyFallbackService', () => {
       const result = await service.tryFallbacks(
         'agent-1',
         'user-1',
-        ['claude-sonnet-4'],
+        [route('claude-sonnet-4')],
         body,
         false,
         'sess-1',
-        'gpt-4o',
+        route('gpt-4o', 'OpenAI'),
       );
 
       expect(result.success).not.toBeNull();
-      expect(result.success!.model).toBe('claude-sonnet-4');
-      expect(result.success!.provider).toBe('Anthropic');
+      expect(result.success!.route.model).toBe('claude-sonnet-4');
+      expect(result.success!.route.provider).toBe('Anthropic');
       expect(result.success!.fallbackIndex).toBe(0);
       expect(result.failures).toHaveLength(0);
     });
@@ -376,34 +384,44 @@ describe('ProxyFallbackService', () => {
       const result = await service.tryFallbacks(
         'agent-1',
         'user-1',
-        ['model-a'],
+        [route('model-a')],
         body,
         false,
         'sess-1',
-        'gpt-4o',
+        route('gpt-4o', 'OpenAI'),
       );
 
       expect(result.success).toBeNull();
       expect(result.failures).toHaveLength(1);
     });
 
-    it('skips models with no provider data', async () => {
+    it('uses explicit fallback route provider without provider inference', async () => {
       pricingCache.getByModel.mockReturnValue(null as never);
       providerKeyService.findProviderForModel.mockResolvedValue(undefined);
+      providerKeyService.getProviderApiKey.mockResolvedValue('sk-test');
+      providerClient.forward.mockResolvedValue({
+        response: new Response('{}', { status: 200 }),
+        isGoogle: false,
+        isAnthropic: true,
+        isChatGpt: false,
+      });
 
       const result = await service.tryFallbacks(
         'agent-1',
         'user-1',
-        ['unknown-model'],
+        [route('unknown-model')],
         body,
         false,
         'sess-1',
-        'gpt-4o',
+        route('gpt-4o', 'OpenAI'),
       );
 
-      expect(result.success).toBeNull();
+      expect(result.success?.route).toEqual(route('unknown-model'));
       expect(result.failures).toHaveLength(0);
-      expect(providerClient.forward).not.toHaveBeenCalled();
+      expect(providerKeyService.findProviderForModel).not.toHaveBeenCalled();
+      expect(providerClient.forward).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'Anthropic', model: 'unknown-model' }),
+      );
     });
 
     it('skips models with no API key', async () => {
@@ -413,11 +431,11 @@ describe('ProxyFallbackService', () => {
       const result = await service.tryFallbacks(
         'agent-1',
         'user-1',
-        ['claude-sonnet-4'],
+        [route('claude-sonnet-4')],
         body,
         false,
         'sess-1',
-        'gpt-4o',
+        route('gpt-4o', 'OpenAI'),
       );
 
       expect(result.success).toBeNull();
@@ -436,15 +454,15 @@ describe('ProxyFallbackService', () => {
       const result = await service.tryFallbacks(
         'agent-1',
         'user-1',
-        ['custom:cp-1/my-model'],
+        [route('custom:cp-1/my-model', 'custom:cp-1')],
         body,
         false,
         'sess-1',
-        'gpt-4o',
+        route('gpt-4o', 'OpenAI'),
       );
 
       expect(result.success).not.toBeNull();
-      expect(result.success!.provider).toBe('custom:cp-1');
+      expect(result.success!.route.provider).toBe('custom:cp-1');
     });
 
     it('tries alternate auth_type for same provider when primary failed (#1272)', async () => {
@@ -466,24 +484,14 @@ describe('ProxyFallbackService', () => {
       const result = await service.tryFallbacks(
         'agent-1',
         'user-1',
-        ['claude-sonnet-4'],
+        [route('claude-sonnet-4', 'Anthropic', 'api_key')],
         body,
         false,
         'sess-1',
-        'gpt-4o',
-        undefined,
-        'anthropic',
-        'subscription',
+        route('gpt-4o', 'anthropic', 'subscription'),
       );
 
       expect(result.success).not.toBeNull();
-      // getAuthType should have been called with the exclusion set
-      expect(providerKeyService.getAuthType).toHaveBeenCalledWith(
-        'agent-1',
-        'Anthropic',
-        new Set(['subscription']),
-      );
-      // getProviderApiKey should use the alternate auth type
       expect(providerKeyService.getProviderApiKey).toHaveBeenCalledWith(
         'agent-1',
         'Anthropic',
@@ -505,18 +513,18 @@ describe('ProxyFallbackService', () => {
       await service.tryFallbacks(
         'agent-1',
         'user-1',
-        ['gpt-4o'],
+        [route('gpt-4o', 'OpenAI')],
         body,
         false,
         'sess-1',
-        'claude-sonnet-4',
-        undefined,
-        'anthropic',
-        'subscription',
+        route('claude-sonnet-4', 'anthropic', 'subscription'),
       );
 
-      // OpenAI is a different provider, so no exclusion set should be passed
-      expect(providerKeyService.getAuthType).toHaveBeenCalledWith('agent-1', 'OpenAI', undefined);
+      expect(providerKeyService.getProviderApiKey).toHaveBeenCalledWith(
+        'agent-1',
+        'OpenAI',
+        'api_key',
+      );
     });
 
     it('accumulates failed auth types across same-provider fallbacks', async () => {
@@ -542,29 +550,21 @@ describe('ProxyFallbackService', () => {
       await service.tryFallbacks(
         'agent-1',
         'user-1',
-        ['claude-sonnet-4', 'claude-haiku-3.5'],
+        [
+          route('claude-sonnet-4', 'Anthropic', 'api_key'),
+          route('claude-haiku-3.5', 'Anthropic', 'api_key'),
+        ],
         body,
         false,
         'sess-1',
-        'gpt-4o',
-        undefined,
-        'anthropic',
-        'subscription',
+        route('gpt-4o', 'anthropic', 'subscription'),
       );
 
-      // First call: exclusion contains 'subscription' (from primary)
-      expect(providerKeyService.getAuthType).toHaveBeenNthCalledWith(
+      expect(providerKeyService.getProviderApiKey).toHaveBeenNthCalledWith(
         1,
         'agent-1',
         'Anthropic',
-        new Set(['subscription']),
-      );
-      // Second call: exclusion now also contains 'api_key' (from first fallback failure)
-      expect(providerKeyService.getAuthType).toHaveBeenNthCalledWith(
-        2,
-        'agent-1',
-        'Anthropic',
-        new Set(['subscription', 'api_key']),
+        'api_key',
       );
     });
 
@@ -588,15 +588,15 @@ describe('ProxyFallbackService', () => {
       const result = await service.tryFallbacks(
         'agent-1',
         'user-1',
-        ['model-a', 'model-b'],
+        [route('model-a'), route('model-b')],
         body,
         false,
         'sess-1',
-        'gpt-4o',
+        route('gpt-4o', 'OpenAI'),
       );
 
       expect(result.success).not.toBeNull();
-      expect(result.success!.model).toBe('model-b');
+      expect(result.success!.route.model).toBe('model-b');
       expect(result.success!.fallbackIndex).toBe(1);
       expect(result.failures).toHaveLength(1);
       expect(result.failures[0].status).toBe(424);
@@ -620,16 +620,15 @@ describe('ProxyFallbackService', () => {
       const result = await service.tryFallbacks(
         'agent-1',
         'user-1',
-        ['anthropic/claude-sonnet-4'],
+        [route('anthropic/claude-sonnet-4', 'openrouter')],
         body,
         false,
         'sess-1',
-        'gpt-4o',
+        route('gpt-4o', 'OpenAI'),
       );
 
       expect(result.success).not.toBeNull();
-      expect(result.success!.provider).toBe('openrouter');
-      expect(providerKeyService.hasActiveProvider).toHaveBeenCalledWith('agent-1', 'anthropic');
+      expect(result.success!.route.provider).toBe('openrouter');
     });
   });
 

@@ -9,6 +9,31 @@ const MOCK_STAGES = [
   { id: 'data_analysis', step: 3, label: 'Data Analysis', desc: 'Crunch numbers, run stats, build charts.' },
 ];
 
+const route = (model: string) => ({ model, provider: 'OpenAI', authType: 'api_key' as const });
+
+const normalizeAssignment = (assignment: any) => ({
+  ...assignment,
+  override_route:
+    assignment.override_route !== undefined
+      ? assignment.override_route
+      : assignment.override_model
+        ? route(assignment.override_model)
+        : null,
+  auto_assigned_route:
+    assignment.auto_assigned_route !== undefined
+      ? assignment.auto_assigned_route
+      : assignment.auto_assigned_model
+        ? route(assignment.auto_assigned_model)
+        : null,
+  fallback_routes:
+    assignment.fallback_routes !== undefined
+      ? assignment.fallback_routes
+      : (assignment.fallback_models ?? []).map(route),
+});
+
+const normalizeAssignments = (assignments: any[] | undefined) =>
+  assignments?.map(normalizeAssignment);
+
 vi.mock('../../src/services/providers.js', () => ({
   SPECIFICITY_STAGES: [
     { id: 'coding', step: 1, label: 'Coding', desc: 'Write, debug, and refactor code.' },
@@ -56,7 +81,11 @@ vi.mock('../../src/pages/RoutingTierCard.js', () => ({
         {props.stage?.label ?? 'Unknown'}
         <button
           data-testid={`persist-fallbacks-${props.stage?.id}`}
-          onClick={() => props.persistFallbacks?.('test-agent', props.stage?.id, ['m1'])}
+          onClick={() =>
+            props.persistFallbacks?.('test-agent', props.stage?.id, [
+              { model: 'm1', provider: 'OpenAI', authType: 'api_key' },
+            ])
+          }
         >persist</button>
         <button
           data-testid={`clear-fallbacks-${props.stage?.id}`}
@@ -76,7 +105,11 @@ vi.mock('../../src/pages/RoutingTierCard.js', () => ({
         >reset</button>
         <button
           data-testid={`fallback-update-${props.stage?.id}`}
-          onClick={() => props.onFallbackUpdate?.(props.stage?.id, ['m1'])}
+          onClick={() =>
+            props.onFallbackUpdate?.(props.stage?.id, [
+              { model: 'm1', provider: 'OpenAI', authType: 'api_key' },
+            ])
+          }
         >fallback-update</button>
         <button
           data-testid={`add-fallback-${props.stage?.id}`}
@@ -99,7 +132,7 @@ import type { RoutingSpecificitySectionProps } from '../../src/pages/RoutingSpec
 import { toast } from '../../src/services/toast-store.js';
 
 function makeProps(overrides: Partial<RoutingSpecificitySectionProps> = {}): RoutingSpecificitySectionProps {
-  return {
+  const props = {
     agentName: () => 'test-agent',
     assignments: () => undefined,
     models: () => [],
@@ -118,6 +151,11 @@ function makeProps(overrides: Partial<RoutingSpecificitySectionProps> = {}): Rou
     refetchAll: vi.fn().mockResolvedValue(undefined),
     refetchSpecificity: vi.fn().mockResolvedValue(undefined),
     ...overrides,
+  };
+  const assignments = props.assignments;
+  return {
+    ...props,
+    assignments: () => normalizeAssignments(assignments?.()),
   };
 }
 
@@ -563,7 +601,7 @@ describe('RoutingSpecificitySection', () => {
     expect(tierData.category).toBe('coding');
   });
 
-  it('tier card getFallbacksFor returns fallback_models from assignment', () => {
+  it('tier card getFallbacksFor returns fallback routes from assignment', () => {
     const props = makeProps({
       assignments: () => [
         {
@@ -583,7 +621,7 @@ describe('RoutingSpecificitySection', () => {
     render(() => <RoutingSpecificitySection {...props} />);
     const card = screen.getByTestId('tier-card-coding');
     const fallbacks = JSON.parse(card.getAttribute('data-fallbacks')!);
-    expect(fallbacks).toEqual(['model-a', 'model-b']);
+    expect(fallbacks).toEqual([route('model-a'), route('model-b')]);
   });
 
   it('tier card getFallbacksFor returns empty array when no assignment found', () => {
@@ -630,7 +668,9 @@ describe('RoutingSpecificitySection', () => {
     render(() => <RoutingSpecificitySection {...props} />);
     fireEvent.click(screen.getByTestId('persist-fallbacks-coding'));
     await waitFor(() => {
-      expect(mockSetSpecificityFallbacks).toHaveBeenCalledWith('test-agent', 'coding', ['m1']);
+      expect(mockSetSpecificityFallbacks).toHaveBeenCalledWith('test-agent', 'coding', [
+        route('m1'),
+      ]);
     });
   });
 
@@ -695,7 +735,7 @@ describe('RoutingSpecificitySection', () => {
     expect(onDropdownOpen).toHaveBeenCalledWith('coding');
     expect(onOverride).toHaveBeenCalledWith('coding', 'model', 'provider');
     expect(onReset).toHaveBeenCalledWith('coding');
-    expect(onFallbackUpdate).toHaveBeenCalledWith('coding', ['m1']);
+    expect(onFallbackUpdate).toHaveBeenCalledWith('coding', [route('m1')]);
     expect(onAddFallback).toHaveBeenCalledWith('coding');
   });
 

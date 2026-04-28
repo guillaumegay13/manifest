@@ -7,9 +7,9 @@ import {
   recordSuccess,
 } from '../proxy-response-handler';
 import { RoutingMeta } from '../proxy.service';
-import { FailedFallback } from '../proxy-fallback.service';
 import { IngestionContext } from '../../../otlp/interfaces/ingestion-context.interface';
 import { StreamUsage } from '../stream-writer';
+import type { AuthType, ModelRoute } from 'manifest-shared';
 
 const testCtx: IngestionContext = {
   tenantId: 'tenant-1',
@@ -18,14 +18,59 @@ const testCtx: IngestionContext = {
   userId: 'user-1',
 };
 
-function makeMeta(overrides: Partial<RoutingMeta> = {}): RoutingMeta {
+type FailedFallback = {
+  route: ModelRoute;
+  fallbackIndex: number;
+  status: number;
+  errorBody: string;
+};
+
+type LegacyMeta = Partial<RoutingMeta> & {
+  model?: string;
+  provider?: string;
+  auth_type?: AuthType;
+  fallbackFromModel?: string;
+  fallbackFromProvider?: string;
+  fallbackFromAuthType?: AuthType;
+};
+
+function route(model: string, provider = 'openai', authType: AuthType = 'api_key'): ModelRoute {
+  return { provider, authType, model };
+}
+
+function failure(
+  model: string,
+  provider: string,
+  status: number,
+  errorBody: string,
+  fallbackIndex = 0,
+): FailedFallback {
+  return { route: route(model, provider), status, errorBody, fallbackIndex };
+}
+
+function makeMeta(overrides: LegacyMeta = {}): RoutingMeta {
+  const {
+    model,
+    provider,
+    auth_type: authType,
+    fallbackFromModel,
+    fallbackFromProvider,
+    fallbackFromAuthType,
+    ...rest
+  } = overrides;
   return {
     tier: 'standard' as any,
-    model: 'gpt-4o',
-    provider: 'openai',
+    route: route(model ?? 'gpt-4o', provider ?? 'openai', authType ?? 'api_key'),
     confidence: 0.9,
     reason: 'auto',
-    ...overrides,
+    fallbackFromRoute: fallbackFromModel
+      ? route(
+          fallbackFromModel,
+          fallbackFromProvider ?? 'openai',
+          fallbackFromAuthType ?? 'api_key',
+        )
+      : undefined,
+    ...rest,
   };
 }
 
@@ -135,17 +180,17 @@ describe('proxy-response-handler', () => {
         testCtx,
         500,
         'Internal Server Error',
-        {
+        expect.objectContaining({
           model: 'gpt-4o',
           provider: 'openai',
           tier: 'standard',
           traceId: 'trace-1',
           fallbackFromModel: undefined,
           fallbackIndex: undefined,
-          authType: undefined,
+          authType: 'api_key',
           reason: 'auto',
           specificityCategory: undefined,
-        },
+        }),
       );
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith(
@@ -186,13 +231,7 @@ describe('proxy-response-handler', () => {
       const meta = makeMeta(); // no fallbackFromModel
       const metaHeaders = buildMetaHeaders(meta);
       const failedFallbacks: FailedFallback[] = [
-        {
-          model: 'claude-3-haiku',
-          provider: 'anthropic',
-          fallbackIndex: 0,
-          status: 429,
-          errorBody: 'rate limited',
-        },
+        failure('claude-3-haiku', 'anthropic', 429, 'rate limited'),
       ];
 
       await handleProviderError(
@@ -213,8 +252,8 @@ describe('proxy-response-handler', () => {
         expect.objectContaining({
           error: expect.objectContaining({
             type: 'fallback_exhausted',
-            primary_model: 'gpt-4o',
-            attempted_fallbacks: [{ model: 'claude-3-haiku', provider: 'anthropic', status: 429 }],
+            primary_route: route('gpt-4o'),
+            attempted_fallbacks: [{ route: route('claude-3-haiku', 'anthropic'), status: 429 }],
           }),
         }),
       );
@@ -225,15 +264,7 @@ describe('proxy-response-handler', () => {
       const recorder = mockRecorder();
       const meta = makeMeta({ fallbackFromModel: 'gpt-4o' });
       const metaHeaders = buildMetaHeaders(meta);
-      const failedFallbacks: FailedFallback[] = [
-        {
-          model: 'claude-3-haiku',
-          provider: 'anthropic',
-          fallbackIndex: 0,
-          status: 429,
-          errorBody: '',
-        },
-      ];
+      const failedFallbacks: FailedFallback[] = [failure('claude-3-haiku', 'anthropic', 429, '')];
 
       await handleProviderError(
         res as any,
@@ -358,9 +389,7 @@ describe('proxy-response-handler', () => {
     it('should record failed fallbacks when present', () => {
       const recorder = mockRecorder();
       const meta = makeMeta({ fallbackFromModel: 'gpt-4o' });
-      const failedFallbacks: FailedFallback[] = [
-        { model: 'claude', provider: 'anthropic', fallbackIndex: 0, status: 500, errorBody: '' },
-      ];
+      const failedFallbacks: FailedFallback[] = [failure('claude', 'anthropic', 500, '')];
 
       recordFallbackFailures(testCtx, meta, failedFallbacks, recorder as any);
 
@@ -379,14 +408,14 @@ describe('proxy-response-handler', () => {
     it('should use default error message when primaryErrorBody is not set', () => {
       const recorder = mockRecorder();
       // The meta fixture represents a fallback-success flow:
-      //   meta.provider  = 'openai'     ← fallback that succeeded
+      //   meta.route.provider  = 'openai'     ← fallback that succeeded
       //   meta.primaryProvider = 'anthropic' ← primary that failed
       // recordPrimaryFailure must attribute the primary row to the primary
       // provider, not the fallback's provider.
       const meta = makeMeta({
         fallbackFromModel: 'claude-sonnet-4',
+        fallbackFromProvider: 'anthropic',
         primaryErrorStatus: 503,
-        primaryProvider: 'anthropic',
       });
 
       recordFallbackFailures(testCtx, meta, undefined, recorder as any);
@@ -397,8 +426,8 @@ describe('proxy-response-handler', () => {
         'claude-sonnet-4',
         'Provider returned HTTP 503',
         expect.any(String),
-        undefined,
-        { provider: 'anthropic', reason: 'auto', callerAttribution: undefined },
+        'api_key',
+        expect.objectContaining({ provider: 'anthropic', reason: 'auto' }),
       );
     });
 
@@ -406,7 +435,7 @@ describe('proxy-response-handler', () => {
       const recorder = mockRecorder();
       const meta = makeMeta({
         fallbackFromModel: 'claude-sonnet-4',
-        primaryProvider: 'anthropic',
+        fallbackFromProvider: 'anthropic',
       });
 
       recordFallbackFailures(testCtx, meta, undefined, recorder as any);
@@ -417,14 +446,12 @@ describe('proxy-response-handler', () => {
         'claude-sonnet-4',
         'Provider returned HTTP 500',
         expect.any(String),
-        undefined,
-        { provider: 'anthropic', reason: 'auto', callerAttribution: undefined },
+        'api_key',
+        expect.objectContaining({ provider: 'anthropic', reason: 'auto' }),
       );
     });
 
-    it('leaves primary provider undefined when meta.primaryProvider is not set', () => {
-      // Guard against regression: without primaryProvider we must NOT fall
-      // back to meta.provider (which is the fallback's provider in this flow).
+    it('uses the fallback-from route provider when no explicit primary provider is set', () => {
       const recorder = mockRecorder();
       const meta = makeMeta({ fallbackFromModel: 'claude-sonnet-4' });
 
@@ -436,8 +463,8 @@ describe('proxy-response-handler', () => {
         'claude-sonnet-4',
         expect.any(String),
         expect.any(String),
-        undefined,
-        { provider: undefined, reason: 'auto', callerAttribution: undefined },
+        'api_key',
+        expect.objectContaining({ provider: 'openai', reason: 'auto' }),
       );
     });
   });
@@ -872,7 +899,7 @@ describe('proxy-response-handler', () => {
 
       await handleNonStreamResponse(res as any, forward as any, meta, {}, client as any);
 
-      expect(client.collectChatGptSseResponse).toHaveBeenCalledWith(sseText, meta.model);
+      expect(client.collectChatGptSseResponse).toHaveBeenCalledWith(sseText, meta.route.model);
       expect(forward.response.text).toHaveBeenCalled();
     });
 
@@ -1132,16 +1159,21 @@ describe('proxy-response-handler', () => {
         'session-1',
       );
 
-      expect(recorder.recordFallbackSuccess).toHaveBeenCalledWith(testCtx, 'gpt-4o', 'standard', {
-        traceId: 'trace-1',
-        provider: 'openai',
-        fallbackFromModel: 'gpt-4o',
-        fallbackIndex: 1,
-        timestamp: '2025-01-01T00:00:00Z',
-        authType: undefined,
-        reason: 'auto',
-        usage,
-      });
+      expect(recorder.recordFallbackSuccess).toHaveBeenCalledWith(
+        testCtx,
+        'gpt-4o',
+        'standard',
+        expect.objectContaining({
+          traceId: 'trace-1',
+          provider: 'openai',
+          fallbackFromModel: 'gpt-4o',
+          fallbackIndex: 1,
+          timestamp: '2025-01-01T00:00:00Z',
+          authType: 'api_key',
+          reason: 'auto',
+          usage,
+        }),
+      );
     });
 
     it('should record success message when no fallback and usage exists', () => {
@@ -1157,14 +1189,14 @@ describe('proxy-response-handler', () => {
         'standard',
         'auto',
         usage,
-        {
+        expect.objectContaining({
           traceId: 'trace-1',
           provider: 'openai',
-          authType: undefined,
+          authType: 'api_key',
           sessionKey: 'session-1',
           durationMs: expect.any(Number),
           specificityCategory: undefined,
-        },
+        }),
       );
     });
 
@@ -1177,11 +1209,11 @@ describe('proxy-response-handler', () => {
       expect(recorder.recordFallbackSuccess).not.toHaveBeenCalled();
       expect(recorder.recordSuccessMessage).toHaveBeenCalledWith(
         testCtx,
-        meta.model,
+        meta.route.model,
         meta.tier,
         meta.reason,
         { prompt_tokens: 0, completion_tokens: 0 },
-        expect.objectContaining({ authType: meta.auth_type }),
+        expect.objectContaining({ authType: meta.route.authType }),
       );
     });
 
@@ -1237,16 +1269,21 @@ describe('proxy-response-handler', () => {
 
       recordSuccess(testCtx, meta, null, '2025-01-01T00:00:00Z', recorder as any);
 
-      expect(recorder.recordFallbackSuccess).toHaveBeenCalledWith(testCtx, 'gpt-4o', 'standard', {
-        traceId: undefined,
-        provider: 'openai',
-        fallbackFromModel: 'gpt-4o',
-        fallbackIndex: 0,
-        timestamp: '2025-01-01T00:00:00Z',
-        authType: undefined,
-        reason: 'auto',
-        usage: undefined,
-      });
+      expect(recorder.recordFallbackSuccess).toHaveBeenCalledWith(
+        testCtx,
+        'gpt-4o',
+        'standard',
+        expect.objectContaining({
+          traceId: undefined,
+          provider: 'openai',
+          fallbackFromModel: 'gpt-4o',
+          fallbackIndex: 0,
+          timestamp: '2025-01-01T00:00:00Z',
+          authType: 'api_key',
+          reason: 'auto',
+          usage: undefined,
+        }),
+      );
     });
 
     it('defaults fallbackIndex to 0 when meta does not set one', () => {
@@ -1315,15 +1352,7 @@ describe('proxy-response-handler', () => {
       const { res } = mockResponse();
       const recorder = mockRecorder();
       const meta = makeMeta();
-      const failedFallbacks: FailedFallback[] = [
-        {
-          model: 'claude-3-haiku',
-          provider: 'anthropic',
-          fallbackIndex: 0,
-          status: 429,
-          errorBody: '',
-        },
-      ];
+      const failedFallbacks: FailedFallback[] = [failure('claude-3-haiku', 'anthropic', 429, '')];
       await handleProviderError(
         res as any,
         testCtx,
@@ -1350,7 +1379,7 @@ describe('proxy-response-handler', () => {
         'gpt-4o',
         'fail',
         expect.any(String),
-        undefined,
+        'api_key',
         expect.objectContaining({ requestHeaders: headers }),
       );
     });
@@ -1359,11 +1388,9 @@ describe('proxy-response-handler', () => {
       const recorder = mockRecorder();
       const meta = makeMeta({
         fallbackFromModel: 'claude-sonnet-4',
-        primaryProvider: 'anthropic',
+        fallbackFromProvider: 'anthropic',
       });
-      const failedFallbacks: FailedFallback[] = [
-        { model: 'x', provider: 'y', fallbackIndex: 0, status: 500, errorBody: '' },
-      ];
+      const failedFallbacks: FailedFallback[] = [failure('x', 'y', 500, '')];
       recordFallbackFailures(testCtx, meta, failedFallbacks, recorder as any, null, headers);
       expect(recorder.recordPrimaryFailure).toHaveBeenCalledWith(
         testCtx,
@@ -1371,7 +1398,7 @@ describe('proxy-response-handler', () => {
         'claude-sonnet-4',
         expect.any(String),
         expect.any(String),
-        undefined,
+        'api_key',
         expect.objectContaining({ requestHeaders: headers }),
       );
       expect(recorder.recordFailedFallbacks).toHaveBeenCalledWith(
@@ -1390,12 +1417,10 @@ describe('proxy-response-handler', () => {
       const recorder = mockRecorder();
       const meta = makeMeta({
         fallbackFromModel: 'claude-sonnet-4',
-        primaryProvider: 'anthropic',
+        fallbackFromProvider: 'anthropic',
         reason: 'header-match',
       });
-      const failedFallbacks: FailedFallback[] = [
-        { model: 'x', provider: 'y', fallbackIndex: 0, status: 500, errorBody: '' },
-      ];
+      const failedFallbacks: FailedFallback[] = [failure('x', 'y', 500, '')];
       recordFallbackFailures(testCtx, meta, failedFallbacks, recorder as any);
       expect(recorder.recordFailedFallbacks).toHaveBeenCalledWith(
         testCtx,

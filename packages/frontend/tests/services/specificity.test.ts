@@ -42,11 +42,13 @@ const assignment = {
   agent_id: 'agent-1',
   category: 'code_generation',
   is_active: true,
-  override_model: null,
-  override_provider: null,
-  override_auth_type: null,
-  auto_assigned_model: 'claude-sonnet-4-20250514',
-  fallback_models: null,
+  override_route: null,
+  auto_assigned_route: {
+    provider: 'anthropic',
+    authType: 'api_key' as const,
+    model: 'claude-sonnet-4-20250514',
+  },
+  fallback_routes: null,
   updated_at: '2026-04-09T00:00:00Z',
 };
 
@@ -122,11 +124,12 @@ describe('toggleSpecificity', () => {
 });
 
 describe('overrideSpecificity', () => {
-  it('should PUT with model and provider', async () => {
-    const overridden = { ...assignment, override_model: 'gpt-4o', override_provider: 'openai' };
+  it('should PUT with route', async () => {
+    const route = { provider: 'openai', authType: 'api_key' as const, model: 'gpt-4o' };
+    const overridden = { ...assignment, override_route: route };
     mockMutateOk(overridden);
 
-    const result = await overrideSpecificity('my-agent', 'code_generation', 'gpt-4o', 'openai');
+    const result = await overrideSpecificity('my-agent', 'code_generation', route);
 
     expect(result).toEqual(overridden);
     expect(mockFetch).toHaveBeenCalledWith(
@@ -135,15 +138,16 @@ describe('overrideSpecificity', () => {
         credentials: 'include',
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'gpt-4o', provider: 'openai' }),
+        body: JSON.stringify({ route }),
       },
     );
   });
 
-  it('should include authType in body when provided', async () => {
+  it('should include authType in the route body', async () => {
+    const route = { provider: 'openai', authType: 'subscription' as const, model: 'gpt-4o' };
     mockMutateOk(assignment);
 
-    await overrideSpecificity('my-agent', 'code_generation', 'gpt-4o', 'openai', 'subscription');
+    await overrideSpecificity('my-agent', 'code_generation', route);
 
     expect(mockFetch).toHaveBeenCalledWith(
       '/api/v1/routing/my-agent/specificity/code_generation',
@@ -151,26 +155,30 @@ describe('overrideSpecificity', () => {
         credentials: 'include',
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'gpt-4o', provider: 'openai', authType: 'subscription' }),
+        body: JSON.stringify({ route }),
       },
     );
   });
 
-  it('should omit authType from body when undefined', async () => {
+  it('should send local authType in the route body', async () => {
+    const route = { provider: 'ollama', authType: 'local' as const, model: 'llama3.1:8b' };
     mockMutateOk(assignment);
 
-    await overrideSpecificity('my-agent', 'code_generation', 'gpt-4o', 'openai', undefined);
+    await overrideSpecificity('my-agent', 'code_generation', route);
 
     const call = mockFetch.mock.calls[0];
     const body = JSON.parse(call[1].body);
-    expect(body).toEqual({ model: 'gpt-4o', provider: 'openai' });
-    expect(body).not.toHaveProperty('authType');
+    expect(body).toEqual({ route });
   });
 
   it('should encode special characters in agent name and category', async () => {
     mockMutateOk(assignment);
 
-    await overrideSpecificity('a b', 'c d', 'model', 'provider');
+    await overrideSpecificity('a b', 'c d', {
+      provider: 'provider',
+      authType: 'api_key',
+      model: 'model',
+    });
 
     expect(mockFetch).toHaveBeenCalledWith(
       '/api/v1/routing/a%20b/specificity/c%20d',
