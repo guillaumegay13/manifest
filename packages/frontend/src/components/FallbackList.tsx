@@ -4,7 +4,7 @@ import {
   setFallbacks,
   type AvailableModel,
   type CustomProviderData,
-  type RoutingProvider,
+  type ModelRoute,
 } from '../services/api.js';
 import { customProviderColor } from '../services/formatters.js';
 import { getModelLabel } from '../services/provider-utils.js';
@@ -17,18 +17,17 @@ import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 interface FallbackListProps {
   agentName: string;
   tier: string;
-  fallbacks: string[];
+  fallbacks: ModelRoute[];
   models: AvailableModel[];
   customProviders: CustomProviderData[];
-  connectedProviders: RoutingProvider[];
-  onUpdate: (updatedFallbacks: string[]) => void;
+  onUpdate: (updated: ModelRoute[]) => void;
   onAddFallback: () => void;
   adding?: boolean;
   primaryDragging?: boolean;
   onPrimaryDropAtSlot?: (slot: number) => void;
   onFallbackDragStart?: (index: number) => void;
   onFallbackDragEnd?: () => void;
-  persistFallbacks?: (agentName: string, tier: string, models: string[]) => Promise<unknown>;
+  persistFallbacks?: (agentName: string, tier: string, routes: ModelRoute[]) => Promise<unknown>;
   persistClearFallbacks?: (agentName: string, tier: string) => Promise<unknown>;
 }
 
@@ -38,37 +37,22 @@ const FallbackList: Component<FallbackListProps> = (props) => {
   const [dropSlot, setDropSlot] = createSignal<number | null>(null);
   let listRef: HTMLDivElement | undefined;
 
-  const modelLabel = (model: string): string => {
-    const info = props.models.find((m) => m.model_name === model);
-    if (info?.display_name) return info.display_name;
-    if (info) {
-      const provId = resolveProviderId(info.provider);
-      if (provId) return getModelLabel(provId, model);
-    }
-    return stripCustomPrefix(model);
-  };
-
-  const providerIdFor = (model: string): string | undefined => {
-    const info = props.models.find((m) => m.model_name === model);
-    if (info) return resolveProviderId(info.provider);
-    return undefined;
-  };
-
-  const authTypeFor = (providerId: string | undefined): string | null => {
-    if (!providerId) return null;
-    const provs = props.connectedProviders.filter(
-      (p) => p.provider.toLowerCase() === providerId.toLowerCase(),
+  const modelLabel = (route: ModelRoute): string => {
+    const info = props.models.find(
+      (m) =>
+        m.model_name === route.model && m.provider.toLowerCase() === route.provider.toLowerCase(),
     );
-    if (provs.some((p) => p.auth_type === 'subscription')) return 'subscription';
-    if (provs.some((p) => p.auth_type === 'api_key')) return 'api_key';
-    return null;
+    if (info?.display_name) return info.display_name;
+    const provId = resolveProviderId(route.provider);
+    if (provId) return getModelLabel(provId, route.model);
+    return stripCustomPrefix(route.model);
   };
 
-  const providerTitle = (providerId: string | undefined, authType: string | null): string => {
-    if (!providerId) return '';
-    const provDef = PROVIDERS.find((p) => p.id === providerId);
-    const name = provDef?.name ?? providerId;
-    const method = authType === 'subscription' ? 'Subscription' : 'API Key';
+  const providerTitle = (route: ModelRoute): string => {
+    const provId = resolveProviderId(route.provider) ?? route.provider;
+    const provDef = PROVIDERS.find((p) => p.id === provId);
+    const name = provDef?.name ?? provId;
+    const method = route.authType === 'subscription' ? 'Subscription' : 'API Key';
     return `${name} (${method})`;
   };
 
@@ -118,9 +102,7 @@ const FallbackList: Component<FallbackListProps> = (props) => {
     const cards = listRef.querySelectorAll<HTMLElement>('.fallback-list__card');
     if (cards.length === 0) return isPrimaryDrag ? 0 : null;
 
-    // Find which slot the cursor is closest to.
-    // Slots are: before card 0, between card 0 and 1, ..., after last card.
-    let slot = cards.length; // default: after the last card
+    let slot = cards.length;
     for (let i = 0; i < cards.length; i++) {
       const rect = cards[i]!.getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
@@ -130,7 +112,6 @@ const FallbackList: Component<FallbackListProps> = (props) => {
       }
     }
 
-    // Don't show indicator at the dragged item's current position (no-op move)
     if (!isPrimaryDrag && (slot === from || slot === from! + 1)) return null;
     return slot;
   };
@@ -142,7 +123,6 @@ const FallbackList: Component<FallbackListProps> = (props) => {
   };
 
   const handleContainerDragLeave = (e: DragEvent) => {
-    // Only clear when leaving the container entirely
     const related = e.relatedTarget as Node | null;
     if (!related || !listRef?.contains(related)) {
       setDropSlot(null);
@@ -156,7 +136,6 @@ const FallbackList: Component<FallbackListProps> = (props) => {
     setDragIndex(null);
     setDropSlot(null);
 
-    // Primary model dropped into fallback list
     if (props.primaryDragging && fromIndex === null && toSlot !== null) {
       props.onPrimaryDropAtSlot?.(toSlot);
       return;
@@ -199,11 +178,10 @@ const FallbackList: Component<FallbackListProps> = (props) => {
           onDragEnd={handleDragEnd}
         >
           <For each={props.fallbacks}>
-            {(model, i) => {
-              const provId = () => providerIdFor(model);
-              const isCustom = () => provId()?.startsWith('custom:');
-              const auth = () => authTypeFor(provId());
-              const title = () => providerTitle(provId(), auth());
+            {(route, i) => {
+              const provId = () => resolveProviderId(route.provider) ?? route.provider;
+              const isCustom = () => provId().startsWith('custom:');
+              const title = () => providerTitle(route);
               return (
                 <>
                   <div
@@ -230,16 +208,21 @@ const FallbackList: Component<FallbackListProps> = (props) => {
                         <circle cx="6" cy="12" r="1.2" />
                       </svg>
                     </span>
-                    <Show when={provId() && !isCustom()}>
+                    <Show when={!isCustom()}>
                       <span class="fallback-list__icon" title={title()}>
-                        {providerIcon(provId()!, 14)}
-                        {authBadgeFor(auth(), 8)}
+                        {providerIcon(provId(), 14)}
+                        {authBadgeFor(route.authType, 8)}
                       </span>
                     </Show>
                     <Show when={isCustom()}>
                       {(() => {
                         const cp = props.customProviders.find((c) => `custom:${c.id}` === provId());
-                        const logo = customProviderLogo(cp?.name ?? '', 14, cp?.base_url, model);
+                        const logo = customProviderLogo(
+                          cp?.name ?? '',
+                          14,
+                          cp?.base_url,
+                          route.model,
+                        );
                         if (logo) {
                           return (
                             <span class="fallback-list__icon" title={cp?.name ?? 'Custom'}>
@@ -265,12 +248,12 @@ const FallbackList: Component<FallbackListProps> = (props) => {
                         );
                       })()}
                     </Show>
-                    <span class="fallback-list__model">{modelLabel(model)}</span>
+                    <span class="fallback-list__model">{modelLabel(route)}</span>
                     <button
                       class="fallback-list__remove"
                       onClick={() => handleRemove(i())}
                       title="Remove fallback"
-                      aria-label={`Remove ${modelLabel(model)}`}
+                      aria-label={`Remove ${modelLabel(route)}`}
                       disabled={removingIndex() !== null}
                     >
                       {removingIndex() === i() ? (

@@ -167,19 +167,34 @@ const ModelPickerModal: Component<Props> = (props) => {
     return groups;
   };
 
-  const isRecommended = (modelName: string): boolean => {
+  const isRecommended = (modelName: string, providerId: string, authType: AuthType): boolean => {
     const t = props.tiers.find((r) => r.tier === props.tierId);
-    return t?.auto_assigned_model === modelName;
+    const auto = t?.auto_assigned_route;
+    if (!auto) return false;
+    return (
+      auto.model === modelName &&
+      auto.provider.toLowerCase() === providerId.toLowerCase() &&
+      auto.authType === authType
+    );
   };
 
-  /** Returns the role of a model in the current tier: "Primary", "Fallback 1", etc. or null */
-  const modelRole = (modelName: string): string | null => {
+  /**
+   * Returns the role this (model, provider, authType) plays in the current
+   * tier: "Primary", "Fallback N", or null. Identity is the full route — two
+   * rows with the same model name but different auth types are independent
+   * roles, which is the whole reason for the route shape.
+   */
+  const modelRole = (modelName: string, providerId: string, authType: AuthType): string | null => {
     const t = props.tiers.find((r) => r.tier === props.tierId);
     if (!t) return null;
-    const primary = t.override_model ?? t.auto_assigned_model;
-    if (primary === modelName) return 'Primary';
-    const fb = t.fallback_models ?? [];
-    const fbIndex = fb.indexOf(modelName);
+    const primary = t.override_route ?? t.auto_assigned_route;
+    const matchesRoute = (r: { model: string; provider: string; authType: AuthType }): boolean =>
+      r.model === modelName &&
+      r.provider.toLowerCase() === providerId.toLowerCase() &&
+      r.authType === authType;
+    if (primary && matchesRoute(primary)) return 'Primary';
+    const fb = t.fallback_routes ?? [];
+    const fbIndex = fb.findIndex(matchesRoute);
     if (fbIndex !== -1) return `Fallback ${fbIndex + 1}`;
     return null;
   };
@@ -448,10 +463,10 @@ const ModelPickerModal: Component<Props> = (props) => {
                     >
                       <span class="routing-modal__model-label">
                         {model.label}
-                        <Show when={isRecommended(model.value)}>
+                        <Show when={isRecommended(model.value, group.provId, activeTab())}>
                           <span class="routing-modal__recommended"> (recommended)</span>
                         </Show>
-                        <Show when={modelRole(model.value)}>
+                        <Show when={modelRole(model.value, group.provId, activeTab())}>
                           {(role) => <span class="routing-modal__role-tag">{role()}</span>}
                         </Show>
                       </span>

@@ -1,4 +1,4 @@
-import { createSignal, For, Show, type Component } from 'solid-js';
+import { createSignal, Show, type Component } from 'solid-js';
 import { PROVIDERS } from '../services/providers.js';
 import type { StageDef } from '../services/providers.js';
 import { getModelLabel } from '../services/provider-utils.js';
@@ -13,39 +13,10 @@ import type {
   TierAssignment,
   AvailableModel,
   AuthType,
+  ModelRoute,
   RoutingProvider,
   CustomProviderData,
 } from '../services/api.js';
-
-function providerIdForModel(model: string, apiModels: AvailableModel[]): string | undefined {
-  const m =
-    apiModels.find((x) => x.model_name === model) ??
-    apiModels.find((x) => x.model_name.startsWith(model + '-'));
-  if (m) {
-    const dbId = resolveProviderId(m.provider);
-    // Ollama providers keep their DB id to avoid the colon-suffix heuristic in
-    // inferProviderFromModel mis-routing cloud models to local Ollama.
-    if (dbId === 'ollama' || dbId === 'ollama-cloud') return dbId;
-    const prefixId = inferProviderFromModel(m.model_name);
-    if (prefixId && PROVIDERS.find((p) => p.id === prefixId)) return prefixId;
-    return dbId ?? prefixId;
-  }
-  const prefix = inferProviderFromModel(model);
-  if (prefix && PROVIDERS.find((p) => p.id === prefix)) return prefix;
-  for (const prov of PROVIDERS) {
-    if (
-      prov.models.some(
-        (pm) =>
-          pm.value === model ||
-          model.startsWith(pm.value + '-') ||
-          pm.value.startsWith(model + '-'),
-      )
-    ) {
-      return prov.id;
-    }
-  }
-  return undefined;
-}
 
 export interface RoutingTierCardProps {
   stage: StageDef;
@@ -62,29 +33,24 @@ export interface RoutingTierCardProps {
   onDropdownOpen: (tierId: string) => void;
   onOverride: (tierId: string, model: string, providerId: string, authType?: AuthType) => void;
   onReset: (tierId: string) => void;
-  onFallbackUpdate: (tierId: string, fallbacks: string[]) => void;
+  onFallbackUpdate: (tierId: string, fallbacks: ModelRoute[]) => void;
   onAddFallback: (tierId: string) => void;
-  getFallbacksFor: (tierId: string) => string[];
+  getFallbacksFor: (tierId: string) => ModelRoute[];
   connectedProviders: () => RoutingProvider[];
-  persistFallbacks?: (agentName: string, tier: string, models: string[]) => Promise<unknown>;
+  persistFallbacks?: (agentName: string, tier: string, routes: ModelRoute[]) => Promise<unknown>;
   persistClearFallbacks?: (agentName: string, tier: string) => Promise<unknown>;
 }
 
-const effectiveModel = (t: TierAssignment): string | null =>
-  t.override_model ?? t.auto_assigned_model;
+const effectiveRoute = (t: TierAssignment): ModelRoute | null =>
+  t.override_route ?? t.auto_assigned_route;
 
 const RoutingTierCard: Component<RoutingTierCardProps> = (props) => {
-  const eff = () => {
+  const eff = (): ModelRoute | null => {
     const t = props.tier();
-    return t ? effectiveModel(t) : null;
+    return t ? effectiveRoute(t) : null;
   };
-  const manualProviderId = () => {
-    const t = props.tier();
-    return t?.override_model ? (t.override_provider ?? undefined) : undefined;
-  };
-  const isManual = () =>
-    props.tier()?.override_model !== null && props.tier()?.override_model !== undefined;
-  const hasFallbacks = () => (props.tier()?.fallback_models ?? []).length > 0;
+  const isManual = () => props.tier()?.override_route != null;
+  const hasFallbacks = () => (props.tier()?.fallback_routes ?? []).length > 0;
   const hasCustomizations = () => isManual() || hasFallbacks();
   const [confirmReset, setConfirmReset] = createSignal(false);
   const [primaryDragging, setPrimaryDragging] = createSignal(false);
@@ -126,16 +92,22 @@ const RoutingTierCard: Component<RoutingTierCardProps> = (props) => {
   };
 
   const handlePrimaryDropAtSlot = async (slot: number) => {
-    const currentModel = eff();
-    if (!currentModel) return;
+    const current = eff();
+    if (!current) return;
     const fallbacks = props.getFallbacksFor(props.stage.id);
     // Build the unified list: insert current primary at drop slot
     const newFallbacks = [...fallbacks];
-    newFallbacks.splice(slot, 0, currentModel);
+    newFallbacks.splice(slot, 0, current);
     // First item becomes new primary, rest stay as fallbacks
     const newPrimary = newFallbacks.shift()!;
-    if (newPrimary === currentModel && slot === 0) return; // no-op
-    // Update fallbacks first, then override primary
+    if (
+      newPrimary.model === current.model &&
+      newPrimary.provider === current.provider &&
+      newPrimary.authType === current.authType &&
+      slot === 0
+    ) {
+      return; // no-op
+    }
     props.onFallbackUpdate(props.stage.id, newFallbacks);
     try {
       const persistFn = props.persistFallbacks ?? setFallbacksApi;
@@ -145,20 +117,18 @@ const RoutingTierCard: Component<RoutingTierCardProps> = (props) => {
       toast.error('Failed to update fallbacks');
       return;
     }
-    const provId = providerIdForModel(newPrimary, props.models());
-    props.onOverride(props.stage.id, newPrimary, provId ?? '');
+    props.onOverride(props.stage.id, newPrimary.model, newPrimary.provider, newPrimary.authType);
   };
 
   const swapPrimaryWithFallback = async (fbIndex: number) => {
-    const currentModel = eff();
-    if (!currentModel) return;
+    const current = eff();
+    if (!current) return;
     const fallbacks = props.getFallbacksFor(props.stage.id);
-    const fbModel = fallbacks[fbIndex];
-    if (!fbModel) return;
-    // Swap: fallback model goes to primary, current primary takes its place
+    const fbRoute = fallbacks[fbIndex];
+    if (!fbRoute) return;
+    // Swap: the fallback route moves to primary; the old primary takes its slot.
     const newFallbacks = [...fallbacks];
-    newFallbacks[fbIndex] = currentModel;
-    // Update fallbacks first, then override primary
+    newFallbacks[fbIndex] = current;
     props.onFallbackUpdate(props.stage.id, newFallbacks);
     try {
       const persistFn = props.persistFallbacks ?? setFallbacksApi;
@@ -168,8 +138,7 @@ const RoutingTierCard: Component<RoutingTierCardProps> = (props) => {
       toast.error('Failed to update fallbacks');
       return;
     }
-    const provId = providerIdForModel(fbModel, props.models());
-    props.onOverride(props.stage.id, fbModel, provId ?? '');
+    props.onOverride(props.stage.id, fbRoute.model, fbRoute.provider, fbRoute.authType);
   };
 
   const modelInfo = (modelName: string): AvailableModel | undefined => {
@@ -253,21 +222,9 @@ const RoutingTierCard: Component<RoutingTierCardProps> = (props) => {
       >
         <div class="routing-card__body">
           <Show when={eff()} fallback={null}>
-            {(modelName) => {
-              const provId = () =>
-                manualProviderId() ?? providerIdForModel(modelName(), props.models());
-              const effectiveAuth = (): AuthType | null => {
-                const t = props.tier();
-                if (t?.override_auth_type) return t.override_auth_type;
-                const id = provId();
-                if (!id) return null;
-                const provs = props
-                  .activeProviders()
-                  .filter((p) => p.provider.toLowerCase() === id.toLowerCase());
-                if (provs.some((p) => p.auth_type === 'subscription')) return 'subscription';
-                if (provs.some((p) => p.auth_type === 'api_key')) return 'api_key';
-                return null;
-              };
+            {(route) => {
+              const provId = () => resolveProviderId(route().provider) ?? route().provider;
+              const effectiveAuth = (): AuthType => route().authType;
               return (
                 <>
                   <Show
@@ -322,7 +279,7 @@ const RoutingTierCard: Component<RoutingTierCardProps> = (props) => {
                               const logo = () => {
                                 const c = cp();
                                 return c
-                                  ? customProviderLogo(c.name, 14, c.base_url, modelName())
+                                  ? customProviderLogo(c.name, 14, c.base_url, route().model)
                                   : null;
                               };
                               return (
@@ -350,7 +307,7 @@ const RoutingTierCard: Component<RoutingTierCardProps> = (props) => {
                               );
                             })()}
                           </Show>
-                          <span class="routing-card__main">{labelFor(modelName())}</span>
+                          <span class="routing-card__main">{labelFor(route().model)}</span>
                           <Show when={!isManual()}>
                             <span class="routing-card__auto-tag">auto</span>
                           </Show>
@@ -381,7 +338,7 @@ const RoutingTierCard: Component<RoutingTierCardProps> = (props) => {
                             <span class="routing-card__chip-price">Included in subscription</span>
                           }
                         >
-                          <span class="routing-card__chip-price">{priceLabel(modelName())}</span>
+                          <span class="routing-card__chip-price">{priceLabel(route().model)}</span>
                         </Show>
                       </div>
                     </div>
@@ -399,7 +356,6 @@ const RoutingTierCard: Component<RoutingTierCardProps> = (props) => {
               fallbacks={props.getFallbacksFor(props.stage.id)}
               models={props.models()}
               customProviders={props.customProviders()}
-              connectedProviders={props.activeProviders()}
               onUpdate={(updatedFallbacks) =>
                 props.onFallbackUpdate(props.stage.id, updatedFallbacks)
               }

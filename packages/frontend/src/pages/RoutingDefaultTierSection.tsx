@@ -3,6 +3,7 @@ import type {
   AuthType,
   AvailableModel,
   CustomProviderData,
+  ModelRoute,
   RoutingProvider,
   TierAssignment,
 } from '../services/api.js';
@@ -24,9 +25,9 @@ export interface RoutingDefaultTierSectionProps {
   onDropdownOpen: (tierId: string) => void;
   onOverride: (tierId: string, model: string, provider: string, authType?: AuthType) => void;
   onReset: (tierId: string) => void;
-  onFallbackUpdate: (tierId: string, fallbacks: string[]) => void;
+  onFallbackUpdate: (tierId: string, fallbacks: ModelRoute[]) => void;
   onAddFallback: (tierId: string) => void;
-  getFallbacksFor: (tierId: string) => string[];
+  getFallbacksFor: (tierId: string) => ModelRoute[];
   getTier: (tierId: string) => TierAssignment | undefined;
   complexityEnabled: () => boolean;
   togglingComplexity: () => boolean;

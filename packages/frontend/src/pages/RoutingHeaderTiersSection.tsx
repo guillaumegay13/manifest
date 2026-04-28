@@ -11,8 +11,8 @@ import {
 } from '../services/api/header-tiers.js';
 import type {
   AvailableModel,
-  AuthType,
   CustomProviderData,
+  ModelRoute,
   RoutingProvider,
 } from '../services/api.js';
 import { toast } from '../services/toast-store.js';
@@ -58,14 +58,9 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
     (props.externalTiers ? props.externalTiers() : internalTiersRes()) ?? [];
   const enabledTiers = (): HeaderTier[] => tiers().filter((t) => t.enabled);
 
-  const handleOverride = async (
-    id: string,
-    model: string,
-    provider: string,
-    authType?: AuthType,
-  ): Promise<void> => {
+  const handleOverride = async (id: string, route: ModelRoute): Promise<void> => {
     try {
-      await overrideHeaderTier(props.agentName(), id, model, provider, authType);
+      await overrideHeaderTier(props.agentName(), id, route);
       await refetch();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update tier');
@@ -143,7 +138,7 @@ const RoutingHeaderTiersSection: Component<Props> = (props) => {
                 models={props.models()}
                 customProviders={props.customProviders()}
                 connectedProviders={props.connectedProviders()}
-                onOverride={(m, p, a) => handleOverride(tier.id, m, p, a)}
+                onOverride={(route) => handleOverride(tier.id, route)}
                 onFallbacksUpdate={() => refetch()}
                 onEdit={() => setModalTier(tier)}
                 onDisable={() => handleToggle(tier.id, false)}

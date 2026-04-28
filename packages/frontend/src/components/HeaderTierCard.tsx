@@ -3,6 +3,7 @@ import type {
   AuthType,
   AvailableModel,
   CustomProviderData,
+  ModelRoute,
   RoutingProvider,
 } from '../services/api.js';
 import {
@@ -13,28 +14,11 @@ import {
 } from '../services/api/header-tiers.js';
 import { providerIcon, customProviderLogo } from './ProviderIcon.js';
 import { authBadgeFor } from './AuthBadge.js';
-import { resolveProviderId, inferProviderFromModel, pricePerM } from '../services/routing-utils.js';
+import { resolveProviderId, pricePerM } from '../services/routing-utils.js';
 import { customProviderColor } from '../services/formatters.js';
-import { PROVIDERS } from '../services/providers.js';
 import FallbackList from './FallbackList.js';
 import ModelPickerModal from './ModelPickerModal.js';
 import HeaderTierSnippetModal from './HeaderTierSnippetModal.js';
-
-function providerIdForModel(model: string, apiModels: AvailableModel[]): string | undefined {
-  const m =
-    apiModels.find((x) => x.model_name === model) ??
-    apiModels.find((x) => x.model_name.startsWith(model + '-'));
-  if (m) {
-    const dbId = resolveProviderId(m.provider);
-    if (dbId === 'ollama' || dbId === 'ollama-cloud') return dbId;
-    const prefixId = inferProviderFromModel(m.model_name);
-    if (prefixId && PROVIDERS.find((p) => p.id === prefixId)) return prefixId;
-    return dbId ?? prefixId;
-  }
-  const prefix = inferProviderFromModel(model);
-  if (prefix && PROVIDERS.find((p) => p.id === prefix)) return prefix;
-  return undefined;
-}
 
 interface Props {
   agentName: string;
@@ -42,8 +26,8 @@ interface Props {
   models: AvailableModel[];
   customProviders: CustomProviderData[];
   connectedProviders: RoutingProvider[];
-  onOverride: (model: string, provider: string, authType?: AuthType) => void | Promise<void>;
-  onFallbacksUpdate: (fallbacks: string[]) => void;
+  onOverride: (route: ModelRoute) => void | Promise<void>;
+  onFallbacksUpdate: (fallbacks: ModelRoute[]) => void;
   onEdit?: () => void;
   onDisable?: () => void;
 }
@@ -55,26 +39,27 @@ const HeaderTierCard: Component<Props> = (props) => {
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [resetting, setResetting] = createSignal(false);
 
-  const currentModel = (): string | null => props.tier.override_model;
-  const fallbacks = (): string[] => props.tier.fallback_models ?? [];
+  const currentRoute = (): ModelRoute | null => props.tier.override_route;
+  const fallbacks = (): ModelRoute[] => props.tier.fallback_routes ?? [];
 
   const providerId = (): string | undefined => {
-    const m = currentModel();
-    if (!m) return undefined;
-    if (props.tier.override_provider) return props.tier.override_provider.toLowerCase();
-    return providerIdForModel(m, props.models);
+    const route = currentRoute();
+    if (!route) return undefined;
+    return resolveProviderId(route.provider) ?? route.provider.toLowerCase();
   };
 
   const modelInfo = (): AvailableModel | undefined => {
-    const m = currentModel();
-    if (!m) return undefined;
+    const route = currentRoute();
+    if (!route) return undefined;
+    const lower = route.provider.toLowerCase();
     return (
-      props.models.find((x) => x.model_name === m) ??
-      props.models.find((x) => x.model_name.startsWith(m + '-'))
+      props.models.find(
+        (x) => x.model_name === route.model && x.provider.toLowerCase() === lower,
+      ) ?? props.models.find((x) => x.model_name === route.model)
     );
   };
 
-  const modelLabel = (): string => modelInfo()?.display_name ?? currentModel() ?? '';
+  const modelLabel = (): string => modelInfo()?.display_name ?? currentRoute()?.model ?? '';
 
   const priceLabel = (): string => {
     const info = modelInfo();
@@ -82,22 +67,7 @@ const HeaderTierCard: Component<Props> = (props) => {
     return `${pricePerM(Number(info.input_price_per_token ?? 0))} in · ${pricePerM(Number(info.output_price_per_token ?? 0))} out per 1M`;
   };
 
-  const effectiveAuth = (): AuthType | null => {
-    if (props.tier.override_auth_type) return props.tier.override_auth_type;
-    const id = providerId();
-    if (!id) return null;
-    const provs = props.connectedProviders.filter(
-      (p) => p.provider.toLowerCase() === id.toLowerCase(),
-    );
-    // Precedence subscription > api_key > local. Keep the "you already pay a
-    // sub" signal on top so a user with both a subscription and a local
-    // Ollama connection sees the subscription badge first; local is the
-    // weakest signal and only wins when it's the sole connection.
-    if (provs.some((p) => p.auth_type === 'subscription')) return 'subscription';
-    if (provs.some((p) => p.auth_type === 'api_key')) return 'api_key';
-    if (provs.some((p) => p.auth_type === 'local')) return 'local';
-    return null;
-  };
+  const effectiveAuth = (): AuthType | null => currentRoute()?.authType ?? null;
 
   const customProviderForId = (id: string | undefined): CustomProviderData | undefined => {
     if (!id?.startsWith('custom:')) return undefined;
@@ -112,10 +82,12 @@ const HeaderTierCard: Component<Props> = (props) => {
   ): Promise<void> => {
     const mode = pickerMode();
     setPickerMode(null);
+    if (!authType) return;
+    const route: ModelRoute = { provider, authType, model };
     if (mode === 'primary') {
-      await props.onOverride(model, provider, authType);
+      await props.onOverride(route);
     } else if (mode === 'fallback') {
-      const next = [...fallbacks(), model];
+      const next: ModelRoute[] = [...fallbacks(), route];
       try {
         await setHeaderTierFallbacks(props.agentName, props.tier.id, next);
         props.onFallbacksUpdate(next);
@@ -203,7 +175,7 @@ const HeaderTierCard: Component<Props> = (props) => {
           </div>
         </span>
         <Show
-          when={currentModel()}
+          when={currentRoute()}
           fallback={
             <button class="routing-card__header-add" onClick={() => setPickerMode('primary')}>
               + Add model
@@ -242,8 +214,8 @@ const HeaderTierCard: Component<Props> = (props) => {
       </code>
 
       <div class="routing-card__body">
-        <Show when={currentModel()}>
-          {(modelName) => (
+        <Show when={currentRoute()}>
+          {(route) => (
             <div class="routing-card__model-chip" onClick={() => setPickerMode('primary')}>
               <div class="routing-card__chip-main">
                 <div class="routing-card__override">
@@ -287,7 +259,7 @@ const HeaderTierCard: Component<Props> = (props) => {
                       );
                     })()}
                   </Show>
-                  <span class="routing-card__main">{modelLabel() || modelName()}</span>
+                  <span class="routing-card__main">{modelLabel() || route().model}</span>
                 </div>
                 <button
                   class="routing-card__chip-action"
@@ -323,7 +295,7 @@ const HeaderTierCard: Component<Props> = (props) => {
         </Show>
       </div>
 
-      <Show when={currentModel()}>
+      <Show when={currentRoute()}>
         <div class="routing-card__right">
           <FallbackList
             agentName={props.agentName}
@@ -331,11 +303,10 @@ const HeaderTierCard: Component<Props> = (props) => {
             fallbacks={fallbacks()}
             models={props.models}
             customProviders={props.customProviders}
-            connectedProviders={props.connectedProviders}
             onUpdate={(updated) => props.onFallbacksUpdate(updated)}
             onAddFallback={() => setPickerMode('fallback')}
-            persistFallbacks={(_agent, tierId, models) =>
-              setHeaderTierFallbacks(props.agentName, tierId, models)
+            persistFallbacks={(_agent, tierId, routes) =>
+              setHeaderTierFallbacks(props.agentName, tierId, routes)
             }
             persistClearFallbacks={(_agent, tierId) =>
               clearHeaderTierFallbacks(props.agentName, tierId)

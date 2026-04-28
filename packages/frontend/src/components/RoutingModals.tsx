@@ -98,18 +98,36 @@ const RoutingModals: Component<RoutingModalsProps> = (props) => (
 
     <Show when={props.fallbackPickerTier()}>
       {(tierId) => {
-        const currentFallbacks = () => props.getTier(tierId())?.fallback_models ?? [];
-        const effectiveModel = () => {
-          const t = props.getTier(tierId());
-          return t ? (t.override_model ?? t.auto_assigned_model) : null;
+        const tier = () => props.getTier(tierId());
+        const currentFallbacks = () => tier()?.fallback_routes ?? [];
+        const primaryRoute = () => {
+          const t = tier();
+          return t ? (t.override_route ?? t.auto_assigned_route) : null;
         };
+        // Filter is auth-aware: an api_key model with the same name as the
+        // primary's subscription model is a distinct route, so it stays in
+        // the picker. This is the bug from #1708 — the previous name-only
+        // filter silently dropped the alternate-auth row.
         const filteredModels = () =>
-          props
-            .models()
-            .filter(
-              (m) =>
-                m.model_name !== effectiveModel() && !currentFallbacks().includes(m.model_name),
+          props.models().filter((m) => {
+            const auth = m.auth_type;
+            const primary = primaryRoute();
+            if (
+              primary &&
+              m.model_name === primary.model &&
+              m.provider.toLowerCase() === primary.provider.toLowerCase() &&
+              auth === primary.authType
+            ) {
+              return false;
+            }
+            const inFallbacks = currentFallbacks().some(
+              (r) =>
+                r.model === m.model_name &&
+                r.provider.toLowerCase() === m.provider.toLowerCase() &&
+                r.authType === auth,
             );
+            return !inFallbacks;
+          });
         return (
           <ModelPickerModal
             tierId={tierId()}

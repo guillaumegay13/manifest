@@ -135,10 +135,20 @@ const Routing: Component = () => {
   ) => {
     setFallbackPickerTier(null);
     if (isSpecificityTier(tierId)) {
+      if (!authType) return;
       const sa = specificityAssignments()?.find((a) => a.category === tierId);
-      const current = sa?.fallback_models ?? [];
-      if (current.includes(modelName)) return;
-      const updated = [...current, modelName];
+      const current = sa?.fallback_routes ?? [];
+      const route = { provider: providerId, authType, model: modelName };
+      if (
+        current.some(
+          (r) =>
+            r.model === route.model &&
+            r.provider.toLowerCase() === route.provider.toLowerCase() &&
+            r.authType === route.authType,
+        )
+      )
+        return;
+      const updated = [...current, route];
       try {
         const { setSpecificityFallbacks } = await import('../services/api.js');
         await setSpecificityFallbacks(agentName(), tierId, updated);
@@ -155,7 +165,7 @@ const Routing: Component = () => {
   const isEnabled = () => connectedProviders()?.some((p) => p.is_active) ?? false;
   const activeProviders = () => connectedProviders()?.filter((p) => p.is_active) ?? [];
   const hasProviders = () => activeProviders().length > 0 || (customProviders()?.length ?? 0) > 0;
-  const hasOverrides = () => tiers()?.some((t) => t.override_model !== null) ?? false;
+  const hasOverrides = () => tiers()?.some((t) => t.override_route !== null) ?? false;
 
   const openProviderModal = () => {
     setWasEnabledBeforeModal(isEnabled());
@@ -189,9 +199,10 @@ const Routing: Component = () => {
     provider: string,
     authType?: 'api_key' | 'subscription' | 'local',
   ) => {
+    if (!authType) return;
     setChangingSpecificity(category);
     try {
-      await overrideSpecificity(agentName(), category, model, provider, authType);
+      await overrideSpecificity(agentName(), category, { provider, authType, model });
       await refetchSpecificity();
     } catch {
       toast.error('Failed to update specificity model');

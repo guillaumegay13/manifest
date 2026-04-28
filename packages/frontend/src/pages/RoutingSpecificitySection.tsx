@@ -12,6 +12,7 @@ import type {
   TierAssignment,
   AvailableModel,
   AuthType,
+  ModelRoute,
   RoutingProvider,
   CustomProviderData,
 } from '../services/api.js';
@@ -146,7 +147,7 @@ export interface RoutingSpecificitySectionProps {
   onDropdownOpen: (category: string) => void;
   onOverride: (category: string, model: string, provider: string, authType?: AuthType) => void;
   onReset: (category: string) => void;
-  onFallbackUpdate: (category: string, fallbacks: string[]) => void;
+  onFallbackUpdate: (category: string, fallbacks: ModelRoute[]) => void;
   onAddFallback: (category: string) => void;
   refetchAll: () => Promise<void>;
   refetchSpecificity?: () => Promise<void>;
@@ -232,10 +233,10 @@ const RoutingSpecificitySection: Component<RoutingSpecificitySectionProps> = (pr
                 onReset={props.onReset}
                 onFallbackUpdate={props.onFallbackUpdate}
                 onAddFallback={props.onAddFallback}
-                getFallbacksFor={(cat) => getAssignment(cat)?.fallback_models ?? []}
+                getFallbacksFor={(cat) => getAssignment(cat)?.fallback_routes ?? []}
                 connectedProviders={props.connectedProviders}
-                persistFallbacks={(_agentName, category, models) =>
-                  setSpecificityFallbacks(_agentName, category, models)
+                persistFallbacks={(_agentName, category, routes) =>
+                  setSpecificityFallbacks(_agentName, category, routes)
                 }
                 persistClearFallbacks={(_agentName, category) =>
                   clearSpecificityFallbacks(_agentName, category)
@@ -327,7 +328,7 @@ const RoutingSpecificitySection: Component<RoutingSpecificitySectionProps> = (pr
                   setShowModal(false);
                   const firstEmpty = SPECIFICITY_STAGES.find((s) => {
                     const a = getAssignment(s.id);
-                    return a?.is_active && !a.override_model && !a.auto_assigned_model;
+                    return a?.is_active && !a.override_route && !a.auto_assigned_route;
                   });
                   if (firstEmpty) {
                     props.onDropdownOpen(firstEmpty.id);
