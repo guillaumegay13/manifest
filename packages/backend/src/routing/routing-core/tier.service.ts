@@ -8,7 +8,7 @@ import { RoutingCacheService } from './routing-cache.service';
 import { ProviderService } from './provider.service';
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { randomUUID } from 'crypto';
-import { TIER_SLOTS, TierSlot } from 'manifest-shared';
+import { TIER_SLOTS, TierSlot, type ModelRoute, routeEquals } from 'manifest-shared';
 import { isManifestUsableProvider } from '../../common/utils/subscription-support';
 
 @Injectable()
@@ -26,7 +26,7 @@ export class TierService {
 
   async hasRoutableTier(agentId: string): Promise<boolean> {
     const rows = await this.tierRepo.find({ where: { agent_id: agentId } });
-    return rows.some((r) => !!r.override_model || !!r.auto_assigned_model);
+    return rows.some((r) => !!r.override_route || !!r.auto_assigned_route);
   }
 
   async getTiers(agentId: string, userId?: string): Promise<TierAssignment[]> {
@@ -55,10 +55,9 @@ export class TierService {
         user_id: userId ?? '',
         agent_id: agentId,
         tier: slot,
-        override_model: null,
-        override_provider: null,
-        override_auth_type: null,
-        auto_assigned_model: null,
+        override_route: null,
+        auto_assigned_route: null,
+        fallback_routes: null,
       }),
     );
     try {
@@ -76,7 +75,7 @@ export class TierService {
       throw err;
     }
 
-    // If agent has active providers, recalculate so new slots get auto-assigned models.
+    // If agent has active providers, recalculate so new slots get auto-assigned routes.
     const providers = await this.providerRepo.find({
       where: { agent_id: agentId, is_active: true },
     });
@@ -97,44 +96,20 @@ export class TierService {
     agentId: string,
     userId: string,
     tier: string,
-    model: string,
-    provider?: string,
-    authType?: 'api_key' | 'subscription',
+    route: ModelRoute,
   ): Promise<TierAssignment> {
-    const available = await this.discoveryService.getModelsForAgent(agentId);
-    const matches = available.filter((m) => m.id === model);
-    if (matches.length === 0) {
-      const providerHint = provider ? ` (provider: ${provider})` : '';
-      const options = available.map((m) => m.id).slice(0, 20);
-      throw new BadRequestException(
-        `Model "${model}" is not in this agent's discovered model list${providerHint}. ` +
-          `Connect the appropriate provider first, or choose from: ${options.join(', ')}${
-            available.length > options.length ? ', …' : ''
-          }`,
-      );
-    }
-    // If provider is supplied, ensure it matches one of the available entries.
-    if (provider) {
-      const providerLower = provider.toLowerCase();
-      const providerMatches = matches.some((m) => m.provider.toLowerCase() === providerLower);
-      if (!providerMatches) {
-        throw new BadRequestException(
-          `Model "${model}" is not offered by provider "${provider}" for this agent.`,
-        );
-      }
-    }
+    await this.assertRouteIsDiscovered(agentId, route);
 
     const existing = await this.tierRepo.findOne({
       where: { agent_id: agentId, tier },
     });
 
     if (existing) {
-      existing.override_model = model;
-      existing.override_provider = provider ?? null;
-      existing.override_auth_type = authType ?? null;
-      if (existing.fallback_models?.includes(model)) {
-        const filtered = existing.fallback_models.filter((m) => m !== model);
-        existing.fallback_models = filtered.length > 0 ? filtered : null;
+      existing.override_route = route;
+      // Drop the new primary from the fallback list — it's no longer a fallback.
+      if (existing.fallback_routes) {
+        const filtered = existing.fallback_routes.filter((r) => !routeEquals(r, route));
+        existing.fallback_routes = filtered.length > 0 ? filtered : null;
       }
       existing.updated_at = new Date().toISOString();
       await this.tierRepo.save(existing);
@@ -147,10 +122,9 @@ export class TierService {
       user_id: userId,
       agent_id: agentId,
       tier,
-      override_model: model,
-      override_provider: provider ?? null,
-      override_auth_type: authType ?? null,
-      auto_assigned_model: null,
+      override_route: route,
+      auto_assigned_route: null,
+      fallback_routes: null,
     });
 
     try {
@@ -158,7 +132,7 @@ export class TierService {
     } catch {
       // Concurrent insert — retry as update
       const retry = await this.tierRepo.findOne({ where: { agent_id: agentId, tier } });
-      if (retry) return this.setOverride(agentId, userId, tier, model, provider, authType);
+      if (retry) return this.setOverride(agentId, userId, tier, route);
     }
     this.routingCache.invalidateAgent(agentId);
     return record;
@@ -170,9 +144,7 @@ export class TierService {
     });
     if (!existing) return;
 
-    existing.override_model = null;
-    existing.override_provider = null;
-    existing.override_auth_type = null;
+    existing.override_route = null;
     existing.updated_at = new Date().toISOString();
     await this.tierRepo.save(existing);
     this.routingCache.invalidateAgent(agentId);
@@ -182,10 +154,8 @@ export class TierService {
     await this.tierRepo.update(
       { agent_id: agentId },
       {
-        override_model: null,
-        override_provider: null,
-        override_auth_type: null,
-        fallback_models: null,
+        override_route: null,
+        fallback_routes: null,
         updated_at: new Date().toISOString(),
       },
     );
@@ -194,27 +164,60 @@ export class TierService {
 
   /* ── Fallbacks ── */
 
-  async getFallbacks(agentId: string, tier: string): Promise<string[]> {
+  async getFallbacks(agentId: string, tier: string): Promise<ModelRoute[]> {
     const existing = await this.tierRepo.findOne({ where: { agent_id: agentId, tier } });
-    return existing?.fallback_models ?? [];
+    return existing?.fallback_routes ?? [];
   }
 
-  async setFallbacks(agentId: string, tier: string, models: string[]): Promise<string[]> {
+  async setFallbacks(agentId: string, tier: string, routes: ModelRoute[]): Promise<ModelRoute[]> {
     const existing = await this.tierRepo.findOne({ where: { agent_id: agentId, tier } });
     if (!existing) return [];
-    existing.fallback_models = models.length > 0 ? models : null;
+    existing.fallback_routes = routes.length > 0 ? routes : null;
     existing.updated_at = new Date().toISOString();
     await this.tierRepo.save(existing);
     this.routingCache.invalidateAgent(agentId);
-    return models;
+    return routes;
   }
 
   async clearFallbacks(agentId: string, tier: string): Promise<void> {
     const existing = await this.tierRepo.findOne({ where: { agent_id: agentId, tier } });
     if (!existing) return;
-    existing.fallback_models = null;
+    existing.fallback_routes = null;
     existing.updated_at = new Date().toISOString();
     await this.tierRepo.save(existing);
     this.routingCache.invalidateAgent(agentId);
+  }
+
+  /**
+   * Validates that the route refers to a model the agent has actually
+   * discovered from the requested provider. Throws BadRequest with a
+   * suggestion list if not — the most common cause is a provider that's been
+   * disconnected since the override was last saved.
+   */
+  private async assertRouteIsDiscovered(agentId: string, route: ModelRoute): Promise<void> {
+    const available = await this.discoveryService.getModelsForAgent(agentId);
+    const providerLower = route.provider.toLowerCase();
+    const matches = available.filter(
+      (m) =>
+        m.id === route.model &&
+        m.provider.toLowerCase() === providerLower &&
+        m.authType === route.authType,
+    );
+    if (matches.length > 0) return;
+
+    const sameModel = available.filter((m) => m.id === route.model);
+    if (sameModel.length === 0) {
+      const options = available.map((m) => m.id).slice(0, 20);
+      throw new BadRequestException(
+        `Model "${route.model}" is not in this agent's discovered model list. ` +
+          `Connect the appropriate provider first, or choose from: ${options.join(', ')}${
+            available.length > options.length ? ', …' : ''
+          }`,
+      );
+    }
+    throw new BadRequestException(
+      `Model "${route.model}" exists for this agent but not via provider "${route.provider}" ` +
+        `with auth type "${route.authType}".`,
+    );
   }
 }

@@ -10,7 +10,7 @@ import { SessionMomentumService } from './session-momentum.service';
 import { LimitCheckService } from '../../notifications/services/limit-check.service';
 import { shouldTriggerFallback } from './fallback-status-codes';
 import { Tier, TIERS, ScorerMessage } from '../../scoring/types';
-import type { SpecificityCategory, TierSlot } from 'manifest-shared';
+import type { ModelRoute, SpecificityCategory, TierSlot } from 'manifest-shared';
 import { SPECIFICITY_CATEGORIES } from 'manifest-shared';
 import {
   ProxyFallbackService,
@@ -27,7 +27,6 @@ import {
 import { ThoughtSignatureCache } from './thought-signature-cache';
 import { ThinkingBlockCache } from './thinking-block-cache';
 import { buildFriendlyResponse, getDashboardUrl } from './proxy-friendly-response';
-import type { AuthType } from 'manifest-shared';
 import { toChatCompletionsRequest } from './responses-adapter';
 
 type ResolvedRouting = Awaited<ReturnType<ResolveService['resolve']>>;
@@ -45,26 +44,19 @@ const MAX_MESSAGES_PER_REQUEST = 1000;
 
 export interface RoutingMeta {
   tier: TierSlot;
-  model: string;
-  provider: string;
+  /** The route that ultimately served this request (primary or successful fallback). */
+  route: ModelRoute;
   confidence: number;
   reason: string;
-  auth_type?: string;
   specificity_category?: string;
   header_tier_id?: string;
   header_tier_name?: string;
   header_tier_color?: string;
-  fallbackFromModel?: string;
+  /** Set on a fallback success: the route the user originally tried. */
+  fallbackFromRoute?: ModelRoute;
   fallbackIndex?: number;
   primaryErrorStatus?: number;
   primaryErrorBody?: string;
-  /**
-   * Provider of the primary model when a fallback ultimately succeeded.
-   * Distinct from `provider`, which in a fallback-success flow holds the
-   * fallback model's provider. Used to attribute the recorded primary
-   * failure row to the correct vendor.
-   */
-  primaryProvider?: string;
 }
 
 export interface ProxyResult {
@@ -120,28 +112,27 @@ export class ProxyService {
       specificityOverride,
       headers,
     );
-    if (!resolved.model || !resolved.provider) {
+    if (!resolved.route) {
       this.logger.warn(
-        `No model available for agent=${agentId}: ` +
-          `tier=${resolved.tier} model=${resolved.model} provider=${resolved.provider} ` +
-          `confidence=${resolved.confidence} reason=${resolved.reason}`,
+        `No route available for agent=${agentId}: ` +
+          `tier=${resolved.tier} confidence=${resolved.confidence} reason=${resolved.reason}`,
       );
       return this.buildNoProviderResult(body.stream === true, agentName);
     }
 
-    const credentials = await this.resolveCredentials(agentId, userId, {
-      provider: resolved.provider,
-      auth_type: resolved.auth_type,
-    });
+    const primaryRoute = resolved.route;
+    const credentials = await this.resolveCredentials(agentId, userId, primaryRoute);
     if (credentials === null) {
       const dashboardUrl = getDashboardUrl(this.config, agentName, 'routing');
-      const content = `[🦚 Manifest] No ${resolved.provider} API key yet. Add one here: ${dashboardUrl}`;
+      const content = `[🦚 Manifest] No ${primaryRoute.provider} API key yet. Add one here: ${dashboardUrl}`;
       return buildFriendlyResponse(content, body.stream === true, 'no_provider_key');
     }
 
-    const primaryModel = normalizeProviderModel(resolved.provider, resolved.model);
+    const wireModel = normalizeProviderModel(primaryRoute.provider, primaryRoute.model);
     this.logger.log(
-      `Proxy: tier=${resolved.tier} model=${primaryModel} provider=${resolved.provider} auth_type=${resolved.auth_type} confidence=${resolved.confidence}`,
+      `Proxy: tier=${resolved.tier} ` +
+        `route=${primaryRoute.provider}/${primaryRoute.authType}/${wireModel} ` +
+        `confidence=${resolved.confidence}`,
     );
 
     const stream = body.stream === true;
@@ -151,15 +142,15 @@ export class ProxyService {
       this.thinkingCache.retrieve(sessionKey, firstToolUseId);
 
     const forward = await this.fallbackService.tryForwardToProvider({
-      provider: resolved.provider,
+      provider: primaryRoute.provider,
       apiKey: credentials.apiKey,
-      model: primaryModel,
+      model: wireModel,
       body,
       chatBody,
       stream,
       sessionKey,
       signal,
-      authType: resolved.auth_type,
+      authType: primaryRoute.authType,
       apiMode,
       resourceUrl: credentials.resourceUrl,
       providerRegion: credentials.providerRegion,
@@ -172,7 +163,7 @@ export class ProxyService {
         agentId,
         userId,
         resolved,
-        primaryModel,
+        primaryRoute,
         forward,
         body,
         chatBody,
@@ -190,7 +181,7 @@ export class ProxyService {
     this.recordCategoryIfValid(sessionKey, resolved.specificity_category);
     return {
       forward,
-      meta: this.buildBaseMeta(resolved, primaryModel),
+      meta: this.buildBaseMeta(resolved, primaryRoute),
     };
   }
 
@@ -245,19 +236,19 @@ export class ProxyService {
   private async resolveCredentials(
     agentId: string,
     userId: string,
-    resolved: { provider: string; auth_type?: AuthType },
+    route: ModelRoute,
   ): Promise<{ apiKey: string; resourceUrl?: string; providerRegion?: string | null } | null> {
     const apiKey = await this.providerKeyService.getProviderApiKey(
       agentId,
-      resolved.provider,
-      resolved.auth_type,
+      route.provider,
+      route.authType,
     );
     if (apiKey === null) return null;
 
     const unwrapped = await resolveApiKey(
-      resolved.provider,
+      route.provider,
       apiKey,
-      resolved.auth_type,
+      route.authType,
       agentId,
       userId,
       this.openaiOauth,
@@ -265,8 +256,8 @@ export class ProxyService {
     );
     const providerRegion = await this.providerKeyService.getProviderRegion(
       agentId,
-      resolved.provider,
-      resolved.auth_type,
+      route.provider,
+      route.authType,
     );
     return { ...unwrapped, providerRegion };
   }
@@ -275,7 +266,7 @@ export class ProxyService {
     agentId: string;
     userId: string;
     resolved: ResolvedRouting;
-    primaryModel: string;
+    primaryRoute: ModelRoute;
     forward: ForwardResult;
     body: ProxyRequestOptions['body'];
     chatBody?: ProxyRequestOptions['body'];
@@ -290,7 +281,7 @@ export class ProxyService {
       agentId,
       userId,
       resolved,
-      primaryModel,
+      primaryRoute,
       forward,
       body,
       chatBody,
@@ -301,22 +292,20 @@ export class ProxyService {
     } = args;
     const tiers = await this.tierService.getTiers(agentId);
     const assignment = tiers.find((t) => t.tier === resolved.tier);
-    const fallbackModels = resolved.fallback_models ?? assignment?.fallback_models;
-    if (!fallbackModels || fallbackModels.length === 0) return null;
+    const fallbackRoutes = resolved.fallback_routes ?? assignment?.fallback_routes ?? null;
+    if (!fallbackRoutes || fallbackRoutes.length === 0) return null;
 
     const primaryStatus = forward.response.status;
     const primaryErrorBody = await forward.response.text();
     const { success, failures } = await this.fallbackService.tryFallbacks(
       agentId,
       userId,
-      fallbackModels,
+      fallbackRoutes,
       body,
       stream,
       sessionKey,
-      primaryModel,
+      primaryRoute,
       signal,
-      resolved.provider ?? undefined,
-      resolved.auth_type,
       args.signatureLookup,
       args.thinkingLookup,
       apiMode,
@@ -329,13 +318,11 @@ export class ProxyService {
     if (success) {
       return {
         forward: success.forward,
-        meta: this.buildBaseMeta(resolved, success.model, {
-          provider: success.provider,
-          fallbackFromModel: primaryModel,
+        meta: this.buildBaseMeta(resolved, success.route, {
+          fallbackFromRoute: primaryRoute,
           fallbackIndex: success.fallbackIndex,
           primaryErrorStatus: primaryStatus,
           primaryErrorBody,
-          primaryProvider: resolved.provider ?? undefined,
         }),
         failedFallbacks: failures,
       };
@@ -357,7 +344,7 @@ export class ProxyService {
         isAnthropic: forward.isAnthropic,
         isChatGpt: forward.isChatGpt,
       },
-      meta: this.buildBaseMeta(resolved, primaryModel),
+      meta: this.buildBaseMeta(resolved, primaryRoute),
       failedFallbacks: failures,
     };
   }
@@ -367,23 +354,19 @@ export class ProxyService {
       tier: string;
       confidence: number;
       reason: string;
-      auth_type?: string;
       specificity_category?: string;
       header_tier_id?: string;
       header_tier_name?: string;
       header_tier_color?: string;
-      provider?: string | null;
     },
-    model: string,
+    route: ModelRoute,
     overrides: Partial<RoutingMeta> = {},
   ): RoutingMeta {
     return {
       tier: resolved.tier as TierSlot,
-      model,
-      provider: overrides.provider ?? resolved.provider ?? '',
+      route,
       confidence: resolved.confidence,
       reason: resolved.reason,
-      auth_type: resolved.auth_type,
       specificity_category: resolved.specificity_category,
       header_tier_id: resolved.header_tier_id,
       header_tier_name: resolved.header_tier_name,

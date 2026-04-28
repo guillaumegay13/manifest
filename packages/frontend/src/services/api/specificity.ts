@@ -1,16 +1,14 @@
 import { fetchJson, fetchMutate, routingPath } from './core.js';
-import type { AuthType } from './routing.js';
+import type { ModelRoute } from './routing.js';
 
 export interface SpecificityAssignment {
   id: string;
   agent_id: string;
   category: string;
   is_active: boolean;
-  override_model: string | null;
-  override_provider: string | null;
-  override_auth_type: AuthType | null;
-  auto_assigned_model: string | null;
-  fallback_models: string[] | null;
+  override_route: ModelRoute | null;
+  auto_assigned_route: ModelRoute | null;
+  fallback_routes: ModelRoute[] | null;
   updated_at: string;
 }
 
@@ -29,19 +27,13 @@ export function toggleSpecificity(agentName: string, category: string, active: b
   );
 }
 
-export function overrideSpecificity(
-  agentName: string,
-  category: string,
-  model: string,
-  provider: string,
-  authType?: AuthType,
-) {
+export function overrideSpecificity(agentName: string, category: string, route: ModelRoute) {
   return fetchMutate<SpecificityAssignment>(
     routingPath(agentName, `specificity/${encodeURIComponent(category)}`),
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, provider, ...(authType && { authType }) }),
+      body: JSON.stringify({ route }),
     },
   );
 }
@@ -52,13 +44,13 @@ export function resetSpecificity(agentName: string, category: string) {
   });
 }
 
-export function setSpecificityFallbacks(agentName: string, category: string, models: string[]) {
-  return fetchMutate<string[]>(
+export function setSpecificityFallbacks(agentName: string, category: string, routes: ModelRoute[]) {
+  return fetchMutate<ModelRoute[]>(
     routingPath(agentName, `specificity/${encodeURIComponent(category)}/fallbacks`),
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ models }),
+      body: JSON.stringify({ routes }),
     },
   );
 }

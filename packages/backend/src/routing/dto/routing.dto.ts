@@ -6,10 +6,11 @@ import {
   IsArray,
   ArrayMaxSize,
   Matches,
+  ValidateNested,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
-import { TIER_SLOTS, AUTH_TYPES } from 'manifest-shared';
+import { TIER_SLOTS, AUTH_TYPES, type AuthType } from 'manifest-shared';
 import { PROVIDER_BY_ID_OR_ALIAS } from '../../common/constants/providers';
 
 const KNOWN_PROVIDER_IDS: readonly string[] = Array.from(PROVIDER_BY_ID_OR_ALIAS.keys());
@@ -71,19 +72,28 @@ export class RemoveProviderQueryDto {
   authType?: 'api_key' | 'subscription';
 }
 
-export class SetOverrideDto {
+/**
+ * The unit of routing identity. A route is `(provider, authType, model)` — the
+ * minimum information needed to send a request and account for it. Two routes
+ * with the same model name but different auth types are distinct identities.
+ */
+export class ModelRouteDto {
+  @IsString()
+  @IsNotEmpty()
+  provider!: string;
+
+  @IsIn(AUTH_TYPES)
+  authType!: AuthType;
+
   @IsString()
   @IsNotEmpty()
   model!: string;
+}
 
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  provider?: string;
-
-  @IsOptional()
-  @IsIn(AUTH_TYPES)
-  authType?: 'api_key' | 'subscription';
+export class SetOverrideDto {
+  @ValidateNested()
+  @Type(() => ModelRouteDto)
+  route!: ModelRouteDto;
 }
 
 export class CopilotPollDto {
@@ -95,7 +105,7 @@ export class CopilotPollDto {
 export class SetFallbacksDto {
   @IsArray()
   @ArrayMaxSize(5)
-  @IsString({ each: true })
-  @IsNotEmpty({ each: true })
-  models!: string[];
+  @ValidateNested({ each: true })
+  @Type(() => ModelRouteDto)
+  routes!: ModelRouteDto[];
 }

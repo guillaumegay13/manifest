@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { ModelRoute } from 'manifest-shared';
 import { TierAssignment } from '../../entities/tier-assignment.entity';
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { DiscoveredModel } from '../../model-discovery/model-fetcher';
@@ -38,11 +39,6 @@ function filterSubModels(models: DiscoveredModel[]): DiscoveredModel[] {
   return result;
 }
 
-interface ScoredModel {
-  model_name: string;
-  score: number;
-}
-
 @Injectable()
 export class TierAutoAssignService {
   private readonly logger = new Logger(TierAutoAssignService.name);
@@ -74,10 +70,11 @@ export class TierAutoAssignService {
       const pickTier: Tier = slot === 'default' ? 'standard' : (slot as Tier);
       // Subscription models always take priority over API key models
       const best = this.pickBest(subModels, pickTier) ?? this.pickBest(keyModels, pickTier);
+      const route = best ? this.toRoute(best) : null;
       const existing = tierMap.get(slot);
 
       if (existing) {
-        existing.auto_assigned_model = best?.model_name ?? null;
+        existing.auto_assigned_route = route;
         existing.updated_at = new Date().toISOString();
         toSave.push(existing);
       } else {
@@ -86,9 +83,9 @@ export class TierAutoAssignService {
           user_id: '',
           agent_id: agentId,
           tier: slot,
-          override_model: null,
-          override_provider: null,
-          auto_assigned_model: best?.model_name ?? null,
+          override_route: null,
+          auto_assigned_route: route,
+          fallback_routes: null,
         });
       }
     }
@@ -100,6 +97,14 @@ export class TierAutoAssignService {
     this.logger.log(`Recalculated tier assignments for agent ${agentId}`);
   }
 
+  private toRoute(model: DiscoveredModel): ModelRoute {
+    return {
+      provider: model.provider,
+      authType: model.authType ?? 'api_key',
+      model: model.id,
+    };
+  }
+
   /**
    * Deterministic sorting per tier — no magic formulas.
    *
@@ -109,7 +114,7 @@ export class TierAutoAssignService {
    * REASONING — highest quality among reasoning-capable models;
    *             falls back to COMPLEX if none have reasoning.
    */
-  pickBest(models: DiscoveredModel[], tier: Tier): ScoredModel | null {
+  pickBest(models: DiscoveredModel[], tier: Tier): DiscoveredModel | null {
     if (models.length === 0) return null;
 
     const totalPrice = (m: DiscoveredModel) => {
@@ -160,6 +165,6 @@ export class TierAutoAssignService {
       }
     }
 
-    return { model_name: picked.id, score: quality(picked) };
+    return picked;
   }
 }

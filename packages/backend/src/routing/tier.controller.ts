@@ -42,14 +42,7 @@ export class TierController {
   ) {
     this.validateTier(tier);
     const agent = await this.resolveAgentService.resolve(user.id, agentName);
-    return this.tierService.setOverride(
-      agent.id,
-      user.id,
-      tier,
-      body.model,
-      body.provider,
-      body.authType,
-    );
+    return this.tierService.setOverride(agent.id, user.id, tier, body.route);
   }
 
   @Delete(':agentName/tiers/:tier')
@@ -91,7 +84,7 @@ export class TierController {
   ) {
     this.validateTier(tier);
     const agent = await this.resolveAgentService.resolve(user.id, agentName);
-    return this.tierService.setFallbacks(agent.id, tier, body.models);
+    return this.tierService.setFallbacks(agent.id, tier, body.routes);
   }
 
   @Delete(':agentName/tiers/:tier/fallbacks')

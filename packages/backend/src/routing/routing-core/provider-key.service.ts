@@ -1,18 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import type { AuthType } from 'manifest-shared';
+import type { AuthType, ModelRoute } from 'manifest-shared';
 import { UserProvider } from '../../entities/user-provider.entity';
-import { TierAssignment } from '../../entities/tier-assignment.entity';
-import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
-import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { RoutingCacheService } from './routing-cache.service';
 import { ProviderService } from './provider.service';
 import { decrypt, getEncryptionSecret } from '../../common/utils/crypto.util';
-import {
-  expandProviderNames,
-  inferProviderFromModelName,
-} from '../../common/utils/provider-aliases';
+import { expandProviderNames } from '../../common/utils/provider-aliases';
 import { isManifestUsableProvider } from '../../common/utils/subscription-support';
 
 @Injectable()
@@ -22,8 +16,6 @@ export class ProviderKeyService {
   constructor(
     @InjectRepository(UserProvider)
     private readonly providerRepo: Repository<UserProvider>,
-    private readonly pricingCache: ModelPricingCacheService,
-    private readonly discoveryService: ModelDiscoveryService,
     private readonly routingCache: RoutingCacheService,
     private readonly providerService: ProviderService,
   ) {}
@@ -104,23 +96,25 @@ export class ProviderKeyService {
     return undefined;
   }
 
-  async getEffectiveModel(agentId: string, assignment: TierAssignment): Promise<string | null> {
-    if (assignment.override_model !== null) {
-      if (await this.isModelAvailable(agentId, assignment.override_model)) {
-        return assignment.override_model;
-      }
-      this.logger.warn(
-        `Override ${assignment.override_model} falling through to auto ` +
-          `for agent=${agentId} tier=${assignment.tier} ` +
-          `(auto=${assignment.auto_assigned_model})`,
-      );
-    }
-
-    if (assignment.auto_assigned_model === null) {
-      this.logger.warn(`auto_assigned_model is null for agent=${agentId} tier=${assignment.tier}`);
-    }
-
-    return assignment.auto_assigned_model;
+  /**
+   * A route is available if the agent has an active provider matching its
+   * `(provider, authType)` pair AND the model still appears in that provider's
+   * discovered model list. The cached-models check guards against stale tier
+   * assignments that point at a model the user has since lost access to.
+   */
+  async isRouteAvailable(agentId: string, route: ModelRoute): Promise<boolean> {
+    const names = expandProviderNames([route.provider]);
+    const records = await this.providerService.getProviders(agentId);
+    const match = records.find(
+      (r) =>
+        r.is_active &&
+        r.auth_type === route.authType &&
+        names.has(r.provider.toLowerCase()) &&
+        isManifestUsableProvider(r),
+    );
+    if (!match) return false;
+    if (!match.cached_models || match.cached_models.length === 0) return true;
+    return match.cached_models.some((m) => m.id === route.model);
   }
 
   private async resolveProviderApiKey(
@@ -174,42 +168,5 @@ export class ProviderKeyService {
     }
 
     return null;
-  }
-
-  async isModelAvailable(agentId: string, model: string): Promise<boolean> {
-    // Check discovered models first
-    const discovered = await this.discoveryService.getModelForAgent(agentId, model);
-    if (discovered) return true;
-
-    const pricing = this.pricingCache.getByModel(model);
-    const inferredPrefix = inferProviderFromModelName(model);
-    const pricingNames = pricing ? expandProviderNames([pricing.provider]) : null;
-    const inferredNames = inferredPrefix ? expandProviderNames([inferredPrefix]) : null;
-
-    // Qwen model ids must come from the provider's native discovery list.
-    // Pricing/OpenRouter aliases are not reliable enough to treat as runnable DashScope ids.
-    if (pricingNames?.has('qwen') || inferredNames?.has('qwen')) {
-      return false;
-    }
-
-    const records = (
-      await this.providerRepo.find({
-        where: { agent_id: agentId, is_active: true },
-      })
-    ).filter(isManifestUsableProvider);
-    if (pricing) {
-      const names = expandProviderNames([pricing.provider]);
-      if (records.find((r) => names.has(r.provider.toLowerCase()))) return true;
-      const canonicalPrefix = inferProviderFromModelName(pricing.model_name);
-      if (canonicalPrefix) {
-        const cpNames = expandProviderNames([canonicalPrefix]);
-        if (records.find((r) => cpNames.has(r.provider.toLowerCase()))) return true;
-      }
-    }
-    if (inferredPrefix) {
-      const prefixNames = expandProviderNames([inferredPrefix]);
-      if (records.find((r) => prefixNames.has(r.provider.toLowerCase()))) return true;
-    }
-    return false;
   }
 }

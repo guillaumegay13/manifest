@@ -1,7 +1,7 @@
-import type { AuthType } from 'manifest-shared';
+import type { AuthType, ModelRoute } from 'manifest-shared';
 import { BASE_URL, fetchJson, fetchMutate, parseErrorMessage, routingPath } from './core.js';
 
-export type { AuthType };
+export type { AuthType, ModelRoute };
 
 export interface RoutingProvider {
   id: string;
@@ -111,11 +111,9 @@ export interface TierAssignment {
   id: string;
   agent_id: string;
   tier: string;
-  override_model: string | null;
-  override_provider: string | null;
-  override_auth_type: AuthType | null;
-  auto_assigned_model: string | null;
-  fallback_models: string[] | null;
+  override_route: ModelRoute | null;
+  auto_assigned_route: ModelRoute | null;
+  fallback_routes: ModelRoute[] | null;
   updated_at: string;
 }
 
@@ -123,17 +121,11 @@ export function getTierAssignments(agentName: string) {
   return fetchJson<TierAssignment[]>(routingPath(agentName, 'tiers'));
 }
 
-export function overrideTier(
-  agentName: string,
-  tier: string,
-  model: string,
-  provider: string,
-  authType?: AuthType,
-) {
+export function overrideTier(agentName: string, tier: string, route: ModelRoute) {
   return fetchMutate<TierAssignment>(routingPath(agentName, `tiers/${encodeURIComponent(tier)}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, provider, ...(authType && { authType }) }),
+    body: JSON.stringify({ route }),
   });
 }
 
@@ -150,16 +142,18 @@ export function resetAllTiers(agentName: string) {
 /* -- Routing: Fallbacks -- */
 
 export function getFallbacks(agentName: string, tier: string) {
-  return fetchJson<string[]>(routingPath(agentName, `tiers/${encodeURIComponent(tier)}/fallbacks`));
+  return fetchJson<ModelRoute[]>(
+    routingPath(agentName, `tiers/${encodeURIComponent(tier)}/fallbacks`),
+  );
 }
 
-export function setFallbacks(agentName: string, tier: string, models: string[]) {
-  return fetchMutate<string[]>(
+export function setFallbacks(agentName: string, tier: string, routes: ModelRoute[]) {
+  return fetchMutate<ModelRoute[]>(
     routingPath(agentName, `tiers/${encodeURIComponent(tier)}/fallbacks`),
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ models }),
+      body: JSON.stringify({ routes }),
     },
   );
 }

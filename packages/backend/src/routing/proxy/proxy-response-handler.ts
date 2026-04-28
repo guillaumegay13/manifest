@@ -29,16 +29,19 @@ function recordSafely(promise: Promise<unknown>, label: string): void {
 export function buildMetaHeaders(meta: RoutingMeta): Record<string, string> {
   const headers: Record<string, string> = {
     'X-Manifest-Tier': meta.tier,
-    'X-Manifest-Model': meta.model,
-    'X-Manifest-Provider': meta.provider,
+    'X-Manifest-Model': meta.route.model,
+    'X-Manifest-Provider': meta.route.provider,
+    'X-Manifest-Auth-Type': meta.route.authType,
     'X-Manifest-Confidence': String(meta.confidence),
     'X-Manifest-Reason': meta.reason,
   };
   if (meta.specificity_category) {
     headers['X-Manifest-Specificity'] = meta.specificity_category;
   }
-  if (meta.fallbackFromModel) {
-    headers['X-Manifest-Fallback-From'] = meta.fallbackFromModel;
+  if (meta.fallbackFromRoute) {
+    headers['X-Manifest-Fallback-From'] = meta.fallbackFromRoute.model;
+    headers['X-Manifest-Fallback-From-Provider'] = meta.fallbackFromRoute.provider;
+    headers['X-Manifest-Fallback-From-Auth-Type'] = meta.fallbackFromRoute.authType;
     headers['X-Manifest-Fallback-Index'] = String(meta.fallbackIndex ?? 0);
   }
   return headers;
@@ -65,7 +68,7 @@ export async function handleProviderError(
   callerAttribution?: CallerAttribution | null,
   requestHeaders?: Record<string, string> | null,
 ): Promise<void> {
-  if (failedFallbacks && failedFallbacks.length > 0 && !meta.fallbackFromModel) {
+  if (failedFallbacks && failedFallbacks.length > 0 && !meta.fallbackFromRoute) {
     await handleFallbackExhausted(
       res,
       ctx,
@@ -84,13 +87,13 @@ export async function handleProviderError(
 
   recordSafely(
     recorder.recordProviderError(ctx, errorStatus, errorBody, {
-      model: meta.model,
-      provider: meta.provider,
+      model: meta.route.model,
+      provider: meta.route.provider,
       tier: meta.tier,
       traceId,
-      fallbackFromModel: meta.fallbackFromModel,
+      fallbackFromModel: meta.fallbackFromRoute?.model,
       fallbackIndex: meta.fallbackIndex,
-      authType: meta.auth_type,
+      authType: meta.route.authType,
       reason: meta.reason,
       specificityCategory: meta.specificity_category,
       callerAttribution,
@@ -103,7 +106,9 @@ export async function handleProviderError(
   );
 
   logger.warn(
-    `Upstream error ${errorStatus}: provider=${meta.provider} model=${meta.model} tier=${meta.tier} body=${errorBody.slice(0, 500)}`,
+    `Upstream error ${errorStatus}: ` +
+      `route=${meta.route.provider}/${meta.route.authType}/${meta.route.model} ` +
+      `tier=${meta.tier} body=${errorBody.slice(0, 500)}`,
   );
   res.status(errorStatus);
   setHeaders(res, metaHeaders);
@@ -131,12 +136,11 @@ function handleFallbackExhausted(
 ): void {
   const baseTime = Date.now();
   recordSafely(
-    recorder.recordFailedFallbacks(ctx, meta.tier, meta.model, failedFallbacks, {
+    recorder.recordFailedFallbacks(ctx, meta.tier, meta.route.model, failedFallbacks, {
       traceId,
       baseTimeMs: baseTime,
       markHandled: true,
       lastAsError: true,
-      authType: meta.auth_type,
       reason: meta.reason,
       callerAttribution,
       requestHeaders,
@@ -152,12 +156,12 @@ function handleFallbackExhausted(
     recorder.recordPrimaryFailure(
       ctx,
       meta.tier,
-      meta.model,
+      meta.route.model,
       errorBody,
       primaryTs,
-      meta.auth_type,
+      meta.route.authType,
       {
-        provider: meta.provider,
+        provider: meta.route.provider,
         reason: meta.reason,
         callerAttribution,
         requestHeaders,
@@ -178,11 +182,9 @@ function handleFallbackExhausted(
       message: sanitizeProviderError(errorStatus, errorBody, process.env.NODE_ENV),
       type: 'fallback_exhausted',
       status: errorStatus,
-      primary_model: meta.model,
-      primary_provider: meta.provider,
+      primary_route: meta.route,
       attempted_fallbacks: failedFallbacks.map((f) => ({
-        model: f.model,
-        provider: f.provider,
+        route: f.route,
         status: f.status,
       })),
     },
@@ -201,7 +203,8 @@ export function recordFallbackFailures(
   callerAttribution?: CallerAttribution | null,
   requestHeaders?: Record<string, string> | null,
 ): string | undefined {
-  if (!meta.fallbackFromModel) return undefined;
+  const primaryRoute = meta.fallbackFromRoute;
+  if (!primaryRoute) return undefined;
 
   const fallbackBaseTime = Date.now();
   const failures = failedFallbacks ?? [];
@@ -210,14 +213,12 @@ export function recordFallbackFailures(
     recorder.recordPrimaryFailure(
       ctx,
       meta.tier,
-      meta.fallbackFromModel,
+      primaryRoute.model,
       meta.primaryErrorBody ?? `Provider returned HTTP ${meta.primaryErrorStatus ?? 500}`,
       new Date(fallbackBaseTime).toISOString(),
-      meta.auth_type,
+      primaryRoute.authType,
       {
-        // Use the primary provider explicitly — meta.provider holds the
-        // succeeding fallback's provider in this flow, not the primary's.
-        provider: meta.primaryProvider,
+        provider: primaryRoute.provider,
         reason: meta.reason,
         callerAttribution,
         requestHeaders,
@@ -231,10 +232,9 @@ export function recordFallbackFailures(
 
   if (failures.length > 0) {
     recordSafely(
-      recorder.recordFailedFallbacks(ctx, meta.tier, meta.fallbackFromModel, failures, {
+      recorder.recordFailedFallbacks(ctx, meta.tier, primaryRoute.model, failures, {
         baseTimeMs: fallbackBaseTime,
         markHandled: true,
-        authType: meta.auth_type,
         reason: meta.reason,
         callerAttribution,
         requestHeaders,
@@ -272,7 +272,10 @@ export async function handleStreamResponse(
 
   if (forward.isGoogle) {
     return pipeStream(forward.response.body!, res, (chunk) => {
-      const { chunk: out, signatures } = providerClient.convertGoogleStreamChunk(chunk, meta.model);
+      const { chunk: out, signatures } = providerClient.convertGoogleStreamChunk(
+        chunk,
+        meta.route.model,
+      );
       if (signatureCache && sessionKey) {
         for (const s of signatures) {
           signatureCache.store(sessionKey, s.toolCallId, s.signature);
@@ -289,7 +292,7 @@ export async function handleStreamResponse(
           }
         : undefined;
     const anthropicTransformer = providerClient.createAnthropicStreamTransformer(
-      meta.model,
+      meta.route.model,
       onThinkingBlocks,
     );
     return pipeStream(forward.response.body!, res, (chunk) => {
@@ -299,7 +302,7 @@ export async function handleStreamResponse(
   }
   if (forward.isChatGpt) {
     return pipeStream(forward.response.body!, res, (chunk) =>
-      providerClient.convertChatGptStreamChunk(chunk, meta.model),
+      providerClient.convertChatGptStreamChunk(chunk, meta.route.model),
     );
   }
   if (apiMode === 'responses') {
@@ -326,7 +329,7 @@ export async function handleNonStreamResponse(
     responseBody = await readNativeResponsesBody(forward.response);
   } else if (forward.isGoogle) {
     const googleData = (await forward.response.json()) as Record<string, unknown>;
-    responseBody = providerClient.convertGoogleResponse(googleData, meta.model);
+    responseBody = providerClient.convertGoogleResponse(googleData, meta.route.model);
     const sigs = (responseBody as Record<string, unknown>)?._extractedSignatures as
       | ExtractedSignature[]
       | undefined;
@@ -338,7 +341,7 @@ export async function handleNonStreamResponse(
     delete (responseBody as Record<string, unknown>)._extractedSignatures;
   } else if (forward.isAnthropic) {
     const anthropicData = (await forward.response.json()) as Record<string, unknown>;
-    responseBody = providerClient.convertAnthropicResponse(anthropicData, meta.model);
+    responseBody = providerClient.convertAnthropicResponse(anthropicData, meta.route.model);
     const extracted = (responseBody as Record<string, unknown>)?._extractedThinkingBlocks as
       | ExtractedThinkingBlocks
       | undefined;
@@ -350,13 +353,16 @@ export async function handleNonStreamResponse(
     // The Codex Responses API always returns SSE even when stream: false.
     // Consume the SSE text and build a non-streaming response.
     const sseText = await forward.response.text();
-    responseBody = providerClient.collectChatGptSseResponse(sseText, meta.model);
+    responseBody = providerClient.collectChatGptSseResponse(sseText, meta.route.model);
   } else {
     responseBody = await forward.response.json();
   }
 
   if (apiMode === 'responses' && !forward.isResponses) {
-    responseBody = fromChatCompletionResponse(responseBody as Record<string, unknown>, meta.model);
+    responseBody = fromChatCompletionResponse(
+      responseBody as Record<string, unknown>,
+      meta.route.model,
+    );
   }
 
   const body = responseBody as Record<string, unknown> | undefined;
@@ -422,15 +428,15 @@ export function recordSuccess(
   callerAttribution?: CallerAttribution | null,
   requestHeaders?: Record<string, string> | null,
 ): void {
-  if (meta.fallbackFromModel && fallbackSuccessTs) {
+  if (meta.fallbackFromRoute && fallbackSuccessTs) {
     recordSafely(
-      recorder.recordFallbackSuccess(ctx, meta.model, meta.tier, {
+      recorder.recordFallbackSuccess(ctx, meta.route.model, meta.tier, {
         traceId,
-        provider: meta.provider,
-        fallbackFromModel: meta.fallbackFromModel,
+        provider: meta.route.provider,
+        fallbackFromModel: meta.fallbackFromRoute.model,
         fallbackIndex: meta.fallbackIndex ?? 0,
         timestamp: fallbackSuccessTs,
-        authType: meta.auth_type,
+        authType: meta.route.authType,
         reason: meta.reason,
         usage: streamUsage ?? undefined,
         callerAttribution,
@@ -445,10 +451,10 @@ export function recordSuccess(
     const usage = streamUsage ?? { prompt_tokens: 0, completion_tokens: 0 };
     const durationMs = startTime ? Date.now() - startTime : undefined;
     recordSafely(
-      recorder.recordSuccessMessage(ctx, meta.model, meta.tier, meta.reason, usage, {
+      recorder.recordSuccessMessage(ctx, meta.route.model, meta.tier, meta.reason, usage, {
         traceId,
-        provider: meta.provider,
-        authType: meta.auth_type,
+        provider: meta.route.provider,
+        authType: meta.route.authType,
         sessionKey,
         durationMs,
         specificityCategory: meta.specificity_category,

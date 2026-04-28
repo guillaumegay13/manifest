@@ -9,13 +9,15 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
-import { IsArray, IsString } from 'class-validator';
+import { IsArray, ArrayMaxSize, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import type { AuthUser } from '../../auth/auth.instance';
 import { TenantCacheService } from '../../common/services/tenant-cache.service';
 import { ResolveAgentService } from '../routing-core/resolve-agent.service';
 import { HeaderTierService } from './header-tier.service';
-import type { TierColor } from 'manifest-shared';
+import { ModelRouteDto } from '../dto/routing.dto';
+import type { ModelRoute, TierColor } from 'manifest-shared';
 
 interface CreateHeaderTierBody {
   name: string;
@@ -35,16 +37,18 @@ interface ReorderBody {
   ids: string[];
 }
 
-interface OverrideBody {
-  model: string;
-  provider?: string;
-  authType?: 'api_key' | 'subscription';
+class OverrideBody {
+  @ValidateNested()
+  @Type(() => ModelRouteDto)
+  route!: ModelRoute;
 }
 
 class FallbacksBody {
   @IsArray()
-  @IsString({ each: true })
-  models!: string[];
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  @Type(() => ModelRouteDto)
+  routes!: ModelRoute[];
 }
 
 @Controller('api/v1/routing')
@@ -127,13 +131,7 @@ export class HeaderTierController {
     @Body() body: OverrideBody,
   ) {
     const agent = await this.resolveAgentService.resolve(user.id, agentName);
-    return this.headerTierService.setOverride(
-      agent.id,
-      id,
-      body.model,
-      body.provider,
-      body.authType,
-    );
+    return this.headerTierService.setOverride(agent.id, id, body.route);
   }
 
   @Delete(':agentName/header-tiers/:id/override')
@@ -155,7 +153,7 @@ export class HeaderTierController {
     @Body() body: FallbacksBody,
   ) {
     const agent = await this.resolveAgentService.resolve(user.id, agentName);
-    return this.headerTierService.setFallbacks(agent.id, id, body.models);
+    return this.headerTierService.setFallbacks(agent.id, id, body.routes);
   }
 
   @Delete(':agentName/header-tiers/:id/fallbacks')

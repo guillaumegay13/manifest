@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
-import { TIER_COLORS, type TierColor } from 'manifest-shared';
+import { TIER_COLORS, type ModelRoute, type TierColor } from 'manifest-shared';
 import { HeaderTier } from '../../entities/header-tier.entity';
 import { RoutingCacheService } from '../routing-core/routing-cache.service';
 
@@ -81,10 +81,8 @@ export class HeaderTierService {
       badge_color: badgeColor,
       sort_order: nextOrder,
       enabled: true,
-      override_model: null,
-      override_provider: null,
-      override_auth_type: null,
-      fallback_models: null,
+      override_route: null,
+      fallback_routes: null,
       created_at: now,
       updated_at: now,
     });
@@ -165,17 +163,9 @@ export class HeaderTierService {
     this.routingCache.invalidateAgent(agentId);
   }
 
-  async setOverride(
-    agentId: string,
-    id: string,
-    model: string,
-    provider?: string,
-    authType?: 'api_key' | 'subscription',
-  ): Promise<HeaderTier> {
+  async setOverride(agentId: string, id: string, route: ModelRoute): Promise<HeaderTier> {
     const row = await this.findOrThrow(agentId, id);
-    row.override_model = model;
-    row.override_provider = provider ?? null;
-    row.override_auth_type = authType ?? null;
+    row.override_route = route;
     row.updated_at = new Date().toISOString();
     await this.repo.save(row);
     this.routingCache.invalidateAgent(agentId);
@@ -184,27 +174,25 @@ export class HeaderTierService {
 
   async clearOverride(agentId: string, id: string): Promise<void> {
     const row = await this.findOrThrow(agentId, id);
-    row.override_model = null;
-    row.override_provider = null;
-    row.override_auth_type = null;
-    row.fallback_models = null;
+    row.override_route = null;
+    row.fallback_routes = null;
     row.updated_at = new Date().toISOString();
     await this.repo.save(row);
     this.routingCache.invalidateAgent(agentId);
   }
 
-  async setFallbacks(agentId: string, id: string, models: string[]): Promise<string[]> {
+  async setFallbacks(agentId: string, id: string, routes: ModelRoute[]): Promise<ModelRoute[]> {
     const row = await this.findOrThrow(agentId, id);
-    row.fallback_models = models.length > 0 ? models : null;
+    row.fallback_routes = routes.length > 0 ? routes : null;
     row.updated_at = new Date().toISOString();
     await this.repo.save(row);
     this.routingCache.invalidateAgent(agentId);
-    return models;
+    return routes;
   }
 
   async clearFallbacks(agentId: string, id: string): Promise<void> {
     const row = await this.findOrThrow(agentId, id);
-    row.fallback_models = null;
+    row.fallback_routes = null;
     row.updated_at = new Date().toISOString();
     await this.repo.save(row);
     this.routingCache.invalidateAgent(agentId);

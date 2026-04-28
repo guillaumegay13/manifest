@@ -16,6 +16,8 @@ export { SPECIFICITY_CATEGORIES } from './specificity';
 export type { SpecificityCategory } from './specificity';
 export { AUTH_TYPES } from './auth-types';
 export type { AuthType } from './auth-types';
+export { routeEquals, routeKey, isModelRoute } from './model-route';
+export type { ModelRoute } from './model-route';
 export { API_KEY_PREFIX } from './api-key';
 export { MODEL_PREFIX_MAP, inferProviderFromModel } from './provider-inference';
 export {

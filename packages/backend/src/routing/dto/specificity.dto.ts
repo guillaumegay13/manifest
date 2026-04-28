@@ -1,19 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsIn, IsBoolean } from 'class-validator';
-import { AUTH_TYPES } from 'manifest-shared';
+import { ValidateNested, IsBoolean } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ModelRouteDto } from './routing.dto';
 
 export class SetSpecificityOverrideDto {
-  @IsString()
-  @IsNotEmpty()
-  model!: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  provider?: string;
-
-  @IsOptional()
-  @IsIn(AUTH_TYPES)
-  authType?: 'api_key' | 'subscription';
+  @ValidateNested()
+  @Type(() => ModelRouteDto)
+  route!: ModelRouteDto;
 }
 
 export class ToggleSpecificityDto {

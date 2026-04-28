@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { TierAssignment } from '../../entities/tier-assignment.entity';
 import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
 import { TierAutoAssignService } from './tier-auto-assign.service';
@@ -21,51 +21,48 @@ export class RoutingInvalidationService {
   /**
    * Clears overrides and fallback entries for models that have been removed
    * from the pricing database (e.g. after a pricing sync).
+   *
+   * The route shape is opaque to SQL filtering (jsonb), so we read every row
+   * and decide in TypeScript. This is fine: the table is bounded by tenants
+   * and the call only fires after a pricing sync.
    */
   async invalidateOverridesForRemovedModels(removedModels: string[]): Promise<void> {
     if (removedModels.length === 0) return;
 
     const removedSet = new Set(removedModels);
+    const allTiers = await this.tierRepo.find();
 
-    const affected = await this.tierRepo.find({
-      where: { override_model: In(removedModels) },
-    });
-
-    const agentIds = new Set<string>();
     const tiersToSave: TierAssignment[] = [];
-    for (const tier of affected) {
-      this.logger.warn(
-        `Clearing override ${tier.override_model} for agent ${tier.agent_id} tier ${tier.tier} (model removed)`,
-      );
-      tier.override_model = null;
-      tier.override_provider = null;
-      tier.override_auth_type = null;
-      tier.updated_at = new Date().toISOString();
-      tiersToSave.push(tier);
-      agentIds.add(tier.agent_id);
-    }
+    const agentIds = new Set<string>();
 
-    // Also clean fallback models referencing removed models.
-    // Scope to affected agents first; if none found, scan all tiers with fallbacks.
-    const fallbackTiers =
-      agentIds.size > 0
-        ? await this.tierRepo.find({ where: { agent_id: In([...agentIds]) } })
-        : await this.tierRepo.find();
-    const savedIds = new Set(tiersToSave.map((t) => t.id));
-    for (const tier of fallbackTiers) {
-      if (!tier.fallback_models || tier.fallback_models.length === 0) continue;
-      const filtered = tier.fallback_models.filter((m) => !removedSet.has(m));
-      if (filtered.length !== tier.fallback_models.length) {
-        tier.fallback_models = filtered.length > 0 ? filtered : null;
+    for (const tier of allTiers) {
+      let mutated = false;
+
+      if (tier.override_route && removedSet.has(tier.override_route.model)) {
+        this.logger.warn(
+          `Clearing override ${tier.override_route.model} for agent ${tier.agent_id} ` +
+            `tier ${tier.tier} (model removed)`,
+        );
+        tier.override_route = null;
+        mutated = true;
+      }
+
+      if (tier.fallback_routes && tier.fallback_routes.length > 0) {
+        const filtered = tier.fallback_routes.filter((r) => !removedSet.has(r.model));
+        if (filtered.length !== tier.fallback_routes.length) {
+          tier.fallback_routes = filtered.length > 0 ? filtered : null;
+          mutated = true;
+        }
+      }
+
+      if (mutated) {
         tier.updated_at = new Date().toISOString();
-        if (!savedIds.has(tier.id)) tiersToSave.push(tier);
+        tiersToSave.push(tier);
         agentIds.add(tier.agent_id);
       }
     }
 
-    // Batch save all tier mutations
     if (tiersToSave.length > 0) await this.tierRepo.save(tiersToSave);
-
     if (agentIds.size === 0) return;
 
     // Parallel recalculate + cache invalidation
@@ -77,7 +74,7 @@ export class RoutingInvalidationService {
     );
 
     this.logger.log(
-      `Invalidated ${affected.length} overrides for ${agentIds.size} agents (removed models: ${removedModels.join(', ')})`,
+      `Invalidated overrides for ${agentIds.size} agents (removed models: ${removedModels.join(', ')})`,
     );
   }
 }

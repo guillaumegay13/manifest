@@ -1,5 +1,5 @@
 import { fetchJson, fetchMutate, routingPath } from './core.js';
-import type { AuthType } from './routing.js';
+import type { ModelRoute } from './routing.js';
 import type { TierColor } from 'manifest-shared';
 
 export interface HeaderTier {
@@ -11,10 +11,8 @@ export interface HeaderTier {
   badge_color: TierColor;
   sort_order: number;
   enabled: boolean;
-  override_model: string | null;
-  override_provider: string | null;
-  override_auth_type: AuthType | null;
-  fallback_models: string[] | null;
+  override_route: ModelRoute | null;
+  fallback_routes: ModelRoute[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -87,19 +85,13 @@ export function reorderHeaderTiers(agentName: string, ids: string[]) {
   });
 }
 
-export function overrideHeaderTier(
-  agentName: string,
-  id: string,
-  model: string,
-  provider: string,
-  authType?: AuthType,
-) {
+export function overrideHeaderTier(agentName: string, id: string, route: ModelRoute) {
   return fetchMutate<HeaderTier>(
     routingPath(agentName, `header-tiers/${encodeURIComponent(id)}/override`),
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, provider, ...(authType && { authType }) }),
+      body: JSON.stringify({ route }),
     },
   );
 }
@@ -110,13 +102,13 @@ export function resetHeaderTier(agentName: string, id: string) {
   });
 }
 
-export function setHeaderTierFallbacks(agentName: string, id: string, models: string[]) {
-  return fetchMutate<string[]>(
+export function setHeaderTierFallbacks(agentName: string, id: string, routes: ModelRoute[]) {
+  return fetchMutate<ModelRoute[]>(
     routingPath(agentName, `header-tiers/${encodeURIComponent(id)}/fallbacks`),
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ models }),
+      body: JSON.stringify({ routes }),
     },
   );
 }

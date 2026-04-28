@@ -192,7 +192,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       baseTimeMs?: number;
       markHandled?: boolean;
       lastAsError?: boolean;
-      authType?: string;
       reason?: string;
       callerAttribution?: CallerAttribution | null;
       requestHeaders?: Record<string, string> | null;
@@ -206,7 +205,6 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       baseTimeMs,
       markHandled = false,
       lastAsError = false,
-      authType,
       reason,
       callerAttribution,
       requestHeaders,
@@ -234,8 +232,8 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
           : 'error';
       const canonical = await this.customProviders.canonicalizeAgentMessageKeys(
         ctx.agentId,
-        f.provider,
-        f.model,
+        f.route.provider,
+        f.route.model,
       );
       await this.messageRepo.insert(
         buildMessageRow(ctx, {
@@ -250,7 +248,10 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
           routing_reason: reason ?? null,
           fallback_from_model: canonicalPrimary.model,
           fallback_index: f.fallbackIndex,
-          auth_type: authType ?? null,
+          // Each fallback carries its own auth — record the route's actual
+          // auth so telemetry attributes the failure to the credential that
+          // was tried, not the primary's.
+          auth_type: f.route.authType,
           caller_attribution: callerAttribution ?? null,
           request_headers: requestHeaders ?? null,
           header_tier_id: headerTierId ?? null,

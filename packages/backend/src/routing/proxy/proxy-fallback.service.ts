@@ -1,12 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { ModelRoute } from 'manifest-shared';
+import { routeEquals } from 'manifest-shared';
 import { ProviderKeyService } from '../routing-core/provider-key.service';
 import { CustomProvider } from '../../entities/custom-provider.entity';
 import { CustomProviderService } from '../custom-provider/custom-provider.service';
 import { OpenaiOauthService } from '../oauth/openai-oauth.service';
 import { MinimaxOauthService } from '../oauth/minimax-oauth.service';
-import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
 import { ProviderClient, ForwardResult } from './provider-client';
 import {
   buildCustomEndpoint,
@@ -17,7 +18,6 @@ import {
 import { CopilotTokenService } from './copilot-token.service';
 import { buildProviderExtraHeaders } from './provider-hooks';
 import { shouldTriggerFallback } from './fallback-status-codes';
-import { inferProviderFromModelName } from '../../common/utils/provider-aliases';
 import { normalizeMinimaxSubscriptionBaseUrl } from '../provider-base-url';
 import { getQwenCompatibleBaseUrl, isQwenResolvedRegion } from '../qwen-region';
 import { normalizeAnthropicShortModelId } from '../../common/utils/anthropic-model-id';
@@ -30,11 +30,16 @@ import type { SignatureLookup, ThinkingBlockLookup } from './proxy-types';
 import type { ProxyApiMode } from './proxy-types';
 
 export interface FailedFallback {
-  model: string;
-  provider: string;
+  route: ModelRoute;
   fallbackIndex: number;
   status: number;
   errorBody: string;
+}
+
+export interface FallbackSuccess {
+  forward: ForwardResult;
+  route: ModelRoute;
+  fallbackIndex: number;
 }
 
 @Injectable()
@@ -49,80 +54,56 @@ export class ProxyFallbackService {
     private readonly minimaxOauth: MinimaxOauthService,
     private readonly providerClient: ProviderClient,
     private readonly copilotToken: CopilotTokenService,
-    private readonly pricingCache: ModelPricingCacheService,
   ) {}
 
+  /**
+   * Walk the configured fallback routes in order, returning at the first one
+   * that returns a 2xx. Routes are explicit `(provider, authType, model)` —
+   * no provider inference, no auth inference. This is what makes #1708
+   * (subscription→api_key fallback for the same model) work cleanly: the user
+   * configures both routes; the resolver hands them over; we just try them.
+   */
   async tryFallbacks(
     agentId: string,
     userId: string,
-    fallbackModels: string[],
+    routes: ModelRoute[],
     body: Record<string, unknown>,
     stream: boolean,
     sessionKey: string,
-    primaryModel: string,
+    primaryRoute: ModelRoute,
     signal?: AbortSignal,
-    primaryProvider?: string,
-    primaryAuthType?: string,
     signatureLookup?: SignatureLookup,
     thinkingLookup?: ThinkingBlockLookup,
     apiMode?: ProxyApiMode,
     chatBody?: Record<string, unknown>,
-  ): Promise<{
-    success: {
-      forward: ForwardResult;
-      model: string;
-      provider: string;
-      fallbackIndex: number;
-    } | null;
-    failures: FailedFallback[];
-  }> {
+  ): Promise<{ success: FallbackSuccess | null; failures: FailedFallback[] }> {
     const failures: FailedFallback[] = [];
 
-    // Track auth types that already failed per provider so fallbacks for the
-    // same provider try a different credential (fixes #1272).
-    const failedAuthByProvider = new Map<string, Set<string>>();
-    if (primaryProvider && primaryAuthType) {
-      failedAuthByProvider.set(primaryProvider.toLowerCase(), new Set([primaryAuthType]));
-    }
-
-    for (let i = 0; i < fallbackModels.length; i++) {
-      const requestedModel = fallbackModels[i];
-      const pricing = this.pricingCache.getByModel(requestedModel);
-
-      // Determine provider: custom prefix -> model name inference -> pricing cache -> user's connected providers
-      let provider: string | undefined;
-      if (CustomProviderService.isCustom(requestedModel)) {
-        const slashIdx = requestedModel.indexOf('/');
-        provider = slashIdx > 0 ? requestedModel.substring(0, slashIdx) : requestedModel;
-      } else {
-        const prefix = inferProviderFromModelName(requestedModel);
-        provider =
-          (prefix && (await this.providerKeyService.hasActiveProvider(agentId, prefix))
-            ? prefix
-            : undefined) ??
-          pricing?.provider ??
-          (await this.providerKeyService.findProviderForModel(agentId, requestedModel));
-      }
-
-      if (!provider) {
-        this.logger.debug(`Fallback ${i}: skipping model=${requestedModel} (no provider data)`);
+    for (let i = 0; i < routes.length; i++) {
+      const route = routes[i];
+      // Skip the route that just failed — it's the primary, retrying it is
+      // pointless. Different `(provider, authType, model)` triples are valid
+      // even when only one component differs; that's the whole point of the
+      // structured route.
+      if (routeEquals(route, primaryRoute)) {
+        this.logger.debug(`Fallback ${i}: skipping ${describe(route)} (matches primary)`);
         continue;
       }
-      const model = normalizeProviderModel(provider, requestedModel);
-      const excludeAuth = failedAuthByProvider.get(provider.toLowerCase());
-      const authType = await this.providerKeyService.getAuthType(agentId, provider, excludeAuth);
-      let apiKey = await this.providerKeyService.getProviderApiKey(agentId, provider, authType);
+
+      const apiKey = await this.providerKeyService.getProviderApiKey(
+        agentId,
+        route.provider,
+        route.authType,
+      );
       if (apiKey === null) {
-        this.logger.debug(
-          `Fallback ${i}: skipping model=${model} provider=${provider} (no API key)`,
-        );
+        this.logger.debug(`Fallback ${i}: skipping ${describe(route)} (no API key)`);
         continue;
       }
 
-      const resolvedCredentials = await resolveApiKey(
-        provider,
+      const credentials = await resolveApiKey(
+        route.provider,
         apiKey,
-        authType,
+        route.authType,
         agentId,
         userId,
         this.openaiOauth,
@@ -130,52 +111,47 @@ export class ProxyFallbackService {
       );
       const providerRegion = await this.providerKeyService.getProviderRegion(
         agentId,
-        provider,
-        authType,
+        route.provider,
+        route.authType,
       );
+      const wireModel = normalizeProviderModel(route.provider, route.model);
 
       this.logger.log(
-        `Fallback ${i}: trying model=${model} provider=${provider} auth_type=${authType} (primary=${primaryModel})`,
+        `Fallback ${i}: trying ${describe(route)} (primary=${describe(primaryRoute)})`,
       );
 
       const forward = await this.tryForwardToProvider({
-        provider,
-        apiKey: resolvedCredentials.apiKey,
-        model,
+        provider: route.provider,
+        apiKey: credentials.apiKey,
+        model: wireModel,
         body,
         chatBody,
         stream,
         sessionKey,
         signal,
-        authType,
+        authType: route.authType,
         apiMode,
-        resourceUrl: resolvedCredentials.resourceUrl,
+        resourceUrl: credentials.resourceUrl,
         providerRegion,
         signatureLookup,
         thinkingLookup,
       });
 
       if (forward.response.ok) {
-        return { success: { forward, model, provider, fallbackIndex: i }, failures };
+        return { success: { forward, route, fallbackIndex: i }, failures };
       }
 
       const errorBody = await forward.response.text();
       failures.push({
-        model,
-        provider,
+        route,
         fallbackIndex: i,
         status: forward.response.status,
         errorBody,
       });
 
-      // Record this auth type as failed for the provider so subsequent
-      // fallback models from the same provider try a different credential.
-      // Create a new Set to avoid mutating the reference passed to getAuthType.
-      const existing = failedAuthByProvider.get(provider.toLowerCase());
-      const updated = new Set(existing);
-      updated.add(authType);
-      failedAuthByProvider.set(provider.toLowerCase(), updated);
-
+      // Stop on errors we treat as terminal (4xx that aren't worth retrying).
+      // The user-visible primary error is preserved by the caller so the
+      // client sees the original failure rather than a fallback's error.
       if (!shouldTriggerFallback(forward.response.status)) break;
     }
     return { success: null, failures };
@@ -328,4 +304,8 @@ export async function resolveApiKey(
     }
   }
   return { apiKey };
+}
+
+function describe(route: ModelRoute): string {
+  return `${route.provider}/${route.authType}/${route.model}`;
 }

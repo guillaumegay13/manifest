@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, IsNull, Repository, In } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { UserProvider } from '../../entities/user-provider.entity';
 import { TierAssignment } from '../../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../../entities/specificity-assignment.entity';
@@ -278,7 +278,7 @@ export class ProviderService {
       const tierMap = new Map(updatedTiers.map((t) => [t.tier, t]));
       for (const { tier, modelName } of invalidated) {
         const updated = tierMap.get(tier);
-        const newModel = updated?.auto_assigned_model ?? null;
+        const newModel = updated?.auto_assigned_route?.model ?? null;
         const tierLabel = TIER_LABELS[tier as keyof typeof TIER_LABELS] ?? tier;
         const suffix = newModel
           ? `${tierLabel} is back to automatic mode (${newModel}).`
@@ -297,10 +297,8 @@ export class ProviderService {
     await this.tierRepo.update(
       { agent_id: agentId },
       {
-        override_model: null,
-        override_provider: null,
-        override_auth_type: null,
-        fallback_models: null,
+        override_route: null,
+        fallback_routes: null,
         updated_at: new Date().toISOString(),
       },
     );
@@ -353,15 +351,12 @@ export class ProviderService {
   }
 
   /**
-   * Clears overrides and fallback entries on both tier_assignments and
-   * specificity_assignments that reference any of the given provider keys.
-   *
-   * A row matches when any of these hold for its override_model/fallback entry:
-   *   - the assignment's override_provider equals the provider key (case-insensitive)
-   *   - the model/entry string starts with `<providerKey>/` (covers custom:<uuid>/... entries
-   *     that don't carry an explicit override_provider, and any fallback_models list where
-   *     provider metadata isn't stored alongside the string)
-   *   - the pricing cache infers the entry belongs to this provider (well-known models)
+   * Clears route-shaped overrides and fallback entries on tier_assignments
+   * and specificity_assignments that point at any of the given provider keys.
+   * With routes carrying an explicit `provider`, the match is just
+   * `route.provider == key` — no name inference, no pricing cache, no prefix
+   * heuristics. The model name is reported back so the caller can surface
+   * "X is no longer available" notifications.
    */
   private async cleanupProviderReferences(
     agentId: string,
@@ -369,74 +364,51 @@ export class ProviderService {
   ): Promise<{ invalidated: { tier: string; modelName: string }[]; hadTierAssignments: boolean }> {
     if (providers.length === 0) return { invalidated: [], hadTierAssignments: false };
 
-    const providerNames = new Set(providers.map((provider) => provider.toLowerCase()));
-    const prefixKeys = providers.map((provider) => `${provider.toLowerCase()}/`);
-    const modelBelongs = (model: string): boolean => {
-      const lower = model.toLowerCase();
-      if (prefixKeys.some((prefix) => lower.startsWith(prefix))) return true;
-      const pricing = this.pricingCache.getByModel(model)?.provider.toLowerCase();
-      return !!pricing && providerNames.has(pricing);
-    };
+    const providerNames = new Set(providers.map((p) => p.toLowerCase()));
+    const matches = (provider: string): boolean => providerNames.has(provider.toLowerCase());
 
     const invalidated: { tier: string; modelName: string }[] = [];
 
-    const tierOverrides = await this.tierRepo.find({
-      where: { agent_id: agentId, override_model: Not(IsNull()) },
-    });
+    const allTiers = await this.tierRepo.find({ where: { agent_id: agentId } });
+    const hadTierAssignments = allTiers.length > 0;
     const tiersToSave: TierAssignment[] = [];
-    for (const tier of tierOverrides) {
-      const overrideProvider = tier.override_provider?.toLowerCase();
-      if (
-        (overrideProvider && providerNames.has(overrideProvider)) ||
-        modelBelongs(tier.override_model!)
-      ) {
-        invalidated.push({ tier: tier.tier, modelName: tier.override_model! });
-        tier.override_model = null;
-        tier.override_provider = null;
-        tier.override_auth_type = null;
+    for (const tier of allTiers) {
+      let mutated = false;
+      if (tier.override_route && matches(tier.override_route.provider)) {
+        invalidated.push({ tier: tier.tier, modelName: tier.override_route.model });
+        tier.override_route = null;
+        mutated = true;
+      }
+      if (tier.fallback_routes && tier.fallback_routes.length > 0) {
+        const filtered = tier.fallback_routes.filter((r) => !matches(r.provider));
+        if (filtered.length !== tier.fallback_routes.length) {
+          tier.fallback_routes = filtered.length > 0 ? filtered : null;
+          mutated = true;
+        }
+      }
+      if (mutated) {
         tier.updated_at = new Date().toISOString();
         tiersToSave.push(tier);
       }
     }
-
-    const allTiers = await this.tierRepo.find({ where: { agent_id: agentId } });
-    const hadTierAssignments = allTiers.length > 0;
-    const savedTierIds = new Set(tiersToSave.map((tier) => tier.id));
-    for (const tier of allTiers) {
-      if (!tier.fallback_models || tier.fallback_models.length === 0) continue;
-      const filtered = tier.fallback_models.filter((model) => !modelBelongs(model));
-      if (filtered.length !== tier.fallback_models.length) {
-        tier.fallback_models = filtered.length > 0 ? filtered : null;
-        tier.updated_at = new Date().toISOString();
-        if (!savedTierIds.has(tier.id)) tiersToSave.push(tier);
-      }
-    }
-
     if (tiersToSave.length > 0) await this.tierRepo.save(tiersToSave);
 
-    const specificityRows = await this.specificityRepo.find({ where: { agent_id: agentId } });
+    const specRows = await this.specificityRepo.find({ where: { agent_id: agentId } });
     const specToSave: SpecificityAssignment[] = [];
-    for (const row of specificityRows) {
-      let changed = false;
-      const overrideProvider = row.override_provider?.toLowerCase();
-      if (
-        row.override_model !== null &&
-        ((overrideProvider && providerNames.has(overrideProvider)) ||
-          modelBelongs(row.override_model))
-      ) {
-        row.override_model = null;
-        row.override_provider = null;
-        row.override_auth_type = null;
-        changed = true;
+    for (const row of specRows) {
+      let mutated = false;
+      if (row.override_route && matches(row.override_route.provider)) {
+        row.override_route = null;
+        mutated = true;
       }
-      if (row.fallback_models && row.fallback_models.length > 0) {
-        const filtered = row.fallback_models.filter((model) => !modelBelongs(model));
-        if (filtered.length !== row.fallback_models.length) {
-          row.fallback_models = filtered.length > 0 ? filtered : null;
-          changed = true;
+      if (row.fallback_routes && row.fallback_routes.length > 0) {
+        const filtered = row.fallback_routes.filter((r) => !matches(r.provider));
+        if (filtered.length !== row.fallback_routes.length) {
+          row.fallback_routes = filtered.length > 0 ? filtered : null;
+          mutated = true;
         }
       }
-      if (changed) {
+      if (mutated) {
         row.updated_at = new Date().toISOString();
         specToSave.push(row);
       }
