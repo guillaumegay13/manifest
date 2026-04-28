@@ -9,7 +9,7 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
-import { IsArray, ArrayMaxSize, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsDefined, IsObject, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import type { AuthUser } from '../../auth/auth.instance';
@@ -38,6 +38,8 @@ interface ReorderBody {
 }
 
 class OverrideBody {
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => ModelRouteDto)
   route!: ModelRoute;

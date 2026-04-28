@@ -116,6 +116,15 @@ describe("customProviderLogo", () => {
     expect(img!.getAttribute("src")).toBe("/icons/azure.svg");
   });
 
+  it("resolves GitHub Models before generic Azure URL matching", () => {
+    const { container } = render(() => (
+      <div>{customProviderLogo("my-provider", 16, "https://models.inference.ai.azure.com")}</div>
+    ));
+    const img = container.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute("src")).toBe("/icons/github.svg");
+  });
+
   it("returns null when base URL does not match any pattern", () => {
     const { container } = render(() => (
       <div>{customProviderLogo("custom", 16, "https://api.example.com/v1")}</div>

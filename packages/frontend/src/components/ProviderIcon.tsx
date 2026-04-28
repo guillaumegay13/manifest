@@ -408,12 +408,12 @@ const CUSTOM_PROVIDER_LOGOS: Record<string, string> = {
 };
 
 const BASE_URL_TO_PROVIDER: [RegExp, string][] = [
+  [/models\.inference\.ai\.azure\.com/i, 'github models'],
   [/\.azure\.com|azure\.openai\.com|openai\.azure\.com/i, 'azure'],
   [/api\.cerebras\.ai/i, 'cerebras'],
   [/api\.cloudflare\.com|workers\.ai/i, 'cloudflare workers ai'],
   [/cohere\.ai/i, 'cohere'],
   [/generativelanguage\.googleapis\.com/i, 'gemini'],
-  [/models\.inference\.ai\.azure\.com/i, 'github models'],
   [/api\.groq\.com/i, 'groq'],
   [/huggingface\.co/i, 'hugging face'],
   [/kilo\.ai/i, 'kilo code'],

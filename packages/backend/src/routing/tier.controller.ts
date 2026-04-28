@@ -108,10 +108,15 @@ export class TierController {
   @Post(':agentName/complexity/toggle')
   async toggleComplexity(@CurrentUser() user: AuthUser, @Param('agentName') agentName: string) {
     const agent = await this.resolveAgentService.resolve(user.id, agentName);
-    const newValue = !agent.complexity_routing_enabled;
-    await this.agentRepo.update(agent.id, { complexity_routing_enabled: newValue });
+    await this.agentRepo
+      .createQueryBuilder()
+      .update(Agent)
+      .set({ complexity_routing_enabled: () => 'NOT complexity_routing_enabled' })
+      .where('id = :id', { id: agent.id })
+      .execute();
+    const updated = await this.agentRepo.findOne({ where: { id: agent.id } });
     this.resolveAgentService.invalidate(agent.tenant_id, agentName);
-    return { enabled: newValue };
+    return { enabled: Boolean(updated?.complexity_routing_enabled) };
   }
 
   private validateTier(tier: string): void {

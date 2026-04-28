@@ -6,6 +6,8 @@ import { AuthUser } from '../../auth/auth.instance';
 
 const mockAgent = { id: 'agent-1', name: 'test-agent' };
 const mockUser = { id: 'user-1', email: 'test@test.com', name: 'Test' } as AuthUser;
+const route = { model: 'gpt-4o', provider: 'openai', authType: 'api_key' as const };
+const fallbackRoute = { model: 'model-a', provider: 'openai', authType: 'api_key' as const };
 
 describe('SpecificityController', () => {
   let controller: SpecificityController;
@@ -55,8 +57,8 @@ describe('SpecificityController', () => {
 
   describe('setOverride', () => {
     it('should validate category, resolve agent, and set override', async () => {
-      const body = { model: 'gpt-4o', provider: 'openai', authType: 'api_key' as const };
-      const override = { id: 'sa-1', category: 'coding', override_model: 'gpt-4o' };
+      const body = { route };
+      const override = { id: 'sa-1', category: 'coding', override_route: route };
       mockSpecificityService.setOverride.mockResolvedValue(override);
 
       const result = await controller.setOverride(mockUser, 'test-agent', 'coding', body);
@@ -66,15 +68,13 @@ describe('SpecificityController', () => {
         'agent-1',
         'user-1',
         'coding',
-        'gpt-4o',
-        'openai',
-        'api_key',
+        route,
       );
       expect(result).toBe(override);
     });
 
     it('should throw BadRequestException for invalid category', async () => {
-      const body = { model: 'gpt-4o' };
+      const body = { route };
 
       await expect(
         controller.setOverride(mockUser, 'test-agent', 'invalid_cat', body),
@@ -158,20 +158,20 @@ describe('SpecificityController', () => {
 
   describe('setFallbacks', () => {
     it('should resolve agent and call service.setFallbacks', async () => {
-      mockSpecificityService.setFallbacks.mockResolvedValue(['model-a']);
+      mockSpecificityService.setFallbacks.mockResolvedValue([fallbackRoute]);
       const result = await controller.setFallbacks(mockUser, 'test-agent', 'coding', {
-        models: ['model-a'],
+        routes: [fallbackRoute],
       });
       expect(mockResolveAgentService.resolve).toHaveBeenCalledWith('user-1', 'test-agent');
       expect(mockSpecificityService.setFallbacks).toHaveBeenCalledWith('agent-1', 'coding', [
-        'model-a',
+        fallbackRoute,
       ]);
-      expect(result).toEqual(['model-a']);
+      expect(result).toEqual([fallbackRoute]);
     });
 
     it('should reject invalid category', async () => {
       await expect(
-        controller.setFallbacks(mockUser, 'test-agent', 'invalid', { models: ['m'] }),
+        controller.setFallbacks(mockUser, 'test-agent', 'invalid', { routes: [fallbackRoute] }),
       ).rejects.toThrow(BadRequestException);
     });
   });

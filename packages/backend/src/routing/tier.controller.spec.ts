@@ -8,6 +8,11 @@ import type { AuthUser } from '../auth/auth.instance';
 
 describe('TierController', () => {
   const user = { id: 'user-1' } as AuthUser;
+  const route = { provider: 'openai', authType: 'api_key' as const, model: 'm' };
+  const fallbackRoutes = [
+    { provider: 'openai', authType: 'api_key' as const, model: 'm1' },
+    { provider: 'anthropic', authType: 'api_key' as const, model: 'm2' },
+  ];
   const agent = {
     id: 'agent-1',
     name: 'demo',
@@ -17,6 +22,7 @@ describe('TierController', () => {
   let tierService: jest.Mocked<Partial<TierService>>;
   let resolveAgentService: { resolve: jest.Mock; invalidate: jest.Mock };
   let agentRepo: jest.Mocked<Partial<Repository<Agent>>>;
+  let toggleQb: Record<string, jest.Mock>;
   let controller: TierController;
 
   beforeEach(() => {
@@ -33,8 +39,15 @@ describe('TierController', () => {
       resolve: jest.fn().mockResolvedValue(agent),
       invalidate: jest.fn(),
     };
+    toggleQb = {
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue(undefined),
+    };
     agentRepo = {
-      update: jest.fn().mockResolvedValue(undefined),
+      createQueryBuilder: jest.fn(() => toggleQb as never),
+      findOne: jest.fn().mockResolvedValue({ ...agent, complexity_routing_enabled: false }),
     };
     controller = new TierController(
       tierService as unknown as TierService,
@@ -53,23 +66,16 @@ describe('TierController', () => {
   it('PUT /tiers/:tier accepts the default slot', async () => {
     (tierService.setOverride as jest.Mock).mockResolvedValue({
       tier: 'default',
-      override_model: 'm',
+      override_route: route,
     });
-    const out = await controller.setOverride(user, 'demo', 'default', { model: 'm' });
-    expect(out).toEqual({ tier: 'default', override_model: 'm' });
-    expect(tierService.setOverride).toHaveBeenCalledWith(
-      'agent-1',
-      'user-1',
-      'default',
-      'm',
-      undefined,
-      undefined,
-    );
+    const out = await controller.setOverride(user, 'demo', 'default', { route });
+    expect(out).toEqual({ tier: 'default', override_route: route });
+    expect(tierService.setOverride).toHaveBeenCalledWith('agent-1', 'user-1', 'default', route);
   });
 
   it('PUT /tiers/:tier rejects unknown slots', async () => {
     await expect(
-      controller.setOverride(user, 'demo', 'nonsense', { model: 'm' }),
+      controller.setOverride(user, 'demo', 'nonsense', { route }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(tierService.setOverride).not.toHaveBeenCalled();
   });
@@ -93,13 +99,13 @@ describe('TierController', () => {
   });
 
   it('GET/PUT/DELETE /tiers/:tier/fallbacks validate the slot', async () => {
-    (tierService.getFallbacks as jest.Mock).mockResolvedValue(['m1']);
-    expect(await controller.getFallbacks(user, 'demo', 'default')).toEqual(['m1']);
+    (tierService.getFallbacks as jest.Mock).mockResolvedValue([fallbackRoutes[0]]);
+    expect(await controller.getFallbacks(user, 'demo', 'default')).toEqual([fallbackRoutes[0]]);
 
-    (tierService.setFallbacks as jest.Mock).mockResolvedValue(['m1', 'm2']);
+    (tierService.setFallbacks as jest.Mock).mockResolvedValue(fallbackRoutes);
     expect(
-      await controller.setFallbacks(user, 'demo', 'default', { models: ['m1', 'm2'] }),
-    ).toEqual(['m1', 'm2']);
+      await controller.setFallbacks(user, 'demo', 'default', { routes: fallbackRoutes }),
+    ).toEqual(fallbackRoutes);
 
     expect(await controller.clearFallbacks(user, 'demo', 'default')).toEqual({ ok: true });
 
@@ -107,7 +113,7 @@ describe('TierController', () => {
       BadRequestException,
     );
     await expect(
-      controller.setFallbacks(user, 'demo', 'bogus', { models: ['m'] }),
+      controller.setFallbacks(user, 'demo', 'bogus', { routes: [route] }),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(controller.clearFallbacks(user, 'demo', 'bogus')).rejects.toBeInstanceOf(
       BadRequestException,
@@ -122,9 +128,16 @@ describe('TierController', () => {
   it('POST complexity/toggle flips the flag and invalidates cache', async () => {
     const result = await controller.toggleComplexity(user, 'demo');
     expect(result).toEqual({ enabled: false });
-    expect(agentRepo.update).toHaveBeenCalledWith('agent-1', {
-      complexity_routing_enabled: false,
+    expect(agentRepo.createQueryBuilder).toHaveBeenCalled();
+    expect(toggleQb.update).toHaveBeenCalledWith(Agent);
+    expect(toggleQb.set).toHaveBeenCalledWith({
+      complexity_routing_enabled: expect.any(Function),
     });
+    const setArg = toggleQb.set.mock.calls[0][0] as Record<string, () => string>;
+    expect(setArg['complexity_routing_enabled']()).toBe('NOT complexity_routing_enabled');
+    expect(toggleQb.where).toHaveBeenCalledWith('id = :id', { id: 'agent-1' });
+    expect(toggleQb.execute).toHaveBeenCalled();
+    expect(agentRepo.findOne).toHaveBeenCalledWith({ where: { id: 'agent-1' } });
     expect(resolveAgentService.invalidate).toHaveBeenCalledWith('tenant-1', 'demo');
   });
 });

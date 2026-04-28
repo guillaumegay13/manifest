@@ -371,6 +371,125 @@ describe('AgentDuplicationService', () => {
       expect(upRow['auth_type']).toBe('local');
     });
 
+    it('remaps custom:<uuid> route references in copied routing assignments', async () => {
+      mockAgentGetOne
+        .mockResolvedValueOnce({ id: 'src-1', tenant_id: 't1', name: 'source' })
+        .mockResolvedValueOnce(null);
+
+      repoRows = {
+        CustomProvider: [
+          {
+            id: 'old-cp-uuid',
+            agent_id: 'src-1',
+            user_id: 'u1',
+            name: 'Local Router',
+            base_url: 'http://localhost:4321',
+            api_kind: 'openai',
+            models: [],
+          },
+        ],
+        TierAssignment: [
+          {
+            id: 'tier-1',
+            user_id: 'u1',
+            agent_id: 'src-1',
+            tier: 'default',
+            override_route: {
+              provider: 'custom:old-cp-uuid',
+              authType: 'local',
+              model: 'local-large',
+            },
+            auto_assigned_route: {
+              provider: 'anthropic',
+              authType: 'api_key',
+              model: 'claude-sonnet-4',
+            },
+            fallback_routes: [
+              {
+                provider: 'custom:old-cp-uuid',
+                authType: 'local',
+                model: 'local-small',
+              },
+              {
+                provider: 'openai',
+                authType: 'api_key',
+                model: 'gpt-4.1-mini',
+              },
+            ],
+          },
+        ],
+        SpecificityAssignment: [
+          {
+            id: 'spec-1',
+            user_id: 'u1',
+            agent_id: 'src-1',
+            category: 'coding',
+            is_active: true,
+            override_route: null,
+            auto_assigned_route: {
+              provider: 'custom:old-cp-uuid',
+              authType: 'local',
+              model: 'local-coder',
+            },
+            fallback_routes: [
+              {
+                provider: 'custom:old-cp-uuid',
+                authType: 'local',
+                model: 'local-fallback',
+              },
+            ],
+          },
+        ],
+      };
+
+      await service.duplicate('user-1', 'source', {
+        name: 'copy',
+        displayName: 'copy',
+      });
+
+      const cpRow = (insertedRows['CustomProvider'] as Array<Record<string, unknown>>)[0];
+      const newCpId = cpRow['id'] as string;
+      const newProvider = `custom:${newCpId}`;
+
+      const [tierRow] = insertedRows['TierAssignment'] as Array<Record<string, unknown>>;
+      expect(tierRow['override_route']).toEqual({
+        provider: newProvider,
+        authType: 'local',
+        model: 'local-large',
+      });
+      expect(tierRow['auto_assigned_route']).toEqual({
+        provider: 'anthropic',
+        authType: 'api_key',
+        model: 'claude-sonnet-4',
+      });
+      expect(tierRow['fallback_routes']).toEqual([
+        {
+          provider: newProvider,
+          authType: 'local',
+          model: 'local-small',
+        },
+        {
+          provider: 'openai',
+          authType: 'api_key',
+          model: 'gpt-4.1-mini',
+        },
+      ]);
+
+      const [specRow] = insertedRows['SpecificityAssignment'] as Array<Record<string, unknown>>;
+      expect(specRow['auto_assigned_route']).toEqual({
+        provider: newProvider,
+        authType: 'local',
+        model: 'local-coder',
+      });
+      expect(specRow['fallback_routes']).toEqual([
+        {
+          provider: newProvider,
+          authType: 'local',
+          model: 'local-fallback',
+        },
+      ]);
+    });
+
     it('duplicates canonical local providers (ollama, lmstudio) as-is', async () => {
       mockAgentGetOne
         .mockResolvedValueOnce({ id: 'src-1', tenant_id: 't1', name: 'source' })

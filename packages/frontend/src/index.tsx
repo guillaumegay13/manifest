@@ -9,11 +9,9 @@ import AgentGuard from './components/AgentGuard.jsx';
 import GuestGuard from './components/GuestGuard.jsx';
 import NotFound from './pages/NotFound.jsx';
 import ToastContainer from './components/ToastContainer.jsx';
-import { lazyReload, clearReloadFlag } from './services/lazy-reload.js';
+import { lazyReload } from './services/lazy-reload.js';
 import type { ParentComponent } from 'solid-js';
 import './styles/theme.css';
-
-clearReloadFlag();
 
 const Overview = lazyReload(() => import('./pages/Overview.jsx'));
 const MessageLog = lazyReload(() => import('./pages/MessageLog.jsx'));

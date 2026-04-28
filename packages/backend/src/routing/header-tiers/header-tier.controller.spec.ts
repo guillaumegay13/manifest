@@ -31,6 +31,7 @@ function makeController(overrides?: { tenantId?: string | null }) {
 }
 
 const user = { id: 'user-1' } as AuthUser;
+const route = { model: 'gpt-4o', provider: 'OpenAI', authType: 'api_key' as const };
 
 describe('HeaderTierController', () => {
   it('list resolves the agent then delegates to the service', async () => {
@@ -101,20 +102,10 @@ describe('HeaderTierController', () => {
     expect(service.reorder).not.toHaveBeenCalled();
   });
 
-  it('setOverride forwards model/provider/authType', async () => {
+  it('setOverride forwards route', async () => {
     const { controller, service } = makeController();
-    await controller.setOverride(user, 'my-agent', 'ht-1', {
-      model: 'gpt-4o',
-      provider: 'OpenAI',
-      authType: 'api_key',
-    });
-    expect(service.setOverride).toHaveBeenCalledWith(
-      'agent-1',
-      'ht-1',
-      'gpt-4o',
-      'OpenAI',
-      'api_key',
-    );
+    await controller.setOverride(user, 'my-agent', 'ht-1', { route });
+    expect(service.setOverride).toHaveBeenCalledWith('agent-1', 'ht-1', route);
   });
 
   it('clearOverride returns ok', async () => {
@@ -124,10 +115,10 @@ describe('HeaderTierController', () => {
     expect(out).toEqual({ ok: true });
   });
 
-  it('setFallbacks forwards models', async () => {
+  it('setFallbacks forwards routes', async () => {
     const { controller, service } = makeController();
-    const out = await controller.setFallbacks(user, 'my-agent', 'ht-1', { models: ['a'] });
-    expect(service.setFallbacks).toHaveBeenCalledWith('agent-1', 'ht-1', ['a']);
+    const out = await controller.setFallbacks(user, 'my-agent', 'ht-1', { routes: [route] });
+    expect(service.setFallbacks).toHaveBeenCalledWith('agent-1', 'ht-1', [route]);
     expect(out).toEqual(['m']);
   });
 

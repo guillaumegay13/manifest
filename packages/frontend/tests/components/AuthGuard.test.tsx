@@ -47,6 +47,19 @@ describe("AuthGuard", () => {
     expect(container.textContent).toContain("Loading...");
   });
 
+  it("keeps both loading logos accessible by name", () => {
+    mockSessionData = { data: null, isPending: true };
+    const { container } = render(() => (
+      <AuthGuard>
+        <span>Protected content</span>
+      </AuthGuard>
+    ));
+    const logoAlts = Array.from(container.querySelectorAll(".auth-logo img")).map((img) =>
+      img.getAttribute("alt"),
+    );
+    expect(logoAlts).toEqual(["Manifest", "Manifest"]);
+  });
+
   it("shows loading state when no session data", () => {
     mockSessionData = { data: null, isPending: false };
     const { container } = render(() => (

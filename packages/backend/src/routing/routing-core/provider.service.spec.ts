@@ -6,6 +6,7 @@ import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache
 import { UserProvider } from '../../entities/user-provider.entity';
 import { TierAssignment } from '../../entities/tier-assignment.entity';
 import { SpecificityAssignment } from '../../entities/specificity-assignment.entity';
+import type { AuthType, ModelRoute } from 'manifest-shared';
 
 jest.mock('../../common/utils/crypto.util', () => ({
   encrypt: jest.fn().mockReturnValue('encrypted-value'),
@@ -68,17 +69,23 @@ function makeProvider(overrides: Partial<UserProvider> = {}): UserProvider {
   });
 }
 
+function makeRoute(
+  provider = 'openai',
+  authType: AuthType = 'api_key',
+  model = 'gpt-4o',
+): ModelRoute {
+  return { provider, authType, model };
+}
+
 function makeTier(overrides: Partial<TierAssignment> = {}): TierAssignment {
   return Object.assign(new TierAssignment(), {
     id: 'tier-1',
     user_id: 'user-1',
     agent_id: 'agent-1',
     tier: 'simple',
-    override_model: null,
-    override_provider: null,
-    override_auth_type: null,
-    auto_assigned_model: 'gpt-4o-mini',
-    fallback_models: null,
+    override_route: null,
+    auto_assigned_route: makeRoute('openai', 'api_key', 'gpt-4o-mini'),
+    fallback_routes: null,
     updated_at: '2025-01-01T00:00:00Z',
     ...overrides,
   });
@@ -361,16 +368,33 @@ describe('ProviderService', () => {
       await expect(service.removeProvider('agent-1', 'openai')).rejects.toThrow(NotFoundException);
     });
 
-    it('should deactivate provider and skip override clearing when other active provider exists', async () => {
+    it('clears only routes for the removed auth type when another auth type remains', async () => {
       const existing = makeProvider({ is_active: true });
       providerRepo.findOne.mockResolvedValue(existing);
-      // Other active provider of same type that is usable (api_key)
-      providerRepo.find.mockResolvedValue([makeProvider({ id: 'p2', auth_type: 'api_key' })]);
 
-      const result = await service.removeProvider('agent-1', 'openai');
+      const tier = makeTier({
+        tier: 'standard',
+        override_route: makeRoute('openai', 'api_key', 'gpt-4o'),
+        fallback_routes: [
+          makeRoute('openai', 'api_key', 'gpt-4o-mini'),
+          makeRoute('openai', 'subscription', 'gpt-5'),
+        ],
+      });
+      tierRepo.find
+        .mockResolvedValueOnce([tier])
+        .mockResolvedValueOnce([makeTier({ tier: 'standard', auto_assigned_route: null })]);
+      specificityRepo.find.mockResolvedValue([]);
+
+      const result = await service.removeProvider('agent-1', 'openai', 'api_key');
 
       expect(existing.is_active).toBe(false);
-      expect(result).toEqual({ notifications: [] });
+      expect(tierRepo.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          override_route: null,
+          fallback_routes: [makeRoute('openai', 'subscription', 'gpt-5')],
+        }),
+      ]);
+      expect(result.notifications).toHaveLength(1);
       expect(routingCache.invalidateAgent).toHaveBeenCalledWith('agent-1');
     });
 
@@ -394,23 +418,18 @@ describe('ProviderService', () => {
       providerRepo.find.mockResolvedValue([]);
 
       const overrideTier = makeTier({
-        override_model: 'gpt-4o',
-        override_provider: 'openai',
+        override_route: makeRoute('openai', 'api_key', 'gpt-4o'),
         tier: 'complex',
       });
-      tierRepo.find
-        .mockResolvedValueOnce([overrideTier]) // overrides (Not IsNull)
-        .mockResolvedValueOnce([overrideTier]); // allTiers
+      tierRepo.find.mockResolvedValueOnce([overrideTier]);
 
       // After recalculate, the tier's auto-assigned model is updated
       const updatedTier = makeTier({
         tier: 'complex',
-        auto_assigned_model: 'claude-3-haiku',
-        override_model: null,
+        auto_assigned_route: makeRoute('anthropic', 'api_key', 'claude-3-haiku'),
+        override_route: null,
       });
       tierRepo.find.mockResolvedValueOnce([updatedTier]); // In(tierNames) lookup
-
-      pricingCache.getByModel.mockReturnValue({ provider: 'openai' });
 
       const result = await service.removeProvider('agent-1', 'openai');
 
@@ -420,26 +439,23 @@ describe('ProviderService', () => {
       expect(result.notifications[0]).toContain('claude-3-haiku');
     });
 
-    it('should generate notification without model when auto_assigned_model is null', async () => {
+    it('should generate notification without model when auto_assigned_route is null', async () => {
       const existing = makeProvider({ is_active: true });
       providerRepo.findOne.mockResolvedValue(existing);
       providerRepo.find.mockResolvedValue([]);
 
       const overrideTier = makeTier({
-        override_model: 'gpt-4o',
-        override_provider: 'openai',
+        override_route: makeRoute('openai', 'api_key', 'gpt-4o'),
         tier: 'simple',
       });
-      tierRepo.find.mockResolvedValueOnce([overrideTier]).mockResolvedValueOnce([overrideTier]);
+      tierRepo.find.mockResolvedValueOnce([overrideTier]);
 
       const updatedTier = makeTier({
         tier: 'simple',
-        auto_assigned_model: null,
-        override_model: null,
+        auto_assigned_route: null,
+        override_route: null,
       });
       tierRepo.find.mockResolvedValueOnce([updatedTier]);
-
-      pricingCache.getByModel.mockReturnValue({ provider: 'openai' });
 
       const result = await service.removeProvider('agent-1', 'openai');
 
@@ -466,20 +482,17 @@ describe('ProviderService', () => {
       providerRepo.find.mockResolvedValue([]);
 
       const overrideTier = makeTier({
-        override_model: 'gpt-4o',
-        override_provider: 'openai',
+        override_route: makeRoute('openai', 'api_key', 'gpt-4o'),
         tier: 'unknown-tier',
       });
-      tierRepo.find.mockResolvedValueOnce([overrideTier]).mockResolvedValueOnce([overrideTier]);
+      tierRepo.find.mockResolvedValueOnce([overrideTier]);
 
       const updatedTier = makeTier({
         tier: 'unknown-tier',
-        auto_assigned_model: null,
-        override_model: null,
+        auto_assigned_route: null,
+        override_route: null,
       });
       tierRepo.find.mockResolvedValueOnce([updatedTier]);
-
-      pricingCache.getByModel.mockReturnValue({ provider: 'openai' });
 
       const result = await service.removeProvider('agent-1', 'openai');
 
@@ -500,10 +513,8 @@ describe('ProviderService', () => {
       expect(tierRepo.update).toHaveBeenCalledWith(
         { agent_id: 'agent-1' },
         expect.objectContaining({
-          override_model: null,
-          override_provider: null,
-          override_auth_type: null,
-          fallback_models: null,
+          override_route: null,
+          fallback_routes: null,
         }),
       );
       expect(autoAssign.recalculate).toHaveBeenCalledWith('agent-1');
@@ -558,7 +569,7 @@ describe('ProviderService', () => {
       expect(providerRepo.save).not.toHaveBeenCalled();
     });
 
-    it('should not remove provider from removedProviders when usable provider with same name exists', async () => {
+    it('clears only unsupported subscription routes when an api-key provider with the same name remains', async () => {
       // Unsupported subscription that will be deactivated
       const unsupported = makeProvider({
         id: 'p1',
@@ -577,6 +588,14 @@ describe('ProviderService', () => {
       providerRepo.find.mockResolvedValueOnce([unsupported, usableApiKey]);
       // Second find (getProviders) returns only the api_key provider
       providerRepo.find.mockResolvedValueOnce([usableApiKey]);
+      const tier = makeTier({
+        fallback_routes: [
+          makeRoute('unsupported-provider', 'subscription', 'sub-model'),
+          makeRoute('unsupported-provider', 'api_key', 'key-model'),
+        ],
+      });
+      tierRepo.find.mockResolvedValueOnce([tier]);
+      specificityRepo.find.mockResolvedValue([]);
 
       await service.getProviders('agent-1');
 
@@ -584,8 +603,11 @@ describe('ProviderService', () => {
       expect(providerRepo.save).toHaveBeenCalledWith([
         expect.objectContaining({ id: 'p1', is_active: false }),
       ]);
-      // But since a usable provider with same name remains, no tier clearing should happen
-      expect(tierRepo.find).not.toHaveBeenCalled();
+      expect(tierRepo.save).toHaveBeenCalledWith([
+        expect.objectContaining({
+          fallback_routes: [makeRoute('unsupported-provider', 'api_key', 'key-model')],
+        }),
+      ]);
     });
 
     it('should recalculate tiers when cleanup removes providers that had tier assignments', async () => {
@@ -599,10 +621,8 @@ describe('ProviderService', () => {
       providerRepo.find.mockResolvedValueOnce([unsupported]);
 
       // cleanupProviderReferences returns hadTierAssignments: true
-      const existingTier = makeTier({ agent_id: 'agent-1', override_model: null });
-      tierRepo.find
-        .mockResolvedValueOnce([]) // overrides (Not IsNull)
-        .mockResolvedValueOnce([existingTier]); // allTiers (has rows = hadTierAssignments)
+      const existingTier = makeTier({ agent_id: 'agent-1', override_route: null });
+      tierRepo.find.mockResolvedValueOnce([existingTier]);
 
       // Second find (getProviders) returns empty
       providerRepo.find.mockResolvedValueOnce([]);
@@ -617,24 +637,16 @@ describe('ProviderService', () => {
   /* ── cleanupProviderReferences (private, tested via removeProvider) ── */
 
   describe('cleanupProviderReferences (via removeProvider)', () => {
-    it('should clear override when pricing provider matches', async () => {
+    it('should clear override when route provider matches', async () => {
       const existing = makeProvider({ is_active: true });
       providerRepo.findOne.mockResolvedValue(existing);
       providerRepo.find.mockResolvedValue([]);
 
       const override = makeTier({
-        override_model: 'gpt-4o',
-        override_provider: null, // no override_provider
+        override_route: makeRoute('openai', 'api_key', 'gpt-4o'),
         tier: 'standard',
       });
-      tierRepo.find
-        .mockResolvedValueOnce([override]) // overrides
-        .mockResolvedValueOnce([override]); // allTiers
-
-      // No updated tier match needed since we won't get invalidated from tierNames
-      tierRepo.find.mockResolvedValueOnce([]);
-
-      pricingCache.getByModel.mockReturnValue({ provider: 'OpenAI' });
+      tierRepo.find.mockResolvedValueOnce([override]).mockResolvedValueOnce([]);
 
       const result = await service.removeProvider('agent-1', 'openai');
 
@@ -649,54 +661,47 @@ describe('ProviderService', () => {
 
       const tierWithFallbacks = makeTier({
         tier: 'standard',
-        override_model: null,
-        fallback_models: ['gpt-4o', 'claude-3-haiku'],
+        override_route: null,
+        fallback_routes: [
+          makeRoute('openai', 'api_key', 'gpt-4o'),
+          makeRoute('anthropic', 'api_key', 'claude-3-haiku'),
+        ],
       });
-      tierRepo.find
-        .mockResolvedValueOnce([]) // overrides (no override)
-        .mockResolvedValueOnce([tierWithFallbacks]); // allTiers
-
-      pricingCache.getByModel.mockImplementation((model: string) => {
-        if (model === 'gpt-4o') return { provider: 'OpenAI' };
-        if (model === 'claude-3-haiku') return { provider: 'Anthropic' };
-        return undefined;
-      });
+      tierRepo.find.mockResolvedValueOnce([tierWithFallbacks]);
 
       await service.removeProvider('agent-1', 'openai');
 
       expect(tierRepo.save).toHaveBeenCalledWith([
-        expect.objectContaining({ fallback_models: ['claude-3-haiku'] }),
+        expect.objectContaining({
+          fallback_routes: [makeRoute('anthropic', 'api_key', 'claude-3-haiku')],
+        }),
       ]);
     });
 
-    it('should set fallback_models to null when all fallbacks removed', async () => {
+    it('should set fallback_routes to null when all fallbacks removed', async () => {
       const existing = makeProvider({ is_active: true });
       providerRepo.findOne.mockResolvedValue(existing);
       providerRepo.find.mockResolvedValue([]);
 
       const tierWithFallbacks = makeTier({
         tier: 'standard',
-        override_model: null,
-        fallback_models: ['gpt-4o'],
+        override_route: null,
+        fallback_routes: [makeRoute('openai', 'api_key', 'gpt-4o')],
       });
-      tierRepo.find
-        .mockResolvedValueOnce([]) // overrides
-        .mockResolvedValueOnce([tierWithFallbacks]); // allTiers
-
-      pricingCache.getByModel.mockReturnValue({ provider: 'OpenAI' });
+      tierRepo.find.mockResolvedValueOnce([tierWithFallbacks]);
 
       await service.removeProvider('agent-1', 'openai');
 
       expect(tierRepo.save).toHaveBeenCalledWith([
-        expect.objectContaining({ fallback_models: null }),
+        expect.objectContaining({ fallback_routes: null }),
       ]);
     });
 
-    it('should handle empty providers array (no-op)', async () => {
+    it('returns no notifications when no routes reference the removed provider', async () => {
       const existing = makeProvider({ is_active: true });
       providerRepo.findOne.mockResolvedValue(existing);
-      // other active provider with same is usable
-      providerRepo.find.mockResolvedValue([makeProvider({ id: 'other', auth_type: 'api_key' })]);
+      tierRepo.find.mockResolvedValue([]);
+      specificityRepo.find.mockResolvedValue([]);
 
       const result = await service.removeProvider('agent-1', 'openai');
 
@@ -710,23 +715,18 @@ describe('ProviderService', () => {
 
       const tier = makeTier({
         id: 'tier-shared',
-        override_model: 'gpt-4o',
-        override_provider: 'openai',
+        override_route: makeRoute('openai', 'api_key', 'gpt-4o'),
         tier: 'complex',
-        fallback_models: ['gpt-4o-mini'],
+        fallback_routes: [makeRoute('openai', 'api_key', 'gpt-4o-mini')],
       });
-      tierRepo.find
-        .mockResolvedValueOnce([tier]) // overrides
-        .mockResolvedValueOnce([tier]); // allTiers
+      tierRepo.find.mockResolvedValueOnce([tier]);
 
       const updatedTier = makeTier({
         tier: 'complex',
-        auto_assigned_model: null,
-        override_model: null,
+        auto_assigned_route: null,
+        override_route: null,
       });
       tierRepo.find.mockResolvedValueOnce([updatedTier]);
-
-      pricingCache.getByModel.mockReturnValue({ provider: 'OpenAI' });
 
       await service.removeProvider('agent-1', 'openai');
 
@@ -736,29 +736,27 @@ describe('ProviderService', () => {
       expect(new Set(ids).size).toBe(ids.length);
     });
 
-    it('should keep fallback models that have no pricing data', async () => {
+    it('should keep fallback routes for other providers', async () => {
       const existing = makeProvider({ is_active: true });
       providerRepo.findOne.mockResolvedValue(existing);
       providerRepo.find.mockResolvedValue([]);
 
       const tierWithFallbacks = makeTier({
         tier: 'standard',
-        override_model: null,
-        fallback_models: ['unknown-model', 'gpt-4o'],
+        override_route: null,
+        fallback_routes: [
+          makeRoute('unknown-provider', 'api_key', 'unknown-model'),
+          makeRoute('openai', 'api_key', 'gpt-4o'),
+        ],
       });
-      tierRepo.find
-        .mockResolvedValueOnce([]) // overrides
-        .mockResolvedValueOnce([tierWithFallbacks]); // allTiers
-
-      pricingCache.getByModel.mockImplementation((model: string) => {
-        if (model === 'gpt-4o') return { provider: 'OpenAI' };
-        return undefined; // unknown-model has no pricing
-      });
+      tierRepo.find.mockResolvedValueOnce([tierWithFallbacks]);
 
       await service.removeProvider('agent-1', 'openai');
 
       expect(tierRepo.save).toHaveBeenCalledWith([
-        expect.objectContaining({ fallback_models: ['unknown-model'] }),
+        expect.objectContaining({
+          fallback_routes: [makeRoute('unknown-provider', 'api_key', 'unknown-model')],
+        }),
       ]);
     });
   });
@@ -775,11 +773,9 @@ describe('ProviderService', () => {
         agent_id: 'agent-1',
         category: 'coding',
         is_active: true,
-        override_model: null,
-        override_provider: null,
-        override_auth_type: null,
-        auto_assigned_model: null,
-        fallback_models: null,
+        override_route: null,
+        auto_assigned_route: null,
+        fallback_routes: null,
         updated_at: '2025-01-01T00:00:00Z',
         ...overrides,
       });
@@ -792,9 +788,7 @@ describe('ProviderService', () => {
       tierRepo.find.mockResolvedValue([]);
 
       const orphanSpec = makeSpecificity({
-        override_model: 'custom:abc-123/gemini-2.5-flash',
-        override_provider: 'custom:abc-123',
-        override_auth_type: 'api_key',
+        override_route: makeRoute('custom:abc-123', 'api_key', 'custom:abc-123/gemini-2.5-flash'),
       });
       specificityRepo.find.mockResolvedValue([orphanSpec]);
 
@@ -803,87 +797,84 @@ describe('ProviderService', () => {
       expect(specificityRepo.save).toHaveBeenCalledWith([
         expect.objectContaining({
           id: 'spec-1',
-          override_model: null,
-          override_provider: null,
-          override_auth_type: null,
+          override_route: null,
         }),
       ]);
     });
 
-    it('clears specificity override when model uses custom prefix but override_provider is null', async () => {
+    it('keeps specificity override when only the model name looks like the removed provider', async () => {
       const existing = makeProvider({ provider: 'custom:abc-123', is_active: true });
       providerRepo.findOne.mockResolvedValue(existing);
       providerRepo.find.mockResolvedValue([]);
       tierRepo.find.mockResolvedValue([]);
 
       const orphanSpec = makeSpecificity({
-        override_model: 'custom:abc-123/gemini-2.5-flash',
-        override_provider: null,
+        override_route: makeRoute('anthropic', 'api_key', 'custom:abc-123/gemini-2.5-flash'),
       });
       specificityRepo.find.mockResolvedValue([orphanSpec]);
 
       await service.removeProvider('agent-1', 'custom:abc-123');
 
-      expect(specificityRepo.save).toHaveBeenCalledWith([
-        expect.objectContaining({ id: 'spec-1', override_model: null }),
-      ]);
+      expect(specificityRepo.save).not.toHaveBeenCalled();
     });
 
-    it('removes custom-prefixed entries from specificity fallback_models', async () => {
+    it('removes custom provider entries from specificity fallback_routes', async () => {
       const existing = makeProvider({ provider: 'custom:abc-123', is_active: true });
       providerRepo.findOne.mockResolvedValue(existing);
       providerRepo.find.mockResolvedValue([]);
       tierRepo.find.mockResolvedValue([]);
 
       const spec = makeSpecificity({
-        override_model: null,
-        fallback_models: ['custom:abc-123/gemini-2.5-flash', 'anthropic/claude-opus-4'],
+        override_route: null,
+        fallback_routes: [
+          makeRoute('custom:abc-123', 'api_key', 'custom:abc-123/gemini-2.5-flash'),
+          makeRoute('anthropic', 'api_key', 'anthropic/claude-opus-4'),
+        ],
       });
       specificityRepo.find.mockResolvedValue([spec]);
 
       await service.removeProvider('agent-1', 'custom:abc-123');
 
       expect(specificityRepo.save).toHaveBeenCalledWith([
-        expect.objectContaining({ fallback_models: ['anthropic/claude-opus-4'] }),
+        expect.objectContaining({
+          fallback_routes: [makeRoute('anthropic', 'api_key', 'anthropic/claude-opus-4')],
+        }),
       ]);
     });
 
-    it('removes custom-prefixed entries from tier fallback_models (pricing cache would miss them)', async () => {
+    it('removes custom provider entries from tier fallback_routes', async () => {
       const existing = makeProvider({ provider: 'custom:abc-123', is_active: true });
       providerRepo.findOne.mockResolvedValue(existing);
       providerRepo.find.mockResolvedValue([]);
 
       const tier = makeTier({
-        override_model: null,
-        fallback_models: ['custom:abc-123/gemini-2.5-flash', 'gpt-4o'],
+        override_route: null,
+        fallback_routes: [
+          makeRoute('custom:abc-123', 'api_key', 'custom:abc-123/gemini-2.5-flash'),
+          makeRoute('openai', 'api_key', 'gpt-4o'),
+        ],
       });
-      tierRepo.find.mockResolvedValueOnce([]).mockResolvedValueOnce([tier]);
-      pricingCache.getByModel.mockImplementation((model: string) => {
-        if (model === 'gpt-4o') return { provider: 'OpenAI' };
-        return undefined;
-      });
+      tierRepo.find.mockResolvedValueOnce([tier]);
 
       await service.removeProvider('agent-1', 'custom:abc-123');
 
       expect(tierRepo.save).toHaveBeenCalledWith([
-        expect.objectContaining({ fallback_models: ['gpt-4o'] }),
+        expect.objectContaining({ fallback_routes: [makeRoute('openai', 'api_key', 'gpt-4o')] }),
       ]);
     });
 
-    it('clears tier override when only override_model carries the custom prefix', async () => {
+    it('clears tier override when route provider is the custom provider', async () => {
       const existing = makeProvider({ provider: 'custom:abc-123', is_active: true });
       providerRepo.findOne.mockResolvedValue(existing);
       providerRepo.find.mockResolvedValue([]);
 
       const orphanTier = makeTier({
         tier: 'standard',
-        override_model: 'custom:abc-123/gemini-2.5-flash',
-        override_provider: null,
+        override_route: makeRoute('custom:abc-123', 'api_key', 'custom:abc-123/gemini-2.5-flash'),
       });
       tierRepo.find
         .mockResolvedValueOnce([orphanTier])
-        .mockResolvedValueOnce([orphanTier])
-        .mockResolvedValueOnce([makeTier({ tier: 'standard', override_model: null })]);
+        .mockResolvedValueOnce([makeTier({ tier: 'standard', override_route: null })]);
 
       const result = await service.removeProvider('agent-1', 'custom:abc-123');
 
@@ -891,7 +882,7 @@ describe('ProviderService', () => {
       expect(result.notifications).toHaveLength(1);
     });
 
-    it('sets specificity fallback_models to null when every entry belongs to the deleted custom provider', async () => {
+    it('sets specificity fallback_routes to null when every entry belongs to the deleted custom provider', async () => {
       // Regression for #1603: specificity fallback list containing only orphan entries
       // should be nulled out (not kept as an empty array) so resolve() has no leftover
       // references to silently forward to the dead provider.
@@ -901,15 +892,18 @@ describe('ProviderService', () => {
       tierRepo.find.mockResolvedValue([]);
 
       const spec = makeSpecificity({
-        override_model: null,
-        fallback_models: ['custom:abc-123/gemini-2.5-flash', 'custom:abc-123/gemini-2.5-pro'],
+        override_route: null,
+        fallback_routes: [
+          makeRoute('custom:abc-123', 'api_key', 'custom:abc-123/gemini-2.5-flash'),
+          makeRoute('custom:abc-123', 'api_key', 'custom:abc-123/gemini-2.5-pro'),
+        ],
       });
       specificityRepo.find.mockResolvedValue([spec]);
 
       await service.removeProvider('agent-1', 'custom:abc-123');
 
       expect(specificityRepo.save).toHaveBeenCalledWith([
-        expect.objectContaining({ fallback_models: null }),
+        expect.objectContaining({ fallback_routes: null }),
       ]);
     });
 
@@ -920,9 +914,8 @@ describe('ProviderService', () => {
       tierRepo.find.mockResolvedValue([]);
 
       const unrelated = makeSpecificity({
-        override_model: 'anthropic/claude-opus-4',
-        override_provider: 'anthropic',
-        fallback_models: ['anthropic/claude-sonnet-4'],
+        override_route: makeRoute('anthropic', 'api_key', 'anthropic/claude-opus-4'),
+        fallback_routes: [makeRoute('anthropic', 'api_key', 'anthropic/claude-sonnet-4')],
       });
       specificityRepo.find.mockResolvedValue([unrelated]);
 

@@ -13,9 +13,13 @@ import {
   isManifestUsableProvider,
   isSupportedSubscriptionProvider,
 } from '../../common/utils/subscription-support';
-import type { AuthType } from 'manifest-shared';
-import { TIER_LABELS } from 'manifest-shared';
+import { TIER_LABELS, type AuthType, type ModelRoute } from 'manifest-shared';
 import { detectQwenRegion, isQwenRegion, isQwenResolvedRegion } from '../qwen-region';
+
+interface ProviderRouteReference {
+  provider: string;
+  authType?: AuthType;
+}
 
 @Injectable()
 export class ProviderService {
@@ -255,17 +259,8 @@ export class ProviderService {
     existing.is_active = false;
     existing.updated_at = new Date().toISOString();
     await this.providerRepo.save(existing);
-    const otherActive = await this.providerRepo.find({
-      where: { agent_id: agentId, provider, is_active: true },
-    });
 
-    if (otherActive.some((record) => isManifestUsableProvider(record))) {
-      // Provider is still available via the other auth type — skip override clearing
-      this.routingCache.invalidateAgent(agentId);
-      return { notifications: [] };
-    }
-
-    const { invalidated } = await this.cleanupProviderReferences(agentId, [provider]);
+    const { invalidated } = await this.cleanupProviderReferences(agentId, [{ provider, authType }]);
     await this.autoAssign.recalculate(agentId);
     this.routingCache.invalidateAgent(agentId);
 
@@ -321,27 +316,19 @@ export class ProviderService {
     }
     await this.providerRepo.save(unsupported);
 
-    const unsupportedIds = new Set(unsupported.map((record) => record.id));
-    const remainingActive = activeProviders.filter((record) => !unsupportedIds.has(record.id));
-    const usableProviders = remainingActive.filter(isManifestUsableProvider);
-
-    const removedProviders = Array.from(
-      new Set(
-        unsupported
-          .map((record) => record.provider)
-          .filter(
-            (provider) =>
-              !usableProviders.some(
-                (record) => record.provider.toLowerCase() === provider.toLowerCase(),
-              ),
-          ),
-      ),
+    const removedReferences = Array.from(
+      new Map(
+        unsupported.map((record) => [
+          `${record.provider.toLowerCase()}:${record.auth_type}`,
+          { provider: record.provider, authType: record.auth_type },
+        ]),
+      ).values(),
     );
 
-    if (removedProviders.length > 0) {
+    if (removedReferences.length > 0) {
       const { hadTierAssignments } = await this.cleanupProviderReferences(
         agentId,
-        removedProviders,
+        removedReferences,
       );
       if (hadTierAssignments) {
         await this.autoAssign.recalculate(agentId);
@@ -352,20 +339,28 @@ export class ProviderService {
 
   /**
    * Clears route-shaped overrides and fallback entries on tier_assignments
-   * and specificity_assignments that point at any of the given provider keys.
-   * With routes carrying an explicit `provider`, the match is just
-   * `route.provider == key` — no name inference, no pricing cache, no prefix
-   * heuristics. The model name is reported back so the caller can surface
+   * and specificity_assignments that point at any of the given provider/auth
+   * references. When an auth type is provided, only that route identity is
+   * removed so routes for another auth method on the same provider survive.
+   * The model name is reported back so the caller can surface
    * "X is no longer available" notifications.
    */
   private async cleanupProviderReferences(
     agentId: string,
-    providers: string[],
+    references: ProviderRouteReference[],
   ): Promise<{ invalidated: { tier: string; modelName: string }[]; hadTierAssignments: boolean }> {
-    if (providers.length === 0) return { invalidated: [], hadTierAssignments: false };
+    if (references.length === 0) return { invalidated: [], hadTierAssignments: false };
 
-    const providerNames = new Set(providers.map((p) => p.toLowerCase()));
-    const matches = (provider: string): boolean => providerNames.has(provider.toLowerCase());
+    const normalizedReferences = references.map((reference) => ({
+      provider: reference.provider.toLowerCase(),
+      authType: reference.authType,
+    }));
+    const matches = (route: ModelRoute): boolean =>
+      normalizedReferences.some(
+        (reference) =>
+          route.provider.toLowerCase() === reference.provider &&
+          (!reference.authType || route.authType === reference.authType),
+      );
 
     const invalidated: { tier: string; modelName: string }[] = [];
 
@@ -374,13 +369,13 @@ export class ProviderService {
     const tiersToSave: TierAssignment[] = [];
     for (const tier of allTiers) {
       let mutated = false;
-      if (tier.override_route && matches(tier.override_route.provider)) {
+      if (tier.override_route && matches(tier.override_route)) {
         invalidated.push({ tier: tier.tier, modelName: tier.override_route.model });
         tier.override_route = null;
         mutated = true;
       }
       if (tier.fallback_routes && tier.fallback_routes.length > 0) {
-        const filtered = tier.fallback_routes.filter((r) => !matches(r.provider));
+        const filtered = tier.fallback_routes.filter((r) => !matches(r));
         if (filtered.length !== tier.fallback_routes.length) {
           tier.fallback_routes = filtered.length > 0 ? filtered : null;
           mutated = true;
@@ -397,12 +392,12 @@ export class ProviderService {
     const specToSave: SpecificityAssignment[] = [];
     for (const row of specRows) {
       let mutated = false;
-      if (row.override_route && matches(row.override_route.provider)) {
+      if (row.override_route && matches(row.override_route)) {
         row.override_route = null;
         mutated = true;
       }
       if (row.fallback_routes && row.fallback_routes.length > 0) {
-        const filtered = row.fallback_routes.filter((r) => !matches(r.provider));
+        const filtered = row.fallback_routes.filter((r) => !matches(r));
         if (filtered.length !== row.fallback_routes.length) {
           row.fallback_routes = filtered.length > 0 ? filtered : null;
           mutated = true;

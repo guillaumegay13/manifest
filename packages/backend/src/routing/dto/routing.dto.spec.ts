@@ -6,6 +6,7 @@ import {
   ConnectProviderDto,
   CopilotPollDto,
   SetFallbacksDto,
+  SetOverrideDto,
 } from './routing.dto';
 
 function toDto(data: Record<string, unknown>): AgentNameParamDto {
@@ -160,48 +161,89 @@ describe('SetFallbacksDto', () => {
     return plainToInstance(SetFallbacksDto, data);
   }
 
-  it('should pass with a single model string', async () => {
-    const dto = toFallbacksDto({ models: ['gpt-4o'] });
+  const route = { provider: 'openai', authType: 'api_key', model: 'gpt-4o' };
+
+  it('should pass with a single route', async () => {
+    const dto = toFallbacksDto({ routes: [route] });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
   });
 
-  it('should pass with up to 5 model strings', async () => {
+  it('should pass with up to 5 routes', async () => {
     const dto = toFallbacksDto({
-      models: ['gpt-4o', 'claude-3', 'gemini-pro', 'llama-3', 'mistral-large'],
+      routes: [
+        route,
+        { provider: 'anthropic', authType: 'api_key', model: 'claude-3' },
+        { provider: 'gemini', authType: 'api_key', model: 'gemini-pro' },
+        { provider: 'openrouter', authType: 'api_key', model: 'llama-3' },
+        { provider: 'mistral', authType: 'api_key', model: 'mistral-large' },
+      ],
     });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
   });
 
   it('should pass with an empty array', async () => {
-    const dto = toFallbacksDto({ models: [] });
+    const dto = toFallbacksDto({ routes: [] });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
   });
 
-  it('should reject an empty string in the array', async () => {
-    const dto = toFallbacksDto({ models: ['gpt-4o', ''] });
+  it('should reject an empty model in a route', async () => {
+    const dto = toFallbacksDto({ routes: [route, { ...route, model: '' }] });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
   });
 
   it('should reject more than 5 items', async () => {
     const dto = toFallbacksDto({
-      models: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6'],
+      routes: [
+        route,
+        { ...route, model: 'm2' },
+        { ...route, model: 'm3' },
+        { ...route, model: 'm4' },
+        { ...route, model: 'm5' },
+        { ...route, model: 'm6' },
+      ],
     });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
   });
 
-  it('should reject a non-string item in the array', async () => {
-    const dto = toFallbacksDto({ models: ['gpt-4o', 42] });
+  it('should reject a non-string model in the array', async () => {
+    const dto = toFallbacksDto({ routes: [route, { ...route, model: 42 }] });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
   });
 
-  it('should reject when models property is missing', async () => {
+  it('should reject when routes property is missing', async () => {
     const dto = toFallbacksDto({});
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+});
+
+describe('SetOverrideDto', () => {
+  function toOverrideDto(data: Record<string, unknown>): SetOverrideDto {
+    return plainToInstance(SetOverrideDto, data);
+  }
+
+  it('should pass with a route', async () => {
+    const dto = toOverrideDto({
+      route: { provider: 'openai', authType: 'api_key', model: 'gpt-4o' },
+    });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('should reject when route is missing', async () => {
+    const dto = toOverrideDto({});
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('should reject when route is not an object', async () => {
+    const dto = toOverrideDto({ route: 'gpt-4o' });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
   });

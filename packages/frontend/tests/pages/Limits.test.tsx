@@ -107,18 +107,19 @@ describe("Limits page", () => {
     });
   });
 
-  it("shows Connect-provider CTA banner when no provider is active", async () => {
+  it("shows routing CTA banner when routing is disabled", async () => {
     mockRoutingStatus = { enabled: false };
 
     const { container } = render(() => <Limits />);
 
     await vi.waitFor(() => {
-      expect(container.textContent).toContain("Connect a provider to set hard limits");
-      expect(container.textContent).not.toContain("Enable routing to set hard limits");
+      expect(container.textContent).toContain("Enable routing to set hard limits");
+      expect(container.textContent).toContain("Email alerts work without routing");
+      expect(container.textContent).not.toContain("Connect a provider to set hard limits");
     });
   });
 
-  it("hides the CTA banner when a provider is already active", async () => {
+  it("hides the CTA banner when routing is enabled", async () => {
     mockRoutingStatus = { enabled: true };
 
     const { container } = render(() => <Limits />);

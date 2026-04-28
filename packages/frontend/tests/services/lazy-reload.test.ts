@@ -4,7 +4,7 @@ vi.mock('solid-js', () => ({
   lazy: (factory: () => Promise<unknown>) => factory,
 }));
 
-import { lazyReload, clearReloadFlag } from '../../src/services/lazy-reload.js';
+import { lazyReload } from '../../src/services/lazy-reload.js';
 
 const RELOAD_KEY = 'manifest:chunk-reload';
 
@@ -30,6 +30,16 @@ describe('lazyReload', () => {
     expect(reloadMock).not.toHaveBeenCalled();
   });
 
+  it('clears the reload flag after a successful import', async () => {
+    sessionStorage.setItem(RELOAD_KEY, '1');
+    const mod = { default: (() => null) as unknown as import('solid-js').Component };
+    const factory = lazyReload(() => Promise.resolve(mod));
+
+    await (factory as unknown as () => Promise<typeof mod>)();
+
+    expect(sessionStorage.getItem(RELOAD_KEY)).toBeNull();
+  });
+
   it('reloads on first import failure', async () => {
     const factory = lazyReload(() => Promise.reject(new Error('chunk fail')));
     const promise = (factory as unknown as () => Promise<unknown>)();
@@ -45,7 +55,7 @@ describe('lazyReload', () => {
     expect(sessionStorage.getItem(RELOAD_KEY)).toBe('1');
   });
 
-  it('propagates error on second failure and clears flag', async () => {
+  it('propagates error on second failure and keeps the guard flag set', async () => {
     sessionStorage.setItem(RELOAD_KEY, '1');
     const factory = lazyReload(() => Promise.reject(new Error('still broken')));
 
@@ -54,19 +64,6 @@ describe('lazyReload', () => {
     ).rejects.toThrow('still broken');
 
     expect(reloadMock).not.toHaveBeenCalled();
-    expect(sessionStorage.getItem(RELOAD_KEY)).toBeNull();
-  });
-});
-
-describe('clearReloadFlag', () => {
-  it('removes the reload key', () => {
-    sessionStorage.setItem(RELOAD_KEY, '1');
-    clearReloadFlag();
-    expect(sessionStorage.getItem(RELOAD_KEY)).toBeNull();
-  });
-
-  it('is a no-op when key is absent', () => {
-    clearReloadFlag();
-    expect(sessionStorage.getItem(RELOAD_KEY)).toBeNull();
+    expect(sessionStorage.getItem(RELOAD_KEY)).toBe('1');
   });
 });

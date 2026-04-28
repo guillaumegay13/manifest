@@ -6,6 +6,8 @@ import {
   IsArray,
   ArrayMaxSize,
   Matches,
+  IsDefined,
+  IsObject,
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
@@ -91,6 +93,8 @@ export class ModelRouteDto {
 }
 
 export class SetOverrideDto {
+  @IsDefined()
+  @IsObject()
   @ValidateNested()
   @Type(() => ModelRouteDto)
   route!: ModelRouteDto;

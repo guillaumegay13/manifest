@@ -8,7 +8,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * `fallback_routes`.
  *
  * Backfill strategy:
- *  - `override_route`: lossless build from the three legacy columns.
+ *  - `override_route`: lossless build from the three legacy columns when
+ *    present, then best-effort model-name inference for older rows that only
+ *    carried `override_model`.
  *  - `auto_assigned_route`: best-effort lookup against the user's connected
  *    providers (resolved by model name → provider+authType). Ambiguous or
  *    absent matches stay null; the auto-assign service repopulates on the next
@@ -19,6 +21,8 @@ export class IntroduceModelRoutes1782000000000 implements MigrationInterface {
   name = 'IntroduceModelRoutes1782000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    const cachedModelName = "COALESCE(m_elem.model->>'id', m_elem.model->>'model_name')";
+
     // 1. Add the new columns nullable so the backfill can populate in place.
     await queryRunner.query(`
       ALTER TABLE tier_assignments
@@ -38,8 +42,10 @@ export class IntroduceModelRoutes1782000000000 implements MigrationInterface {
         ADD COLUMN fallback_routes jsonb
     `);
 
-    // 2. Lossless override_route backfill: every legacy override row carries
-    //    model + provider + auth_type, so the route is fully determined.
+    // 2. Override backfill: newer rows carry model + provider + auth_type and
+    //    can be copied directly. Older rows can have only override_model, so a
+    //    second pass infers a unique active provider/auth route from the cached
+    //    discovered models.
     for (const table of ['tier_assignments', 'specificity_assignments', 'header_tiers']) {
       await queryRunner.query(`
         UPDATE ${table}
@@ -51,6 +57,32 @@ export class IntroduceModelRoutes1782000000000 implements MigrationInterface {
         WHERE override_model IS NOT NULL
           AND override_provider IS NOT NULL
           AND override_auth_type IS NOT NULL
+      `);
+      await queryRunner.query(`
+        WITH candidates AS (
+          SELECT t.id, t.override_model, up.provider, up.auth_type,
+                 COUNT(*) OVER (PARTITION BY t.id) AS match_count
+          FROM ${table} t
+          JOIN user_providers up
+            ON up.agent_id = t.agent_id
+           AND up.is_active
+          CROSS JOIN LATERAL jsonb_array_elements(up.cached_models::jsonb) AS m_elem(model)
+          CROSS JOIN LATERAL (SELECT ${cachedModelName} AS model_name) m
+          WHERE t.override_model IS NOT NULL
+            AND t.override_route IS NULL
+            AND m.model_name = t.override_model
+            AND (t.override_provider IS NULL OR lower(up.provider) = lower(t.override_provider))
+            AND (t.override_auth_type IS NULL OR up.auth_type = t.override_auth_type)
+        )
+        UPDATE ${table} t
+        SET override_route = jsonb_build_object(
+          'provider', c.provider,
+          'authType', c.auth_type,
+          'model', c.override_model
+        )
+        FROM candidates c
+        WHERE t.id = c.id
+          AND c.match_count = 1
       `);
     }
 
@@ -71,8 +103,9 @@ export class IntroduceModelRoutes1782000000000 implements MigrationInterface {
                  COUNT(*) OVER (PARTITION BY up.agent_id, m.model_name) AS match_count
           FROM user_providers up,
                jsonb_array_elements(up.cached_models::jsonb) AS m_elem(model),
-               LATERAL (SELECT m_elem.model->>'model_name' AS model_name) m
+               LATERAL (SELECT ${cachedModelName} AS model_name) m
           WHERE up.is_active
+            AND m.model_name IS NOT NULL
         ) m
         WHERE t.agent_id = m.agent_id
           AND t.auto_assigned_model = m.model_name
@@ -102,13 +135,14 @@ export class IntroduceModelRoutes1782000000000 implements MigrationInterface {
                jsonb_array_elements_text(t2.fallback_models::jsonb)
                  WITH ORDINALITY AS ord(model_name, idx)
           LEFT JOIN LATERAL (
-            SELECT up.provider, up.auth_type, m_elem.model->>'model_name' AS model_name,
-                   COUNT(*) OVER (PARTITION BY up.agent_id, m_elem.model->>'model_name') AS match_count
+            SELECT up.provider, up.auth_type, m.model_name,
+                   COUNT(*) OVER (PARTITION BY up.agent_id, m.model_name) AS match_count
             FROM user_providers up,
-                 jsonb_array_elements(up.cached_models::jsonb) AS m_elem(model)
+                 jsonb_array_elements(up.cached_models::jsonb) AS m_elem(model),
+                 LATERAL (SELECT ${cachedModelName} AS model_name) m
             WHERE up.agent_id = t2.agent_id
               AND up.is_active
-              AND m_elem.model->>'model_name' = ord.model_name
+              AND m.model_name = ord.model_name
           ) m ON m.match_count = 1
           WHERE t2.fallback_models IS NOT NULL
           GROUP BY t2.id

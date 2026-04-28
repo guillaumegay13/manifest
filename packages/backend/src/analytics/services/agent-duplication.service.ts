@@ -1,6 +1,7 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import type { ModelRoute } from 'manifest-shared';
 import { randomBytes } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { Agent } from '../../entities/agent.entity';
@@ -49,6 +50,21 @@ export class AgentDuplicationService {
     const oldId = provider.slice(AgentDuplicationService.CUSTOM_PREFIX.length);
     const newId = idMap.get(oldId);
     return newId ? `${AgentDuplicationService.CUSTOM_PREFIX}${newId}` : provider;
+  }
+
+  private remapRouteProvider<T extends ModelRoute | null>(route: T, idMap: Map<string, string>): T {
+    if (!route) return route;
+    return {
+      ...route,
+      provider: this.remapCustomProviderRef(route.provider, idMap),
+    };
+  }
+
+  private remapFallbackRoutes(
+    routes: ModelRoute[] | null,
+    idMap: Map<string, string>,
+  ): ModelRoute[] | null {
+    return routes?.map((route) => this.remapRouteProvider(route, idMap)) ?? null;
   }
 
   private async findOwnedAgent(userId: string, agentName: string): Promise<Agent | null> {
@@ -194,9 +210,12 @@ export class AgentDuplicationService {
             user_id: t.user_id,
             agent_id: newAgentId,
             tier: t.tier,
-            override_route: t.override_route,
-            auto_assigned_route: t.auto_assigned_route,
-            fallback_routes: t.fallback_routes,
+            override_route: this.remapRouteProvider(t.override_route, customProviderIdMap),
+            auto_assigned_route: this.remapRouteProvider(
+              t.auto_assigned_route,
+              customProviderIdMap,
+            ),
+            fallback_routes: this.remapFallbackRoutes(t.fallback_routes, customProviderIdMap),
             updated_at: now,
           })),
         );
@@ -213,9 +232,12 @@ export class AgentDuplicationService {
             agent_id: newAgentId,
             category: s.category,
             is_active: s.is_active,
-            override_route: s.override_route,
-            auto_assigned_route: s.auto_assigned_route,
-            fallback_routes: s.fallback_routes,
+            override_route: this.remapRouteProvider(s.override_route, customProviderIdMap),
+            auto_assigned_route: this.remapRouteProvider(
+              s.auto_assigned_route,
+              customProviderIdMap,
+            ),
+            fallback_routes: this.remapFallbackRoutes(s.fallback_routes, customProviderIdMap),
             updated_at: now,
           })),
         );
