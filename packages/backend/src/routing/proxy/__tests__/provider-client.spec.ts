@@ -231,6 +231,40 @@ describe('ProviderClient', () => {
       ]);
       expect(sentBody.stream).toBe(true);
       expect(sentBody.max_output_tokens).toBeUndefined();
+      expect(sentBody.parallel_tool_calls).toBe(true);
+    });
+
+    it('promotes client system input to instructions for subscription Responses requests', async () => {
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+
+      await client.forward({
+        provider: 'openai',
+        apiKey: 'oauth-token',
+        model: 'gpt-5.4',
+        body: {
+          input: [
+            { role: 'system', content: 'Use the coaching tool policy.' },
+            { role: 'user', content: 'Save my macro target.' },
+          ],
+          stream: false,
+        },
+        chatBody: {
+          messages: [
+            { role: 'system', content: 'Use the coaching tool policy.' },
+            { role: 'user', content: 'Save my macro target.' },
+          ],
+          stream: false,
+        },
+        stream: false,
+        authType: 'subscription',
+        apiMode: 'responses',
+      });
+
+      const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(sentBody.instructions).toBe('Use the coaching tool policy.');
+      expect(sentBody.input).toEqual([
+        { role: 'user', content: [{ type: 'input_text', text: 'Save my macro target.' }] },
+      ]);
     });
 
     it('uses normalized chat body for non-native Responses providers', async () => {

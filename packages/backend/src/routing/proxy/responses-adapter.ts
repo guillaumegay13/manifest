@@ -144,6 +144,8 @@ export function toNativeResponsesRequest(
     inputList?: boolean;
     forceStream?: boolean;
     omitMaxOutputTokens?: boolean;
+    promoteInputInstructions?: boolean;
+    defaultParallelToolCalls?: boolean;
   },
 ): JsonRecord {
   const request: JsonRecord = { ...body, model };
@@ -156,8 +158,15 @@ export function toNativeResponsesRequest(
     request.stream = false;
   }
   if (body.store === undefined) request.store = false;
+  if (opts?.defaultParallelToolCalls && body.parallel_tool_calls === undefined) {
+    request.parallel_tool_calls = true;
+  }
+  const input =
+    opts?.promoteInputInstructions === true
+      ? promoteInputInstructions(body.input, request)
+      : body.input;
   if (opts?.inputList) {
-    request.input = toNativeResponsesInput(body.input);
+    request.input = toNativeResponsesInput(input);
   }
   if (
     opts?.defaultInstructions &&
@@ -166,6 +175,36 @@ export function toNativeResponsesRequest(
     request.instructions = DEFAULT_INSTRUCTIONS;
   }
   return request;
+}
+
+function promoteInputInstructions(input: unknown, request: JsonRecord): unknown {
+  if (!Array.isArray(input)) return input;
+
+  const instructionParts: string[] = [];
+  const remainingInput: unknown[] = [];
+
+  for (const item of input) {
+    if (!isRecord(item) || (item.role !== 'system' && item.role !== 'developer')) {
+      remainingInput.push(item);
+      continue;
+    }
+
+    const text = textFromContent(item.content).trim();
+    if (text) {
+      instructionParts.push(text);
+    } else {
+      remainingInput.push(item);
+    }
+  }
+
+  if (instructionParts.length === 0) return input;
+
+  const existingInstructions =
+    typeof request.instructions === 'string' && request.instructions.trim()
+      ? [request.instructions.trim()]
+      : [];
+  request.instructions = [...existingInstructions, ...instructionParts].join('\n\n');
+  return remainingInput;
 }
 
 function toNativeResponsesInput(input: unknown): unknown {

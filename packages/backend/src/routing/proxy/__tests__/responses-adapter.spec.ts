@@ -185,6 +185,61 @@ describe('Responses adapter', () => {
     ]);
   });
 
+  it('can promote system and developer input messages into native Responses instructions', () => {
+    const result = toNativeResponsesRequest(
+      {
+        input: [
+          { role: 'system', content: 'Follow the coaching policy.' },
+          {
+            role: 'developer',
+            content: [{ type: 'input_text', text: 'Prefer tool calls for durable writes.' }],
+          },
+          { role: 'user', content: 'Remember my new macro target.' },
+        ],
+      },
+      'gpt-5.4',
+      { inputList: true, promoteInputInstructions: true },
+    );
+
+    expect(result.instructions).toBe(
+      'Follow the coaching policy.\n\nPrefer tool calls for durable writes.',
+    );
+    expect(result.input).toEqual([
+      { role: 'user', content: [{ type: 'input_text', text: 'Remember my new macro target.' }] },
+    ]);
+  });
+
+  it('appends promoted instructions after explicit native Responses instructions', () => {
+    const result = toNativeResponsesRequest(
+      {
+        instructions: 'Base instruction.',
+        input: [
+          { role: 'system', content: 'Request-specific instruction.' },
+          { role: 'user', content: 'Hi' },
+        ],
+      },
+      'gpt-5.4',
+      { inputList: true, promoteInputInstructions: true },
+    );
+
+    expect(result.instructions).toBe('Base instruction.\n\nRequest-specific instruction.');
+    expect(result.input).toEqual([{ role: 'user', content: [{ type: 'input_text', text: 'Hi' }] }]);
+  });
+
+  it('can default native Responses parallel tool calls while preserving explicit values', () => {
+    expect(
+      toNativeResponsesRequest({ input: 'hi' }, 'gpt-5.4', {
+        defaultParallelToolCalls: true,
+      }).parallel_tool_calls,
+    ).toBe(true);
+
+    expect(
+      toNativeResponsesRequest({ input: 'hi', parallel_tool_calls: false }, 'gpt-5.4', {
+        defaultParallelToolCalls: true,
+      }).parallel_tool_calls,
+    ).toBe(false);
+  });
+
   it('can force streaming for native backends that always return SSE', () => {
     expect(
       toNativeResponsesRequest({ input: 'hi', stream: false }, 'gpt-5.4', {
