@@ -1,5 +1,7 @@
+import { BadRequestException } from '@nestjs/common';
 import { SpecificityService } from '../specificity.service';
 import { RoutingCacheService } from '../routing-cache.service';
+import { ModelDiscoveryService } from '../../../model-discovery/model-discovery.service';
 import { SpecificityAssignment } from '../../../entities/specificity-assignment.entity';
 import type { AuthType, ModelRoute } from 'manifest-shared';
 
@@ -40,6 +42,7 @@ describe('SpecificityService', () => {
     setSpecificity: jest.Mock;
     invalidateAgent: jest.Mock;
   };
+  let discoveryService: { getModelsForAgent: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -49,10 +52,22 @@ describe('SpecificityService', () => {
       setSpecificity: jest.fn(),
       invalidateAgent: jest.fn(),
     };
+    discoveryService = {
+      getModelsForAgent: jest.fn().mockResolvedValue([
+        { id: 'gpt-4o', provider: 'openai', authType: 'api_key' },
+        { id: 'gpt-4o', provider: 'openai', authType: 'subscription' },
+        { id: 'claude-3', provider: 'anthropic', authType: 'api_key' },
+        { id: 'new-model', provider: 'anthropic', authType: 'api_key' },
+        { id: 'model-x', provider: 'openai', authType: 'api_key' },
+        { id: 'model-a', provider: 'openai', authType: 'api_key' },
+        { id: 'model-b', provider: 'anthropic', authType: 'api_key' },
+      ]),
+    };
 
     service = new SpecificityService(
       repo as unknown as any,
       cache as unknown as RoutingCacheService,
+      discoveryService as unknown as ModelDiscoveryService,
     );
   });
 
@@ -319,6 +334,18 @@ describe('SpecificityService', () => {
       const result = await service.setFallbacks('agent-1', 'coding', [route('model-a')]);
       expect(result).toEqual([]);
       expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('rejects fallback routes outside the discovered route list', async () => {
+      const existing = makeAssignment();
+      repo.findOne.mockResolvedValue(existing);
+
+      await expect(
+        service.setFallbacks('agent-1', 'coding', [route('missing-model')]),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(repo.save).not.toHaveBeenCalled();
+      expect(cache.invalidateAgent).not.toHaveBeenCalled();
     });
   });
 

@@ -1529,7 +1529,7 @@ describe('ModelDiscoveryService', () => {
       expect(subEntry!.contextWindow).toBe(200000);
     });
 
-    it('should deduplicate same model + same auth type from multiple providers', async () => {
+    it('should deduplicate same provider + same model + same auth type', async () => {
       const providers = [
         makeProvider({
           id: 'p1',
@@ -1557,6 +1557,34 @@ describe('ModelDiscoveryService', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].authType).toBe('subscription');
+    });
+
+    it('should keep same model + same auth type from different providers', async () => {
+      const providers = [
+        makeProvider({
+          id: 'p1',
+          provider: 'anthropic',
+          cached_models: [
+            makeModel({ id: 'claude-sonnet-4', provider: 'anthropic', authType: 'api_key' }),
+          ],
+        }),
+        makeProvider({
+          id: 'p2',
+          provider: 'openrouter',
+          cached_models: [
+            makeModel({ id: 'claude-sonnet-4', provider: 'openrouter', authType: 'api_key' }),
+          ],
+        }),
+      ];
+      providerRepo.find.mockResolvedValue(providers);
+      customProviderRepo.find.mockResolvedValue([]);
+
+      const result = await service.getModelsForAgent('agent-1');
+
+      expect(result).toHaveLength(2);
+      expect(result.map((m) => m.provider).sort()).toEqual(['anthropic', 'openrouter']);
+      expect(result.every((m) => m.id === 'claude-sonnet-4')).toBe(true);
+      expect(result.every((m) => m.authType === 'api_key')).toBe(true);
     });
 
     it('should use provider auth_type as fallback when cached model has no authType', async () => {

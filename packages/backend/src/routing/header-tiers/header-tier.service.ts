@@ -4,7 +4,12 @@ import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { TIER_COLORS, type ModelRoute, type TierColor } from 'manifest-shared';
 import { HeaderTier } from '../../entities/header-tier.entity';
+import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { RoutingCacheService } from '../routing-core/routing-cache.service';
+import {
+  assertRouteIsDiscovered,
+  assertRoutesAreDiscovered,
+} from '../routing-core/route-validation';
 
 export const RESERVED_HEADER_KEYS = new Set<string>([
   'authorization',
@@ -38,6 +43,7 @@ export class HeaderTierService {
     @InjectRepository(HeaderTier)
     private readonly repo: Repository<HeaderTier>,
     private readonly routingCache: RoutingCacheService,
+    private readonly discoveryService: ModelDiscoveryService,
   ) {}
 
   async list(agentId: string): Promise<HeaderTier[]> {
@@ -165,6 +171,7 @@ export class HeaderTierService {
 
   async setOverride(agentId: string, id: string, route: ModelRoute): Promise<HeaderTier> {
     const row = await this.findOrThrow(agentId, id);
+    await assertRouteIsDiscovered(this.discoveryService, agentId, route);
     row.override_route = route;
     row.updated_at = new Date().toISOString();
     await this.repo.save(row);
@@ -183,6 +190,9 @@ export class HeaderTierService {
 
   async setFallbacks(agentId: string, id: string, routes: ModelRoute[]): Promise<ModelRoute[]> {
     const row = await this.findOrThrow(agentId, id);
+    if (routes.length > 0) {
+      await assertRoutesAreDiscovered(this.discoveryService, agentId, routes);
+    }
     row.fallback_routes = routes.length > 0 ? routes : null;
     row.updated_at = new Date().toISOString();
     await this.repo.save(row);

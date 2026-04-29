@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserProvider } from '../../entities/user-provider.entity';
@@ -10,6 +10,7 @@ import { ModelDiscoveryService } from '../../model-discovery/model-discovery.ser
 import { randomUUID } from 'crypto';
 import { TIER_SLOTS, TierSlot, type ModelRoute, routeEquals } from 'manifest-shared';
 import { isManifestUsableProvider } from '../../common/utils/subscription-support';
+import { assertRouteIsDiscovered, assertRoutesAreDiscovered } from './route-validation';
 
 @Injectable()
 export class TierService {
@@ -98,7 +99,7 @@ export class TierService {
     tier: string,
     route: ModelRoute,
   ): Promise<TierAssignment> {
-    await this.assertRouteIsDiscovered(agentId, route);
+    await assertRouteIsDiscovered(this.discoveryService, agentId, route);
 
     const existing = await this.tierRepo.findOne({
       where: { agent_id: agentId, tier },
@@ -172,6 +173,9 @@ export class TierService {
   async setFallbacks(agentId: string, tier: string, routes: ModelRoute[]): Promise<ModelRoute[]> {
     const existing = await this.tierRepo.findOne({ where: { agent_id: agentId, tier } });
     if (!existing) return [];
+    if (routes.length > 0) {
+      await assertRoutesAreDiscovered(this.discoveryService, agentId, routes);
+    }
     existing.fallback_routes = routes.length > 0 ? routes : null;
     existing.updated_at = new Date().toISOString();
     await this.tierRepo.save(existing);
@@ -186,38 +190,5 @@ export class TierService {
     existing.updated_at = new Date().toISOString();
     await this.tierRepo.save(existing);
     this.routingCache.invalidateAgent(agentId);
-  }
-
-  /**
-   * Validates that the route refers to a model the agent has actually
-   * discovered from the requested provider. Throws BadRequest with a
-   * suggestion list if not — the most common cause is a provider that's been
-   * disconnected since the override was last saved.
-   */
-  private async assertRouteIsDiscovered(agentId: string, route: ModelRoute): Promise<void> {
-    const available = await this.discoveryService.getModelsForAgent(agentId);
-    const providerLower = route.provider.toLowerCase();
-    const matches = available.filter(
-      (m) =>
-        m.id === route.model &&
-        m.provider.toLowerCase() === providerLower &&
-        m.authType === route.authType,
-    );
-    if (matches.length > 0) return;
-
-    const sameModel = available.filter((m) => m.id === route.model);
-    if (sameModel.length === 0) {
-      const options = available.map((m) => m.id).slice(0, 20);
-      throw new BadRequestException(
-        `Model "${route.model}" is not in this agent's discovered model list. ` +
-          `Connect the appropriate provider first, or choose from: ${options.join(', ')}${
-            available.length > options.length ? ', …' : ''
-          }`,
-      );
-    }
-    throw new BadRequestException(
-      `Model "${route.model}" exists for this agent but not via provider "${route.provider}" ` +
-        `with auth type "${route.authType}".`,
-    );
   }
 }

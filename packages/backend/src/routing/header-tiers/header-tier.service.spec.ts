@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { HeaderTierService } from './header-tier.service';
 import { HeaderTier } from '../../entities/header-tier.entity';
+import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { RoutingCacheService } from '../routing-core/routing-cache.service';
 
 type Repo = jest.Mocked<
@@ -29,8 +30,18 @@ function makeCache() {
 function makeService() {
   const repo = makeRepo();
   const cache = makeCache();
-  const svc = new HeaderTierService(repo as unknown as Repository<HeaderTier>, cache);
-  return { svc, repo, cache };
+  const discovery = {
+    getModelsForAgent: jest.fn().mockResolvedValue([
+      { id: 'gpt-4o', provider: 'openai', authType: 'api_key' },
+      { id: 'claude', provider: 'anthropic', authType: 'subscription' },
+    ]),
+  };
+  const svc = new HeaderTierService(
+    repo as unknown as Repository<HeaderTier>,
+    cache,
+    discovery as unknown as ModelDiscoveryService,
+  );
+  return { svc, repo, cache, discovery };
 }
 
 const validInput = {
@@ -381,6 +392,18 @@ describe('HeaderTierService', () => {
       repo.findOne.mockResolvedValue({ id: 'h1', agent_id: 'a1' } as HeaderTier);
       const out = await svc.setFallbacks('a1', 'h1', [apiKeyRoute, subscriptionRoute]);
       expect(out).toEqual([apiKeyRoute, subscriptionRoute]);
+    });
+
+    it('setFallbacks rejects routes outside the discovered route list', async () => {
+      const { svc, repo, cache } = makeService();
+      repo.findOne.mockResolvedValue({ id: 'h1', agent_id: 'a1' } as HeaderTier);
+
+      await expect(
+        svc.setFallbacks('a1', 'h1', [{ provider: 'OpenAI', authType: 'api_key', model: 'bogus' }]),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(repo.save).not.toHaveBeenCalled();
+      expect(cache.invalidateAgent).not.toHaveBeenCalled();
     });
 
     it('setFallbacks([]) stores null', async () => {

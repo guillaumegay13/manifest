@@ -4,7 +4,9 @@ import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import type { ModelRoute } from 'manifest-shared';
 import { SpecificityAssignment } from '../../entities/specificity-assignment.entity';
+import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { RoutingCacheService } from './routing-cache.service';
+import { assertRouteIsDiscovered, assertRoutesAreDiscovered } from './route-validation';
 
 @Injectable()
 export class SpecificityService {
@@ -12,6 +14,7 @@ export class SpecificityService {
     @InjectRepository(SpecificityAssignment)
     private readonly repo: Repository<SpecificityAssignment>,
     private readonly routingCache: RoutingCacheService,
+    private readonly discoveryService: ModelDiscoveryService,
   ) {}
 
   async getAssignments(agentId: string): Promise<SpecificityAssignment[]> {
@@ -71,6 +74,8 @@ export class SpecificityService {
     category: string,
     route: ModelRoute,
   ): Promise<SpecificityAssignment> {
+    await assertRouteIsDiscovered(this.discoveryService, agentId, route);
+
     const existing = await this.repo.findOne({ where: { agent_id: agentId, category } });
 
     if (existing) {
@@ -121,6 +126,9 @@ export class SpecificityService {
   ): Promise<ModelRoute[]> {
     const existing = await this.repo.findOne({ where: { agent_id: agentId, category } });
     if (!existing) return [];
+    if (routes.length > 0) {
+      await assertRoutesAreDiscovered(this.discoveryService, agentId, routes);
+    }
     existing.fallback_routes = routes.length > 0 ? routes : null;
     existing.updated_at = new Date().toISOString();
     await this.repo.save(existing);

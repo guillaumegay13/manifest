@@ -408,7 +408,7 @@ describe('TierService', () => {
 
       await expect(
         service.setOverride('agent-1', 'user-1', 'simple', route('missing-model')),
-      ).rejects.toThrow(/…/);
+      ).rejects.toThrow(/\.\.\./);
     });
   });
 
@@ -517,6 +517,18 @@ describe('TierService', () => {
 
       expect(result).toEqual([]);
       expect(tierRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should reject fallback routes outside the discovered route list', async () => {
+      const existing = makeTier();
+      tierRepo.findOne.mockResolvedValue(existing);
+
+      await expect(
+        service.setFallbacks('agent-1', 'simple', [route('gpt-does-not-exist')]),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(tierRepo.save).not.toHaveBeenCalled();
+      expect(routingCache.invalidateAgent).not.toHaveBeenCalled();
     });
   });
 

@@ -218,12 +218,14 @@ export class ModelDiscoveryService {
       const providerAuthType: AuthType = p.auth_type;
       for (const m of cached) {
         const effectiveAuthType = m.authType ?? providerAuthType;
-        // Deduplicate by model ID + auth type so subscription and API key
-        // versions of the same model are kept as independent entries.
-        const dedupeKey = `${m.id}::${effectiveAuthType}`;
+        const effectiveProvider = m.provider || p.provider;
+        // Deduplicate exact route duplicates only. The routing primitive is
+        // provider + auth type + model, so the same model ID can exist through
+        // multiple providers and must remain independently selectable.
+        const dedupeKey = `${effectiveProvider.toLowerCase()}::${effectiveAuthType}::${m.id}`;
         if (!seen.has(dedupeKey)) {
           seen.set(dedupeKey, models.length);
-          models.push({ ...m, authType: effectiveAuthType });
+          models.push({ ...m, provider: effectiveProvider, authType: effectiveAuthType });
         }
       }
     }
