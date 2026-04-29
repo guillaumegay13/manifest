@@ -11,6 +11,7 @@ import { sanitizeProviderError } from './proxy-error-sanitizer';
 import {
   chatCompletionStreamChunkToResponses,
   collectResponsesSseResponse,
+  createResponsesSsePassthroughTransformer,
   fromChatCompletionResponse,
 } from './responses-adapter';
 import type { ProxyApiMode } from './proxy-types';
@@ -267,7 +268,9 @@ export async function handleStreamResponse(
     apiMode === 'responses' ? chatCompletionStreamChunkToResponses : (chunk: string) => chunk;
 
   if (apiMode === 'responses' && forward.isResponses) {
-    return pipeStream(forward.response.body!, res);
+    return pipeStream(forward.response.body!, res, createResponsesSsePassthroughTransformer(), {
+      appendDone: false,
+    });
   }
 
   if (forward.isGoogle) {

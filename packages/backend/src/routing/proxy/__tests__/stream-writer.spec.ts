@@ -157,6 +157,17 @@ describe('pipeStream', () => {
     expect(written).toContain('data: [DONE]\n\n');
   });
 
+  it('should allow transformed streams to suppress the trailing [DONE]', async () => {
+    const { res, written } = mockResponse();
+    const stream = createReadableStream(['data: chunk1\n\n']);
+
+    await pipeStream(stream, res as never, (chunk) => `transformed:${chunk}\n\n`, {
+      appendDone: false,
+    });
+
+    expect(written).toEqual(['transformed:chunk1\n\n']);
+  });
+
   it('should skip null results from transform', async () => {
     const { res, written } = mockResponse();
     const stream = createReadableStream(['data: skip\n\ndata: keep\n\n']);

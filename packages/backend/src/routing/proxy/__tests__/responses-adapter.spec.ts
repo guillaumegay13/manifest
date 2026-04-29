@@ -1,6 +1,7 @@
 import {
   chatCompletionStreamChunkToResponses,
   collectResponsesSseResponse,
+  createResponsesSsePassthroughTransformer,
   fromChatCompletionResponse,
   toChatCompletionsRequest,
   toNativeResponsesRequest,
@@ -317,6 +318,30 @@ describe('Responses adapter', () => {
       expect(result.output).toEqual([
         expect.objectContaining({
           type: 'message',
+          content: [{ type: 'output_text', text: 'Hi', annotations: [] }],
+        }),
+      ]);
+    });
+  });
+
+  describe('createResponsesSsePassthroughTransformer', () => {
+    it('adds collected text to completed events whose response output is empty', () => {
+      const transform = createResponsesSsePassthroughTransformer();
+      const delta = transform('event: response.output_text.delta\n{"delta":"Hi"}');
+      const completed = transform(
+        [
+          'event: response.completed',
+          'data: {"response":{"id":"resp_1","object":"response","output":[]}}',
+        ].join('\n'),
+      );
+
+      expect(delta).toBe('event: response.output_text.delta\ndata: {"delta":"Hi"}\n\n');
+      expect(completed).toBeTruthy();
+      const data = JSON.parse(completed!.split('\ndata: ')[1]);
+      expect(data.response.output).toEqual([
+        expect.objectContaining({
+          type: 'message',
+          role: 'assistant',
           content: [{ type: 'output_text', text: 'Hi', annotations: [] }],
         }),
       ]);

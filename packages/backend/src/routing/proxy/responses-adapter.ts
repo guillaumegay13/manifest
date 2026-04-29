@@ -308,6 +308,31 @@ export function collectResponsesSseResponse(sseText: string): JsonRecord {
   );
 }
 
+export function createResponsesSsePassthroughTransformer(): (chunk: string) => string | null {
+  let text = '';
+
+  return (chunk: string): string | null => {
+    const parsed = parseSseEvent(chunk);
+    if (!parsed) return null;
+
+    if (parsed.event === 'response.output_text.delta') {
+      const data = safeParse(parsed.data);
+      if (typeof data?.delta === 'string') text += data.delta;
+      return formatRawResponsesEvent(parsed.event, parsed.data);
+    }
+
+    if (parsed.event === 'response.completed') {
+      const data = safeParse(parsed.data);
+      if (data && isRecord(data.response)) {
+        data.response = withCollectedTextOutput(data.response, text);
+        return formatResponsesEvent(parsed.event, data);
+      }
+    }
+
+    return formatRawResponsesEvent(parsed.event, parsed.data);
+  };
+}
+
 function withCollectedTextOutput(response: JsonRecord, text: string): JsonRecord {
   if (!text) return response;
   const output = Array.isArray(response.output) ? response.output : [];
@@ -340,6 +365,9 @@ function parseSseEvent(raw: string): { event: string; data: string } | null {
   for (const line of raw.split('\n')) {
     if (line.startsWith('event: ')) event = line.slice(7).trim();
     if (line.startsWith('data: ')) data += line.slice(6);
+    if (!line.startsWith('event: ') && !line.startsWith('data: ') && line.trim()) {
+      data += line.trim();
+    }
   }
   return event || data ? { event, data } : null;
 }
@@ -423,4 +451,8 @@ function extractDataPayloads(chunk: string): string[] {
 
 function formatResponsesEvent(event: string, data: JsonRecord): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function formatRawResponsesEvent(event: string, data: string): string {
+  return `${event ? `event: ${event}\n` : ''}data: ${data}\n\n`;
 }

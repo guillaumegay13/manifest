@@ -99,6 +99,7 @@ export async function pipeStream(
   source: ReadableStream<Uint8Array>,
   dest: ExpressResponse,
   transform?: (chunk: string) => string | null,
+  opts?: { appendDone?: boolean },
 ): Promise<StreamUsage | null> {
   const reader = source.getReader();
   const decoder = new TextDecoder();
@@ -237,7 +238,7 @@ export async function pipeStream(
     // Ensure the stream ends with [DONE] for OpenAI-compatible clients.
     // Non-transformed streams (OpenAI) already include it from the provider.
     // Transformed streams (Google) need it added explicitly.
-    if (transform) {
+    if (transform && opts?.appendDone !== false) {
       dest.write('data: [DONE]\n\n');
     }
   } finally {

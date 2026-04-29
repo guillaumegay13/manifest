@@ -623,11 +623,18 @@ describe('proxy-response-handler', () => {
       expect(pipeStreamSpy).toHaveBeenCalledWith(forward.response.body, res);
     });
 
-    it('should pass through native Responses streams without a transformer', async () => {
+    it('should repair native Responses subscription streams without appending chat [DONE]', async () => {
       const { res } = mockResponse();
       const forward = mockForward({ isResponses: true });
       const client = mockProviderClient();
       const meta = makeMeta();
+      let capturedTransform: ((chunk: string) => string | null) | undefined;
+      pipeStreamSpy.mockImplementation(
+        async (_body: unknown, _res: unknown, transform?: (chunk: string) => string | null) => {
+          capturedTransform = transform;
+          return null;
+        },
+      );
 
       await handleStreamResponse(
         res as any,
@@ -641,7 +648,15 @@ describe('proxy-response-handler', () => {
         'responses',
       );
 
-      expect(pipeStreamSpy).toHaveBeenCalledWith(forward.response.body, res);
+      expect(pipeStreamSpy).toHaveBeenCalledWith(forward.response.body, res, expect.any(Function), {
+        appendDone: false,
+      });
+      expect(capturedTransform).toBeDefined();
+      capturedTransform!('event: response.output_text.delta\n{"delta":"Hi"}');
+      const completed = capturedTransform!(
+        'event: response.completed\n{"response":{"id":"resp_1","object":"response","output":[]}}',
+      );
+      expect(completed).toContain('"text":"Hi"');
     });
 
     it('should convert chat completion streams when serving Responses clients', async () => {
