@@ -206,6 +206,7 @@ export class ProviderClient {
                 defaultInstructions: endpointKey === 'openai-subscription',
                 inputList: endpointKey === 'openai-subscription',
                 forceStream: endpointKey === 'openai-subscription',
+                omitMaxOutputTokens: endpointKey === 'openai-subscription',
               })
             : toResponsesRequest(body, bareModel),
       };

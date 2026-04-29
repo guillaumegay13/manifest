@@ -215,7 +215,7 @@ describe('ProviderClient', () => {
         provider: 'openai',
         apiKey: 'oauth-token',
         model: 'gpt-5.4',
-        body: { input: 'Hello', stream: false },
+        body: { input: 'Hello', stream: false, max_output_tokens: 64 },
         chatBody: { messages: [{ role: 'user', content: 'Hello' }], stream: false },
         stream: false,
         authType: 'subscription',
@@ -230,6 +230,7 @@ describe('ProviderClient', () => {
         { role: 'user', content: [{ type: 'input_text', text: 'Hello' }] },
       ]);
       expect(sentBody.stream).toBe(true);
+      expect(sentBody.max_output_tokens).toBeUndefined();
     });
 
     it('uses normalized chat body for non-native Responses providers', async () => {

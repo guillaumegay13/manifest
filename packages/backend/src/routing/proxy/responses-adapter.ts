@@ -139,9 +139,17 @@ function toChatToolChoice(toolChoice: unknown): unknown {
 export function toNativeResponsesRequest(
   body: JsonRecord,
   model: string,
-  opts?: { defaultInstructions?: boolean; inputList?: boolean; forceStream?: boolean },
+  opts?: {
+    defaultInstructions?: boolean;
+    inputList?: boolean;
+    forceStream?: boolean;
+    omitMaxOutputTokens?: boolean;
+  },
 ): JsonRecord {
   const request: JsonRecord = { ...body, model };
+  if (opts?.omitMaxOutputTokens) {
+    delete request.max_output_tokens;
+  }
   if (opts?.forceStream) {
     request.stream = true;
   } else if (body.stream === undefined) {

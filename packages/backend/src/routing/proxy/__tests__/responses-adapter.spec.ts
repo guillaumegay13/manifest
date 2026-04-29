@@ -192,6 +192,14 @@ describe('Responses adapter', () => {
     ).toBe(true);
   });
 
+  it('can omit max_output_tokens for subscription Responses backends that reject it', () => {
+    const result = toNativeResponsesRequest({ input: 'hi', max_output_tokens: 64 }, 'gpt-5.4', {
+      omitMaxOutputTokens: true,
+    });
+
+    expect(result).not.toHaveProperty('max_output_tokens');
+  });
+
   describe('fromChatCompletionResponse', () => {
     it('converts text, tool calls, and usage to a Response object', () => {
       const result = fromChatCompletionResponse(
