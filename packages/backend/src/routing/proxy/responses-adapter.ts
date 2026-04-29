@@ -284,6 +284,7 @@ function toResponsesUsage(usage: unknown): JsonRecord | null {
 export function collectResponsesSseResponse(sseText: string): JsonRecord {
   let text = '';
   let completed: JsonRecord | null = null;
+  const functionCalls = new Map<number, JsonRecord>();
 
   for (const event of sseText.split('\n\n')) {
     const parsed = parseSseEvent(event);
@@ -292,13 +293,14 @@ export function collectResponsesSseResponse(sseText: string): JsonRecord {
       const data = safeParse(parsed.data);
       if (typeof data?.delta === 'string') text += data.delta;
     }
+    collectFunctionCallEvent(parsed, functionCalls);
     if (parsed.event === 'response.completed') {
       const data = safeParse(parsed.data);
       completed = isRecord(data?.response) ? data.response : null;
     }
   }
 
-  if (completed) return withCollectedTextOutput(completed, text);
+  if (completed) return withCollectedOutput(completed, text, functionCalls);
   return fromChatCompletionResponse(
     {
       choices: [{ message: { content: text } }],
@@ -310,6 +312,7 @@ export function collectResponsesSseResponse(sseText: string): JsonRecord {
 
 export function createResponsesSsePassthroughTransformer(): (chunk: string) => string | null {
   let text = '';
+  const functionCalls = new Map<number, JsonRecord>();
 
   return (chunk: string): string | null => {
     const parsed = parseSseEvent(chunk);
@@ -321,15 +324,85 @@ export function createResponsesSsePassthroughTransformer(): (chunk: string) => s
       return formatRawResponsesEvent(parsed.event, parsed.data);
     }
 
+    collectFunctionCallEvent(parsed, functionCalls);
+
     if (parsed.event === 'response.completed') {
       const data = safeParse(parsed.data);
       if (data && isRecord(data.response)) {
-        data.response = withCollectedTextOutput(data.response, text);
+        data.response = withCollectedOutput(data.response, text, functionCalls);
         return formatResponsesEvent(parsed.event, data);
       }
     }
 
     return formatRawResponsesEvent(parsed.event, parsed.data);
+  };
+}
+
+function collectFunctionCallEvent(
+  parsed: { event: string; data: string },
+  functionCalls: Map<number, JsonRecord>,
+): void {
+  const data = safeParse(parsed.data);
+  if (!data) return;
+  const index = typeof data.output_index === 'number' ? data.output_index : functionCalls.size;
+
+  if (
+    parsed.event === 'response.output_item.added' ||
+    parsed.event === 'response.output_item.done'
+  ) {
+    const item = isRecord(data.item) ? data.item : null;
+    if (item?.type === 'function_call') {
+      functionCalls.set(index, normalizeFunctionCall(item));
+    }
+    return;
+  }
+
+  if (parsed.event === 'response.function_call_arguments.delta') {
+    const delta = typeof data.delta === 'string' ? data.delta : '';
+    if (!delta) return;
+    const item = functionCalls.get(index) ?? normalizeFunctionCall({ type: 'function_call' });
+    item.arguments = `${typeof item.arguments === 'string' ? item.arguments : ''}${delta}`;
+    functionCalls.set(index, item);
+    return;
+  }
+
+  if (parsed.event === 'response.function_call_arguments.done') {
+    const item = functionCalls.get(index) ?? normalizeFunctionCall({ type: 'function_call' });
+    if (typeof data.arguments === 'string') {
+      item.arguments = data.arguments;
+      functionCalls.set(index, item);
+    }
+  }
+}
+
+function normalizeFunctionCall(item: JsonRecord): JsonRecord {
+  return {
+    ...item,
+    type: 'function_call',
+    arguments: typeof item.arguments === 'string' ? item.arguments : '',
+  };
+}
+
+function withCollectedOutput(
+  response: JsonRecord,
+  text: string,
+  functionCalls: Map<number, JsonRecord>,
+): JsonRecord {
+  const withText = withCollectedTextOutput(response, text);
+  if (functionCalls.size === 0) return withText;
+
+  const output = Array.isArray(withText.output) ? withText.output : [];
+  const hasFunctionCall = output.some((item) => isRecord(item) && item.type === 'function_call');
+  if (hasFunctionCall) return withText;
+
+  return {
+    ...withText,
+    output: [
+      ...output,
+      ...[...functionCalls.entries()]
+        .sort(([left], [right]) => left - right)
+        .map(([, item]) => item),
+    ],
   };
 }
 

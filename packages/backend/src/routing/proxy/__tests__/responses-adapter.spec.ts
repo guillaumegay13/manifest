@@ -305,6 +305,54 @@ describe('Responses adapter', () => {
       ]);
     });
 
+    it('keeps collected function calls when the completed response omits output', () => {
+      const response = {
+        id: 'resp_1',
+        object: 'response',
+        output: [],
+        usage: { input_tokens: 1, output_tokens: 2, total_tokens: 3 },
+      };
+      const result = collectResponsesSseResponse(
+        [
+          'event: response.output_item.added\ndata: {"output_index":0,"item":{"type":"function_call","call_id":"call_1","name":"get_sessions"}}',
+          'event: response.function_call_arguments.delta\ndata: {"output_index":0,"delta":"{\\"start_date\\":"}',
+          'event: response.function_call_arguments.delta\ndata: {"output_index":0,"delta":"\\"2026-04-29\\"}"}',
+          `event: response.completed\ndata: ${JSON.stringify({ response })}`,
+          '',
+        ].join('\n\n'),
+      );
+
+      expect(result.output).toEqual([
+        {
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'get_sessions',
+          arguments: '{"start_date":"2026-04-29"}',
+        },
+      ]);
+    });
+
+    it('uses output_item.done as the final function call item', () => {
+      const response = { id: 'resp_1', object: 'response', output: [] };
+      const result = collectResponsesSseResponse(
+        [
+          'event: response.output_item.added\ndata: {"output_index":0,"item":{"type":"function_call","call_id":"call_1","name":"get_sessions"}}',
+          'event: response.output_item.done\ndata: {"output_index":0,"item":{"type":"function_call","call_id":"call_1","name":"get_sessions","arguments":"{\\"start_date\\":\\"2026-04-29\\"}"}}',
+          `event: response.completed\ndata: ${JSON.stringify({ response })}`,
+          '',
+        ].join('\n\n'),
+      );
+
+      expect(result.output).toEqual([
+        {
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'get_sessions',
+          arguments: '{"start_date":"2026-04-29"}',
+        },
+      ]);
+    });
+
     it('falls back to collected output text and ignores malformed events', () => {
       const result = collectResponsesSseResponse(
         [
@@ -344,6 +392,39 @@ describe('Responses adapter', () => {
           role: 'assistant',
           content: [{ type: 'output_text', text: 'Hi', annotations: [] }],
         }),
+      ]);
+    });
+
+    it('adds collected function calls to completed events whose response output is empty', () => {
+      const transform = createResponsesSsePassthroughTransformer();
+      transform(
+        [
+          'event: response.output_item.added',
+          'data: {"output_index":0,"item":{"type":"function_call","call_id":"call_1","name":"get_sessions"}}',
+        ].join('\n'),
+      );
+      transform(
+        [
+          'event: response.function_call_arguments.done',
+          'data: {"output_index":0,"arguments":"{\\"start_date\\":\\"2026-04-29\\"}"}',
+        ].join('\n'),
+      );
+      const completed = transform(
+        [
+          'event: response.completed',
+          'data: {"response":{"id":"resp_1","object":"response","output":[]}}',
+        ].join('\n'),
+      );
+
+      expect(completed).toBeTruthy();
+      const data = JSON.parse(completed!.split('\ndata: ')[1]);
+      expect(data.response.output).toEqual([
+        {
+          type: 'function_call',
+          call_id: 'call_1',
+          name: 'get_sessions',
+          arguments: '{"start_date":"2026-04-29"}',
+        },
       ]);
     });
   });
