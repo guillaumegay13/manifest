@@ -64,6 +64,8 @@ const api = () => request(app.getHttpServer());
 const auth = (r: request.Test) => r.set('x-api-key', TEST_API_KEY);
 const smokeBearer = (r: request.Test) =>
   r.set('Authorization', `Bearer ${smokeOtlpKey}`);
+const resolvedRoute = (body: { route?: { model?: string } | null }) =>
+  body.route ?? null;
 
 async function waitForMessages(
   agentName: string,
@@ -213,7 +215,7 @@ describe('ST-05: Tier routing', () => {
       .expect(200);
 
     expect(res.body.tier).toBe('simple');
-    expect(res.body.model).not.toBeNull();
+    expect(resolvedRoute(res.body)?.model).not.toBeNull();
   });
 
   it('routes a complex prompt to a higher tier', async () => {
@@ -230,7 +232,7 @@ describe('ST-05: Tier routing', () => {
       .expect(200);
 
     expect(['complex', 'reasoning']).toContain(res.body.tier);
-    expect(res.body.model).not.toBeNull();
+    expect(resolvedRoute(res.body)?.model).not.toBeNull();
   });
 });
 
@@ -322,18 +324,23 @@ describe('ST-08: Hard limit blocks', () => {
 describe('ST-09: Fallback chain', () => {
   const provKey = () => `custom:${customProviderId}`;
   const modelKey = (m: string) => `${provKey()}/${m}`;
+  const route = (m: string) => ({
+    provider: provKey(),
+    authType: 'api_key' as const,
+    model: modelKey(m),
+  });
 
   beforeAll(async () => {
     // Set tier override so the primary model is model-a
     await auth(api().put(`/api/v1/routing/${smokeAgentName}/tiers/simple`))
-      .send({ model: modelKey('model-a') })
+      .send({ route: route('model-a') })
       .expect(200);
 
     // Set fallback chain: model-b → model-c
     await auth(
       api().put(`/api/v1/routing/${smokeAgentName}/tiers/simple/fallbacks`),
     )
-      .send({ models: [modelKey('model-b'), modelKey('model-c')] })
+      .send({ routes: [route('model-b'), route('model-c')] })
       .expect(200);
 
     // Program mock: model-a → 500, model-b → 500, model-c → 200

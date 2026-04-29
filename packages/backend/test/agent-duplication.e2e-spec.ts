@@ -14,6 +14,16 @@ describe('Agent Duplication (e2e)', () => {
   let ds: DataSource;
   const headers = { 'x-api-key': TEST_API_KEY };
   const sourceAgent = 'test-agent';
+  const anthropicRoute = {
+    provider: 'anthropic',
+    authType: 'api_key' as const,
+    model: 'anthropic/claude-opus-4-6',
+  };
+  const openaiRoute = {
+    provider: 'openai',
+    authType: 'api_key' as const,
+    model: 'openai/gpt-4o-mini',
+  };
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -49,11 +59,9 @@ describe('Agent Duplication (e2e)', () => {
       user_id: 'test-user-001',
       agent_id: TEST_AGENT_ID,
       tier: 'standard',
-      override_model: 'anthropic/claude-opus-4-6',
-      override_provider: 'anthropic',
-      override_auth_type: 'api_key',
-      auto_assigned_model: null,
-      fallback_models: ['openai/gpt-4o-mini'],
+      override_route: anthropicRoute,
+      auto_assigned_route: null,
+      fallback_routes: [openaiRoute],
       updated_at: now,
     });
     await ds.getRepository(SpecificityAssignment).insert({
@@ -62,11 +70,9 @@ describe('Agent Duplication (e2e)', () => {
       agent_id: TEST_AGENT_ID,
       category: 'coding',
       is_active: true,
-      override_model: 'anthropic/claude-opus-4-6',
-      override_provider: 'anthropic',
-      override_auth_type: 'api_key',
-      auto_assigned_model: null,
-      fallback_models: null,
+      override_route: anthropicRoute,
+      auto_assigned_route: null,
+      fallback_routes: null,
       updated_at: now,
     });
   });
@@ -144,7 +150,8 @@ describe('Agent Duplication (e2e)', () => {
       .find({ where: { agent_id: res.body.agent.id } });
     expect(newTiers).toHaveLength(1);
     expect(newTiers[0].tier).toBe('standard');
-    expect(newTiers[0].override_model).toBe('anthropic/claude-opus-4-6');
+    expect(newTiers[0].override_route).toEqual(anthropicRoute);
+    expect(newTiers[0].fallback_routes).toEqual([openaiRoute]);
 
     const newSpec = await ds
       .getRepository(SpecificityAssignment)
