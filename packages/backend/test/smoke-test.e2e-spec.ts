@@ -215,7 +215,9 @@ describe('ST-05: Tier routing', () => {
       .expect(200);
 
     expect(res.body.tier).toBe('simple');
-    expect(resolvedRoute(res.body)?.model).not.toBeNull();
+    expect(resolvedRoute(res.body)).toEqual(
+      expect.objectContaining({ model: expect.any(String) }),
+    );
   });
 
   it('routes a complex prompt to a higher tier', async () => {
@@ -232,7 +234,9 @@ describe('ST-05: Tier routing', () => {
       .expect(200);
 
     expect(['complex', 'reasoning']).toContain(res.body.tier);
-    expect(resolvedRoute(res.body)?.model).not.toBeNull();
+    expect(resolvedRoute(res.body)).toEqual(
+      expect.objectContaining({ model: expect.any(String) }),
+    );
   });
 });
 

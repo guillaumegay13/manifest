@@ -162,7 +162,9 @@ describe('Routing enabled → scorer routes by query complexity', () => {
       .expect(200);
 
     expect(res.body.tier).toBe('simple');
-    expect(resolvedRoute(res.body)?.model).not.toBeNull();
+    expect(resolvedRoute(res.body)).toEqual(
+      expect.objectContaining({ model: expect.any(String) }),
+    );
   });
 
   it('routes "what is a dog" → simple tier', async () => {
@@ -171,7 +173,9 @@ describe('Routing enabled → scorer routes by query complexity', () => {
       .expect(200);
 
     expect(res.body.tier).toBe('simple');
-    expect(resolvedRoute(res.body)?.model).not.toBeNull();
+    expect(resolvedRoute(res.body)).toEqual(
+      expect.objectContaining({ model: expect.any(String) }),
+    );
   });
 
   it('routes complex React request → complex tier with high-quality model', async () => {
@@ -188,8 +192,12 @@ describe('Routing enabled → scorer routes by query complexity', () => {
       .expect(200);
 
     expect(['complex', 'reasoning']).toContain(res.body.tier);
-    expect(resolvedRoute(res.body)?.model).not.toBeNull();
-    expect(resolvedRoute(res.body)?.provider).not.toBeNull();
+    expect(resolvedRoute(res.body)).toEqual(
+      expect.objectContaining({
+        model: expect.any(String),
+        provider: expect.any(String),
+      }),
+    );
     // Complex tier should pick a high-quality model (not gpt-4o-mini)
     expect(res.body.route.model).not.toBe('gpt-4o-mini');
   });
@@ -227,7 +235,9 @@ describe('Routing enabled → scorer routes by query complexity', () => {
       .expect(200);
 
     expect(['complex', 'reasoning']).toContain(res.body.tier);
-    expect(resolvedRoute(res.body)?.model).not.toBeNull();
+    expect(resolvedRoute(res.body)).toEqual(
+      expect.objectContaining({ model: expect.any(String) }),
+    );
   });
 
   it('tools floor query to at least standard tier', async () => {
@@ -247,7 +257,9 @@ describe('Routing enabled → scorer routes by query complexity', () => {
       .expect(200);
 
     expect(res.body.tier).not.toBe('simple');
-    expect(resolvedRoute(res.body)?.model).not.toBeNull();
+    expect(resolvedRoute(res.body)).toEqual(
+      expect.objectContaining({ model: expect.any(String) }),
+    );
   });
 
   it('system messages do not inflate scoring', async () => {
@@ -413,7 +425,9 @@ describe('Routing disabled after deactivation → falls back to null', () => {
       .send({ messages: [{ role: 'user', content: 'hi' }] })
       .expect(200);
 
-    expect(resolvedRoute(res.body)?.model).not.toBeNull();
+    expect(resolvedRoute(res.body)).toEqual(
+      expect.objectContaining({ model: expect.any(String) }),
+    );
     expect(res.body.tier).toBe('simple');
   });
 });
