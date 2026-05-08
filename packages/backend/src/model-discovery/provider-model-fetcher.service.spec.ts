@@ -1,4 +1,9 @@
 import { ProviderModelFetcherService, PROVIDER_CONFIGS } from './provider-model-fetcher.service';
+import { fetchBedrockModels } from './bedrock-model-fetcher';
+
+jest.mock('./bedrock-model-fetcher', () => ({
+  fetchBedrockModels: jest.fn(),
+}));
 
 describe('ProviderModelFetcherService', () => {
   let service: ProviderModelFetcherService;
@@ -45,6 +50,46 @@ describe('ProviderModelFetcherService', () => {
   it('should return [] for unknown provider', async () => {
     const result = await service.fetch('nonexistent', 'key123');
     expect(result).toEqual([]);
+  });
+
+  /* ── Bedrock dispatch ── */
+
+  describe('bedrock dispatch', () => {
+    const mockedFetch = fetchBedrockModels as jest.MockedFunction<typeof fetchBedrockModels>;
+
+    beforeEach(() => mockedFetch.mockReset());
+
+    it('routes bedrock provider to fetchBedrockModels with the apiKey blob', async () => {
+      mockedFetch.mockResolvedValue([
+        {
+          id: 'anthropic.claude-3-5',
+          displayName: 'Claude 3.5',
+          provider: 'bedrock',
+          contextWindow: 200000,
+          inputPricePerToken: null,
+          outputPricePerToken: null,
+          capabilityReasoning: false,
+          capabilityCode: false,
+          qualityScore: 3,
+        },
+      ]);
+      const out = await service.fetch('bedrock', '{"accessKeyId":"a"}');
+      expect(mockedFetch).toHaveBeenCalledWith({ apiKey: '{"accessKeyId":"a"}' });
+      expect(out).toHaveLength(1);
+      expect(out[0].id).toBe('anthropic.claude-3-5');
+    });
+
+    it('returns [] when fetchBedrockModels throws', async () => {
+      mockedFetch.mockRejectedValue(new Error('aws denied'));
+      const out = await service.fetch('bedrock', 'irrelevant');
+      expect(out).toEqual([]);
+    });
+
+    it('returns [] when fetchBedrockModels throws a non-Error', async () => {
+      mockedFetch.mockRejectedValue('string-error');
+      const out = await service.fetch('bedrock', 'irrelevant');
+      expect(out).toEqual([]);
+    });
   });
 
   /* ── Network error ── */

@@ -75,6 +75,29 @@ describe('SHARED_PROVIDER_BY_ID', () => {
   });
 });
 
+describe('Bedrock provider entry', () => {
+  it('declares the AWS Bedrock provider with multi-field credentials', () => {
+    const entry = SHARED_PROVIDER_BY_ID_OR_ALIAS.get('bedrock');
+    expect(entry).toBeDefined();
+    expect(entry?.displayName).toBe('AWS Bedrock');
+    expect(entry?.credentialFields?.map((f) => f.id)).toEqual([
+      'accessKeyId',
+      'secretAccessKey',
+      'sessionToken',
+    ]);
+  });
+
+  it('resolves both aws-bedrock and amazon-bedrock aliases', () => {
+    expect(SHARED_PROVIDER_BY_ID_OR_ALIAS.get('aws-bedrock')?.id).toBe('bedrock');
+    expect(SHARED_PROVIDER_BY_ID_OR_ALIAS.get('amazon-bedrock')?.id).toBe('bedrock');
+  });
+
+  it('has no OpenRouter prefix mapping (Bedrock is not on OpenRouter)', () => {
+    const entry = SHARED_PROVIDER_BY_ID_OR_ALIAS.get('bedrock');
+    expect(entry?.openRouterPrefixes).toEqual([]);
+  });
+});
+
 describe('LOCAL_SERVER_HINTS', () => {
   it('provides a setup hint for every tileOnly / localOnly registry entry that users connect via the tile UI', () => {
     // Every provider with a local-server setup flow (llama.cpp, LM Studio,

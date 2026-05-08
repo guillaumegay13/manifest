@@ -1,5 +1,6 @@
 export const ROUTING_PROVIDER_API_KEY_URLS: Record<string, string> = {
   anthropic: 'https://console.anthropic.com/settings/keys',
+  bedrock: 'https://docs.aws.amazon.com/bedrock/latest/userguide/getting-started.html',
   deepseek: 'https://platform.deepseek.com/api_keys',
   gemini: 'https://aistudio.google.com/apikey',
   minimax: 'https://platform.minimax.io/docs/api-reference/api-overview',

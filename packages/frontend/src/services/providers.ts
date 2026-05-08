@@ -1,6 +1,10 @@
 /* ── LLM Provider definitions (shared by Routing page) ── */
 
-import { SHARED_PROVIDER_BY_ID, type SharedProviderEntry } from 'manifest-shared';
+import {
+  SHARED_PROVIDER_BY_ID,
+  type CredentialFieldDef,
+  type SharedProviderEntry,
+} from 'manifest-shared';
 
 export interface ProviderDef {
   id: string;
@@ -12,6 +16,8 @@ export interface ProviderDef {
   keyPrefix: string;
   minKeyLength: number;
   keyPlaceholder: string;
+  /** Multi-field credential schema (Bedrock); see SharedProviderEntry. */
+  credentialFields?: readonly CredentialFieldDef[];
   noKeyRequired?: boolean;
   localOnly?: boolean;
   /** Provider supports agent-side OAuth/subscription auth (setup-token, OAuth, device-login). */
@@ -88,6 +94,11 @@ const PROVIDER_UI: Record<string, ProviderUIOverlay> = {
     subscriptionAuthMode: 'token',
     subscriptionKeyPlaceholder: 'Paste your setup-token',
     subscriptionCommand: 'claude setup-token',
+    models: [],
+  },
+  bedrock: {
+    initial: 'AB',
+    subtitle: 'Claude Opus, Sonnet, Haiku via AWS',
     models: [],
   },
   deepseek: {
@@ -245,6 +256,7 @@ export function buildProviderDef(shared: SharedProviderEntry): ProviderDef {
     minKeyLength: shared.minKeyLength,
     keyPlaceholder: shared.keyPlaceholder,
     localOnly: shared.localOnly || undefined,
+    credentialFields: shared.credentialFields,
     ...overlay,
   };
 }
@@ -254,6 +266,7 @@ export function buildProviderDef(shared: SharedProviderEntry): ProviderDef {
 const PROVIDER_ORDER = [
   'qwen',
   'anthropic',
+  'bedrock',
   'deepseek',
   'copilot',
   'gemini',

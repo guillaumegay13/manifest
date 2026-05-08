@@ -5,6 +5,7 @@ import { validatePublicUrl } from '../../common/utils/url-validation';
 import { isSelfHosted } from '../../common/utils/detect-self-hosted';
 import { resolveSubscriptionEndpointKey } from './provider-hooks';
 import { injectOpenRouterCacheControl } from './cache-injection';
+import { forwardToBedrock } from './bedrock-transport';
 import {
   toGoogleRequest,
   toAnthropicRequest,
@@ -138,6 +139,17 @@ export class ProviderClient {
         const message = err instanceof Error ? err.message : String(err);
         throw new Error(`Refusing to forward to disallowed URL: ${message}`);
       }
+    }
+
+    if (endpoint.transport === 'aws-bedrock') {
+      const response = await forwardToBedrock({
+        apiKey,
+        model: bareModel,
+        body: requestBody,
+        stream,
+        signal,
+      });
+      return { response, isGoogle, isAnthropic, isChatGpt, isResponses };
     }
 
     return this.executeFetch(url, finalHeaders, requestBody, signal, {

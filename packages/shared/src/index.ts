@@ -52,7 +52,7 @@ export {
   LOCAL_SERVER_HINTS,
   normalizeProviderName,
 } from './providers';
-export type { SharedProviderEntry, LocalServerHint } from './providers';
+export type { SharedProviderEntry, LocalServerHint, CredentialFieldDef } from './providers';
 export type { ResolveResponse } from './resolve-response';
 export {
   SUBSCRIPTION_PROVIDER_CONFIGS,

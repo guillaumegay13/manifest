@@ -19,6 +19,7 @@ import { toast } from '../services/toast-store.js';
 import { formatTimeAgo } from '../services/formatters.js';
 import CopyButton from './CopyButton.js';
 import ProviderKeyForm, { MAX_KEYS_PER_PROVIDER } from './ProviderKeyForm.js';
+import BedrockKeyForm from './BedrockKeyForm.js';
 import OAuthDetailView from './OAuthDetailView.js';
 import DeviceCodeDetailView from './DeviceCodeDetailView.js';
 import { getRoutingProviderApiKeyUrl } from '../services/provider-api-key-urls.js';
@@ -431,8 +432,30 @@ const ProviderDetailView: Component<ProviderDetailViewProps> = (props) => {
         </Show>
       </Show>
 
+      {/* Multi-field credential form (currently Bedrock only). */}
+      <Show when={provDef.credentialFields && !isSubMode()}>
+        <BedrockKeyForm
+          provDef={provDef}
+          provId={props.provId}
+          agentName={props.agentName}
+          connected={connected}
+          busy={props.busy}
+          setBusy={props.setBusy}
+          onBack={props.onBack}
+          onUpdate={props.onUpdate}
+        />
+      </Show>
+
       {/* API key / subscription token form (non-Ollama, non-command-only, non-OAuth) */}
-      <Show when={!isOllama && !isCommandOnly() && !isPopupOAuthFlow() && !isDeviceCodeFlow()}>
+      <Show
+        when={
+          !isOllama &&
+          !isCommandOnly() &&
+          !isPopupOAuthFlow() &&
+          !isDeviceCodeFlow() &&
+          !(provDef.credentialFields && !isSubMode())
+        }
+      >
         <ProviderKeyForm
           provDef={provDef}
           provId={props.provId}
