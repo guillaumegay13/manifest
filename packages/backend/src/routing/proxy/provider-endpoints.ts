@@ -23,6 +23,15 @@ export interface ProviderEndpoint {
    * forward time.
    */
   requiresSsrfRevalidation?: boolean;
+  /**
+   * Non-HTTP transport for providers that can't use plain `fetch()`.
+   * Currently only `'aws-bedrock'`, which uses the AWS SDK so SigV4
+   * signing and binary eventstream framing happen inside the SDK rather
+   * than the proxy. When set, `baseUrl`, `buildHeaders`, and `buildPath`
+   * are unused — the body is built per `format` (Anthropic) and handed
+   * to the dedicated transport in `bedrock-transport.ts`.
+   */
+  transport?: 'aws-bedrock';
 }
 
 const openaiHeaders = (apiKey: string) => ({
@@ -104,6 +113,16 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
     buildHeaders: anthropicHeaders,
     buildPath: () => '/v1/messages',
     format: 'anthropic',
+  },
+  bedrock: {
+    // Bedrock requests are dispatched via the AWS SDK in
+    // `bedrock-transport.ts`; baseUrl/buildPath/buildHeaders are only
+    // present to satisfy the ProviderEndpoint contract.
+    baseUrl: 'aws-sdk://bedrock-runtime',
+    buildHeaders: () => ({}),
+    buildPath: () => '',
+    format: 'anthropic',
+    transport: 'aws-bedrock',
   },
   deepseek: {
     baseUrl: 'https://api.deepseek.com',

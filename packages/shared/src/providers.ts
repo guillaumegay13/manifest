@@ -41,6 +41,29 @@ export interface SharedProviderEntry {
    * skips entries with `tileOnly: true`.
    */
   tileOnly?: boolean;
+  /**
+   * Multi-field credential schema for providers that need more than a
+   * single bearer token (e.g. AWS Bedrock: access key + secret + optional
+   * session token, with region selected separately on the existing
+   * `region` column). When present, the frontend renders one input per
+   * field and packs them into a JSON object before sending to the
+   * backend's connect endpoint. When absent, the standard single-field
+   * `keyPlaceholder` input is rendered.
+   */
+  credentialFields?: readonly CredentialFieldDef[];
+}
+
+export interface CredentialFieldDef {
+  /** JSON key written into the packed credential payload. */
+  id: string;
+  /** Field label shown in the UI. */
+  label: string;
+  /** Placeholder shown inside the input. */
+  placeholder?: string;
+  /** Whether the input should mask the value (password style). */
+  secret?: boolean;
+  /** Whether the field is required for the credential to be valid. */
+  required?: boolean;
 }
 
 export const SHARED_PROVIDERS: readonly SharedProviderEntry[] = [
@@ -67,6 +90,37 @@ export const SHARED_PROVIDERS: readonly SharedProviderEntry[] = [
     keyPrefix: 'sk-ant-',
     minKeyLength: 50,
     keyPlaceholder: 'sk-ant-...',
+  },
+  {
+    id: 'bedrock',
+    displayName: 'AWS Bedrock',
+    aliases: ['aws-bedrock', 'amazon-bedrock'],
+    openRouterPrefixes: [],
+    requiresApiKey: true,
+    localOnly: false,
+    color: '#ff9900',
+    keyPrefix: '',
+    minKeyLength: 16,
+    keyPlaceholder: 'AKIA...',
+    credentialFields: [
+      {
+        id: 'accessKeyId',
+        label: 'Access Key ID',
+        placeholder: 'AKIA...',
+        required: true,
+      },
+      {
+        id: 'secretAccessKey',
+        label: 'Secret Access Key',
+        secret: true,
+        required: true,
+      },
+      {
+        id: 'sessionToken',
+        label: 'Session Token (optional)',
+        secret: true,
+      },
+    ],
   },
   {
     id: 'deepseek',

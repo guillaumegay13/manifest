@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { DiscoveredModel, FetcherConfig } from './model-fetcher';
+import { fetchBedrockModels } from './bedrock-model-fetcher';
 import { OLLAMA_CLOUD_HOST, OLLAMA_HOST } from '../common/constants/ollama';
 import {
   CODEX_CLI_ORIGINATOR,
@@ -463,6 +464,14 @@ export class ProviderModelFetcherService {
       configKey = 'zai-subscription';
     } else if (configKey === 'opencode-go') {
       return this.fetchOpencodeGoCatalog();
+    } else if (configKey === 'bedrock') {
+      try {
+        return await fetchBedrockModels({ apiKey });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to fetch Bedrock models: ${message}`);
+        return [];
+      }
     }
     const config = PROVIDER_CONFIGS[configKey];
     if (!config) {
