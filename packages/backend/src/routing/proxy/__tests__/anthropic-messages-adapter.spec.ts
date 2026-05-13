@@ -686,6 +686,22 @@ describe('Anthropic Messages adapter', () => {
       expect(sse).toContain('"index":1'); // tool_use gets index 1, after thinking@0
     });
 
+    it('ignores late reasoning_content after a text block has started', () => {
+      const t = createMessagesStreamTransformer('deepseek-v4-flash');
+      const sse = flushChunks(t, [
+        'data: {"choices":[{"delta":{"reasoning_content":"plan"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n',
+        'data: {"choices":[{"delta":{"reasoning_content":"late"}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+      ]);
+
+      const thinkingDeltas = sse.match(/"type":"thinking_delta"/g) ?? [];
+      expect(thinkingDeltas).toHaveLength(1);
+      expect(sse).toContain('"thinking":"plan"');
+      expect(sse).not.toContain('"thinking":"late"');
+      expect(sse).toContain('"delta":{"type":"text_delta","text":"answer"}');
+    });
+
     it('finalize is idempotent — second call returns null', () => {
       const t = createMessagesStreamTransformer('m');
       t.transform('data: {"choices":[{"delta":{"content":"x"},"finish_reason":"stop"}]}\n\n');

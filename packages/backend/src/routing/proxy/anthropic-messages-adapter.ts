@@ -384,7 +384,11 @@ function transformStreamChunk(chunk: string, state: StreamState): string | null 
     // `delta.reasoning_content` separately from `delta.content`. Surface it as
     // an Anthropic `thinking` content block so clients can echo it back on the
     // next turn — the upstream rejects follow-ups that don't return the trace.
-    if (typeof delta.reasoning_content === 'string' && delta.reasoning_content.length > 0) {
+    if (
+      typeof delta.reasoning_content === 'string' &&
+      delta.reasoning_content.length > 0 &&
+      canEmitThinkingDelta(state)
+    ) {
       if (state.thinkingIndex === null) {
         state.thinkingIndex = nextBlockIndex(state);
         events.push(
@@ -488,6 +492,12 @@ function nextBlockIndex(state: StreamState): number {
     (state.textIndex !== null ? 1 : 0) +
     state.toolCalls.size
   );
+}
+
+function canEmitThinkingDelta(state: StreamState): boolean {
+  if (state.thinkingOpened) return true;
+  if (state.thinkingIndex !== null) return false;
+  return !state.textOpened && Array.from(state.toolCalls.values()).every((entry) => !entry.opened);
 }
 
 function closeThinkingBlock(state: StreamState, events: string[]): void {
