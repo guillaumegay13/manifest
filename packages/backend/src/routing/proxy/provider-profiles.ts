@@ -15,8 +15,15 @@
 import { OPENAI_RESPONSES_ONLY_RE, stripVendorPrefix } from '../../common/constants/openai-models';
 import { ForwardOptions } from './proxy-types';
 
-/** Wire family. Mirrors `ProviderEndpoint.format` so resolution stays in parity. */
-type Transport = 'openai' | 'anthropic' | 'google' | 'chatgpt';
+/**
+ * Vendor family — *who* we're talking to. Orthogonal to the wire shape.
+ * The legacy `ProviderEndpoint.format` conflated this with `wireApi`: an
+ * OpenAI-vendor endpoint speaking the Responses API was tagged `'chatgpt'`.
+ */
+type Transport = 'openai' | 'anthropic' | 'google';
+
+/** Wire shape — *which* request/response schema. Today only OpenAI has two. */
+type WireApi = 'chat_completions' | 'responses';
 
 /**
  * Per-provider request quirks that today live as global `Set`s consulted by the
@@ -33,6 +40,7 @@ export interface ProviderQuirks {
 interface WireShape {
   endpointKey: string;
   transport: Transport;
+  wireApi: WireApi;
   baseUrl: string;
   path: string;
 }
@@ -51,6 +59,7 @@ export interface ProviderProfile extends WireShape {
 export interface ResolvedProfile {
   endpointKey: string;
   transport: Transport;
+  wireApi: WireApi;
   baseUrl: string;
   path: string;
   quirks?: ProviderQuirks;
@@ -67,6 +76,7 @@ export const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
     id: 'openai',
     endpointKey: 'openai',
     transport: 'openai',
+    wireApi: 'chat_completions',
     baseUrl: 'https://api.openai.com',
     path: '/v1/chat/completions',
     quirks: {
@@ -75,10 +85,11 @@ export const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
     },
     modelRouting: [{ match: OPENAI_RESPONSES_ONLY_RE, variant: 'responses' }],
     variants: {
-      // ChatGPT subscription OAuth → Codex backend (separate base + path).
+      // ChatGPT subscription OAuth → Codex backend (separate base + path),
+      // still the OpenAI vendor speaking the Responses API.
       subscription: {
         endpointKey: 'openai-subscription',
-        transport: 'chatgpt',
+        wireApi: 'responses',
         baseUrl: 'https://chatgpt.com/backend-api',
         path: '/codex/responses',
       },
@@ -86,7 +97,7 @@ export const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
       // responses-only model families (Codex, *-pro, o1-pro, deep-research).
       responses: {
         endpointKey: 'openai-responses',
-        transport: 'chatgpt',
+        wireApi: 'responses',
         path: '/v1/responses',
       },
     },
@@ -125,6 +136,7 @@ export function resolveProfile(provider: string, opts: ResolveOptions): Resolved
   return {
     endpointKey: variant?.endpointKey ?? base.endpointKey,
     transport: variant?.transport ?? base.transport,
+    wireApi: variant?.wireApi ?? base.wireApi,
     baseUrl: variant?.baseUrl ?? base.baseUrl,
     path: variant?.path ?? base.path,
     quirks: base.quirks,

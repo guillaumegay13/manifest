@@ -58,7 +58,26 @@ describe('resolveProfile — OpenAI profile (migration spike)', () => {
     expect(quirks?.streamUsageOptions).toBe(true);
   });
 
-  it('resolves a transport that matches the endpoint registry format (parity)', () => {
+  it('decomposes vendor (transport) from wire shape (wireApi)', () => {
+    const base = resolveProfile('openai', { model: 'gpt-4o' })!;
+    expect(base.transport).toBe('openai');
+    expect(base.wireApi).toBe('chat_completions');
+
+    const responses = resolveProfile('openai', { apiMode: 'responses', model: 'gpt-4o' })!;
+    expect(responses.transport).toBe('openai');
+    expect(responses.wireApi).toBe('responses');
+
+    const subscription = resolveProfile('openai', { authType: 'subscription', model: 'gpt-4o' })!;
+    expect(subscription.transport).toBe('openai');
+    expect(subscription.wireApi).toBe('responses');
+  });
+
+  it("reconstructs the registry's legacy format from (transport, wireApi) (parity)", () => {
+    // The legacy `ProviderEndpoint.format` collapses these two axes: an
+    // OpenAI-vendor endpoint speaking the Responses API is tagged 'chatgpt'.
+    const toLegacyFormat = (transport: string, wireApi: string): string =>
+      transport === 'openai' && wireApi === 'responses' ? 'chatgpt' : transport;
+
     const cases: Parameters<typeof resolveProfile>[1][] = [
       { model: 'gpt-4o' },
       { apiMode: 'responses', model: 'gpt-4o' },
@@ -66,7 +85,7 @@ describe('resolveProfile — OpenAI profile (migration spike)', () => {
     ];
     for (const opts of cases) {
       const r = resolveProfile('openai', opts)!;
-      expect(r.transport).toBe(PROVIDER_ENDPOINTS[r.endpointKey].format);
+      expect(toLegacyFormat(r.transport, r.wireApi)).toBe(PROVIDER_ENDPOINTS[r.endpointKey].format);
     }
   });
 });
