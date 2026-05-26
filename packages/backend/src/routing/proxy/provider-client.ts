@@ -5,7 +5,8 @@ import { PROVIDER_ENDPOINTS, ProviderEndpoint, resolveEndpointKey } from './prov
 import { validatePublicUrl } from '../../common/utils/url-validation';
 import { isSelfHosted } from '../../common/utils/detect-self-hosted';
 import { resolveSubscriptionEndpointKey } from './provider-hooks';
-import { resolveProfile } from './provider-profiles';
+import { resolveProfile, ResolvedProfile } from './provider-profiles';
+import { deriveWireSpec, WireSpec } from './provider-wire-spec';
 import { injectOpenRouterCacheControl } from './cache-injection';
 import {
   applyAnthropicMessagesMutations,
@@ -107,17 +108,21 @@ export class ProviderClient {
       authType,
     } = opts;
 
-    const { endpoint, endpointKey } = this.resolveEndpoint(
+    const { endpoint, endpointKey, profile } = this.resolveEndpoint(
       customEndpoint,
       provider,
       authType,
       model,
       opts.apiMode,
     );
-    const isGoogle = endpoint.format === 'google';
-    const isAnthropic = endpoint.format === 'anthropic';
-    const isResponses = opts.apiMode === 'responses' && endpoint.format === 'chatgpt';
-    const isChatGpt = endpoint.format === 'chatgpt' && !isResponses;
+    // Dispatch on the (vendor, wire-shape) pair rather than the overloaded
+    // registry `format`. Migrated providers carry it on their profile;
+    // unmigrated ones derive it from `endpoint.format`.
+    const wire = deriveWireSpec(profile, endpoint.format);
+    const isGoogle = wire.transport === 'google';
+    const isAnthropic = wire.transport === 'anthropic';
+    const isResponses = opts.apiMode === 'responses' && wire.wireApi === 'responses';
+    const isChatGpt = wire.wireApi === 'responses' && !isResponses;
     const isCodeAssist = !!endpoint.codeAssistEnvelope;
 
     const bareModel = stripModelPrefix(model, endpointKey);
@@ -143,6 +148,7 @@ export class ProviderClient {
     const { url, headers, requestBody } = this.buildRequest({
       endpoint,
       endpointKey,
+      wire,
       bareModel,
       model,
       apiKey,
@@ -189,9 +195,9 @@ export class ProviderClient {
     authType: string | undefined,
     model: string,
     apiMode: ForwardOptions['apiMode'],
-  ): { endpoint: ProviderEndpoint; endpointKey: string } {
+  ): { endpoint: ProviderEndpoint; endpointKey: string; profile: ResolvedProfile | null } {
     if (customEndpoint) {
-      return { endpoint: customEndpoint, endpointKey: 'custom' };
+      return { endpoint: customEndpoint, endpointKey: 'custom', profile: null };
     }
     let resolved = resolveEndpointKey(provider);
     if (!resolved) {
@@ -205,6 +211,7 @@ export class ProviderClient {
       return {
         endpoint: PROVIDER_ENDPOINTS[profile.endpointKey],
         endpointKey: profile.endpointKey,
+        profile,
       };
     }
     if (authType === 'subscription') {
@@ -231,12 +238,13 @@ export class ProviderClient {
         resolved = 'opencode-go-anthropic';
       }
     }
-    return { endpoint: PROVIDER_ENDPOINTS[resolved], endpointKey: resolved };
+    return { endpoint: PROVIDER_ENDPOINTS[resolved], endpointKey: resolved, profile: null };
   }
 
   private buildRequest(ctx: {
     endpoint: ProviderEndpoint;
     endpointKey: string;
+    wire: WireSpec;
     bareModel: string;
     model: string;
     apiKey: string;
@@ -250,7 +258,8 @@ export class ProviderClient {
     reasoningContentLookup?: ForwardOptions['reasoningContentLookup'];
     providerResource?: string;
   }): { url: string; headers: Record<string, string>; requestBody: Record<string, unknown> } {
-    const { endpoint, endpointKey, bareModel, apiKey, authType, body, chatBody, stream } = ctx;
+    const { endpoint, endpointKey, wire, bareModel, apiKey, authType, body, chatBody, stream } =
+      ctx;
     // For non-chat_completions inbound modes ('responses', 'messages'), the
     // routing layer pre-translated the request into chat_completions form
     // (`chatBody`). Provider adapters all consume chat_completions, so prefer
@@ -258,7 +267,7 @@ export class ProviderClient {
     const requestSource =
       ctx.apiMode && ctx.apiMode !== 'chat_completions' ? (chatBody ?? body) : body;
 
-    if (endpoint.format === 'google') {
+    if (wire.transport === 'google') {
       // Google accepts the API key via header (set by buildHeaders below) so
       // we no longer need to embed it in the URL. Keeping the key out of the
       // URL avoids leaking it into upstream proxy / LB access logs.
@@ -283,7 +292,7 @@ export class ProviderClient {
       };
     }
 
-    if (endpoint.format === 'anthropic') {
+    if (wire.transport === 'anthropic') {
       const isSubscription = authType === 'subscription';
       // When the inbound request is already Anthropic Messages
       // (`POST /v1/messages`) and the resolved upstream is also Anthropic,
@@ -315,7 +324,7 @@ export class ProviderClient {
       };
     }
 
-    if (endpoint.format === 'chatgpt') {
+    if (wire.wireApi === 'responses') {
       const requestBody =
         ctx.apiMode === 'responses'
           ? // ChatGPT subscription tokens hit the Codex Responses backend, which
@@ -358,7 +367,12 @@ export class ProviderClient {
       ctx.model,
       ctx.reasoningContentLookup,
     );
-    if (stream && SUPPORTS_USAGE_STREAM_OPTIONS.has(endpointKey)) {
+    // Migrated providers declare this on their profile; unmigrated providers
+    // still consult the legacy Set until they get a profile.
+    const supportsUsageStreamOptions = wire.quirks
+      ? !!wire.quirks.streamUsageOptions
+      : SUPPORTS_USAGE_STREAM_OPTIONS.has(endpointKey);
+    if (stream && supportsUsageStreamOptions) {
       const existing =
         typeof sanitized.stream_options === 'object' && sanitized.stream_options !== null
           ? (sanitized.stream_options as Record<string, unknown>)
