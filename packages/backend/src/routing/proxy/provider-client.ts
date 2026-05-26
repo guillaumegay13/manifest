@@ -5,6 +5,7 @@ import { PROVIDER_ENDPOINTS, ProviderEndpoint, resolveEndpointKey } from './prov
 import { validatePublicUrl } from '../../common/utils/url-validation';
 import { isSelfHosted } from '../../common/utils/detect-self-hosted';
 import { resolveSubscriptionEndpointKey } from './provider-hooks';
+import { resolveProfile } from './provider-profiles';
 import { injectOpenRouterCacheControl } from './cache-injection';
 import {
   applyAnthropicMessagesMutations,
@@ -196,19 +197,22 @@ export class ProviderClient {
     if (!resolved) {
       throw new Error(`No endpoint configured for provider: ${provider}`);
     }
+    // Providers migrated to declarative profiles resolve through the generic
+    // engine. Unmigrated providers return null and fall through to the legacy
+    // chain below. Migration status is tracked in provider-profiles.ts.
+    const profile = resolveProfile(resolved, { authType, apiMode, model });
+    if (profile) {
+      return {
+        endpoint: PROVIDER_ENDPOINTS[profile.endpointKey],
+        endpointKey: profile.endpointKey,
+      };
+    }
     if (authType === 'subscription') {
       const override = resolveSubscriptionEndpointKey(resolved);
       if (override) resolved = override;
     }
-    if (apiMode === 'responses' && resolved === 'openai') {
-      resolved = 'openai-responses';
-    }
     if (apiMode === 'responses' && resolved === 'xai') {
       resolved = 'xai-responses';
-    }
-    // OpenAI rejects these models on /v1/chat/completions; forward to /v1/responses.
-    if (resolved === 'openai' && OPENAI_RESPONSES_ONLY_RE.test(stripVendorPrefix(model))) {
-      resolved = 'openai-responses';
     }
     // xAI multi-agent models are Responses API-only; route them to /v1/responses
     // while still accepting Chat Completions-shaped client requests.
