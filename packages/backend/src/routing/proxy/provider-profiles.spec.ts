@@ -7,7 +7,7 @@ import {
 
 describe('resolveProfile — OpenAI profile (migration spike)', () => {
   it('returns null for providers not yet migrated to a profile', () => {
-    expect(resolveProfile('anthropic', { model: 'claude-sonnet-4' })).toBeNull();
+    expect(resolveProfile('google', { model: 'gemini-2.5-pro' })).toBeNull();
   });
 
   it('resolves the base OpenAI profile to /v1/chat/completions', () => {
@@ -195,6 +195,7 @@ describe('streamUsageOptions quirk matches legacy SUPPORTS_USAGE_STREAM_OPTIONS'
     copilot: true,
     zai: true,
     'opencode-go': true,
+    minimax: true,
   };
   for (const [id, want] of Object.entries(expected)) {
     it(`${id} → ${want}`, () => {
@@ -264,5 +265,36 @@ describe('subscription / anthropic-variant routing parity (zai / opencode-go)', 
     const r = resolveProfile('opencode-go', { model: 'glm-4.6' })!;
     expect(r.endpointKey).toBe('opencode-go');
     expect(r.transport).toBe('openai');
+  });
+});
+
+describe('anthropic-transport routing parity (anthropic / minimax)', () => {
+  const toLegacyFormat = (transport: string, wireApi: string): string =>
+    transport === 'openai' && wireApi === 'responses' ? 'chatgpt' : transport;
+
+  it('anthropic api-key base uses x-api-key', () => {
+    const r = resolveProfile('anthropic', { model: 'claude-sonnet-4' })!;
+    expect(r.endpointKey).toBe('anthropic');
+    expect(buildProfileHeaders(r.auth, 'KEY')).toEqual(
+      PROVIDER_ENDPOINTS.anthropic.buildHeaders('KEY'),
+    );
+  });
+
+  it('anthropic subscription uses Bearer + oauth beta header (same endpoint)', () => {
+    const r = resolveProfile('anthropic', { authType: 'subscription', model: 'claude-sonnet-4' })!;
+    expect(r.endpointKey).toBe('anthropic');
+    expect(buildProfileHeaders(r.auth, 'KEY')).toEqual(
+      PROVIDER_ENDPOINTS.anthropic.buildHeaders('KEY', 'subscription'),
+    );
+  });
+
+  it('minimax subscription swaps to the native Anthropic backend', () => {
+    const r = resolveProfile('minimax', { authType: 'subscription', model: 'minimax-m2' })!;
+    expect(r.endpointKey).toBe('minimax-subscription');
+    expect(r.transport).toBe('anthropic');
+    const ep = PROVIDER_ENDPOINTS['minimax-subscription'];
+    expect(`${r.baseUrl}${r.path}`).toBe(`${ep.baseUrl}${ep.buildPath('m')}`);
+    expect(buildProfileHeaders(r.auth, 'KEY')).toEqual(ep.buildHeaders('KEY'));
+    expect(toLegacyFormat(r.transport, r.wireApi)).toBe(ep.format);
   });
 });

@@ -316,6 +316,49 @@ export const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
       },
     },
   },
+
+  // ── Anthropic-transport providers ──
+  // Anthropic: same endpoint for api-key and subscription; only the auth recipe
+  // differs (subscription uses Bearer + the OAuth beta header).
+  anthropic: {
+    id: 'anthropic',
+    endpointKey: 'anthropic',
+    transport: 'anthropic',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'x-api-key', headers: { 'anthropic-version': '2023-06-01' } },
+    baseUrl: 'https://api.anthropic.com',
+    path: '/v1/messages',
+    variants: {
+      subscription: {
+        auth: {
+          scheme: 'bearer',
+          headers: { 'anthropic-version': '2023-06-01', 'anthropic-beta': 'oauth-2025-04-20' },
+        },
+      },
+    },
+  },
+  // MiniMax: OpenAI-shaped on api-key; subscription swaps to the native
+  // Anthropic protocol. (Region/resource-URL subscription routes are applied
+  // upstream via customEndpoint and bypass this profile.)
+  minimax: {
+    id: 'minimax',
+    endpointKey: 'minimax',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
+    baseUrl: 'https://api.minimax.io',
+    path: '/v1/chat/completions',
+    quirks: { streamUsageOptions: true },
+    variants: {
+      subscription: {
+        endpointKey: 'minimax-subscription',
+        transport: 'anthropic',
+        auth: { scheme: 'bearer', headers: { 'anthropic-version': '2023-06-01' } },
+        baseUrl: 'https://api.minimax.io/anthropic',
+        path: '/v1/messages',
+      },
+    },
+  },
 };
 
 /**
