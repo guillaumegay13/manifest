@@ -1,5 +1,9 @@
-import { PROVIDER_PROFILES, resolveProfile } from './provider-profiles';
+import { buildProfileHeaders, PROVIDER_PROFILES, resolveProfile } from './provider-profiles';
 import { PROVIDER_ENDPOINTS } from './provider-endpoints';
+import {
+  CODEX_CLI_ORIGINATOR,
+  CODEX_CLI_USER_AGENT,
+} from '../../common/constants/subscription-clients';
 
 describe('resolveProfile — OpenAI profile (migration spike)', () => {
   it('returns null for providers not yet migrated to a profile', () => {
@@ -87,5 +91,68 @@ describe('resolveProfile — OpenAI profile (migration spike)', () => {
       const r = resolveProfile('openai', opts)!;
       expect(toLegacyFormat(r.transport, r.wireApi)).toBe(PROVIDER_ENDPOINTS[r.endpointKey].format);
     }
+  });
+});
+
+describe('buildProfileHeaders', () => {
+  it('builds bearer auth + JSON content type', () => {
+    expect(buildProfileHeaders({ scheme: 'bearer' }, 'sk-123')).toEqual({
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer sk-123',
+    });
+  });
+
+  it('builds x-api-key auth', () => {
+    expect(buildProfileHeaders({ scheme: 'x-api-key' }, 'sk-123')).toEqual({
+      'Content-Type': 'application/json',
+      'x-api-key': 'sk-123',
+    });
+  });
+
+  it('builds x-goog-api-key auth', () => {
+    expect(buildProfileHeaders({ scheme: 'x-goog-api-key' }, 'sk-123')).toEqual({
+      'Content-Type': 'application/json',
+      'x-goog-api-key': 'sk-123',
+    });
+  });
+
+  it('omits the auth header for scheme "none"', () => {
+    expect(buildProfileHeaders({ scheme: 'none' }, 'sk-123')).toEqual({
+      'Content-Type': 'application/json',
+    });
+  });
+
+  it('merges static extra headers', () => {
+    expect(
+      buildProfileHeaders({ scheme: 'bearer', headers: { 'X-Title': 'Manifest' } }, 'sk-123'),
+    ).toEqual({
+      'Content-Type': 'application/json',
+      'X-Title': 'Manifest',
+      Authorization: 'Bearer sk-123',
+    });
+  });
+});
+
+describe('OpenAI auth recipes match the legacy registry header closures (parity)', () => {
+  it('base profile → registry openai headers', () => {
+    const r = resolveProfile('openai', { model: 'gpt-4o' })!;
+    expect(buildProfileHeaders(r.auth, 'sk-x')).toEqual(
+      PROVIDER_ENDPOINTS[r.endpointKey].buildHeaders('sk-x'),
+    );
+  });
+
+  it('responses variant → registry openai-responses headers', () => {
+    const r = resolveProfile('openai', { apiMode: 'responses', model: 'gpt-4o' })!;
+    expect(buildProfileHeaders(r.auth, 'sk-x')).toEqual(
+      PROVIDER_ENDPOINTS[r.endpointKey].buildHeaders('sk-x'),
+    );
+  });
+
+  it('subscription variant → registry openai-subscription Codex headers', () => {
+    const r = resolveProfile('openai', { authType: 'subscription', model: 'gpt-4o' })!;
+    const built = buildProfileHeaders(r.auth, 'sk-x');
+    expect(built).toEqual(PROVIDER_ENDPOINTS[r.endpointKey].buildHeaders('sk-x'));
+    expect(built.originator).toBe(CODEX_CLI_ORIGINATOR);
+    expect(built['user-agent']).toBe(CODEX_CLI_USER_AGENT);
   });
 });

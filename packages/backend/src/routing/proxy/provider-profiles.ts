@@ -13,6 +13,10 @@
  * validate the shape against real behaviour.
  */
 import { OPENAI_RESPONSES_ONLY_RE, stripVendorPrefix } from '../../common/constants/openai-models';
+import {
+  CODEX_CLI_ORIGINATOR,
+  CODEX_CLI_USER_AGENT,
+} from '../../common/constants/subscription-clients';
 import { ForwardOptions } from './proxy-types';
 
 /**
@@ -36,11 +40,22 @@ export interface ProviderQuirks {
   streamUsageOptions?: boolean;
 }
 
+/**
+ * How to authenticate to the upstream. Replaces the per-endpoint `buildHeaders`
+ * closures in the registry with declarative data.
+ */
+export interface AuthRecipe {
+  scheme: 'bearer' | 'x-api-key' | 'x-goog-api-key' | 'none';
+  /** Static extra headers (e.g. anthropic-version, Codex/Copilot client tags). */
+  headers?: Record<string, string>;
+}
+
 /** The wire-shape fields a variant may override on top of its base profile. */
 interface WireShape {
   endpointKey: string;
   transport: Transport;
   wireApi: WireApi;
+  auth: AuthRecipe;
   baseUrl: string;
   path: string;
 }
@@ -60,6 +75,7 @@ export interface ResolvedProfile {
   endpointKey: string;
   transport: Transport;
   wireApi: WireApi;
+  auth: AuthRecipe;
   baseUrl: string;
   path: string;
   quirks?: ProviderQuirks;
@@ -77,6 +93,7 @@ export const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
     endpointKey: 'openai',
     transport: 'openai',
     wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
     baseUrl: 'https://api.openai.com',
     path: '/v1/chat/completions',
     quirks: {
@@ -90,6 +107,10 @@ export const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
       subscription: {
         endpointKey: 'openai-subscription',
         wireApi: 'responses',
+        auth: {
+          scheme: 'bearer',
+          headers: { originator: CODEX_CLI_ORIGINATOR, 'user-agent': CODEX_CLI_USER_AGENT },
+        },
         baseUrl: 'https://chatgpt.com/backend-api',
         path: '/codex/responses',
       },
@@ -137,8 +158,25 @@ export function resolveProfile(provider: string, opts: ResolveOptions): Resolved
     endpointKey: variant?.endpointKey ?? base.endpointKey,
     transport: variant?.transport ?? base.transport,
     wireApi: variant?.wireApi ?? base.wireApi,
+    auth: variant?.auth ?? base.auth,
     baseUrl: variant?.baseUrl ?? base.baseUrl,
     path: variant?.path ?? base.path,
     quirks: base.quirks,
   };
+}
+
+/** Build request headers from a declarative auth recipe. */
+export function buildProfileHeaders(auth: AuthRecipe, apiKey: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...auth.headers,
+  };
+  if (auth.scheme === 'bearer') {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  } else if (auth.scheme === 'x-api-key') {
+    headers['x-api-key'] = apiKey;
+  } else if (auth.scheme === 'x-goog-api-key') {
+    headers['x-goog-api-key'] = apiKey;
+  }
+  return headers;
 }

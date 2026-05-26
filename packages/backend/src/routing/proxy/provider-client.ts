@@ -5,7 +5,7 @@ import { PROVIDER_ENDPOINTS, ProviderEndpoint, resolveEndpointKey } from './prov
 import { validatePublicUrl } from '../../common/utils/url-validation';
 import { isSelfHosted } from '../../common/utils/detect-self-hosted';
 import { resolveSubscriptionEndpointKey } from './provider-hooks';
-import { resolveProfile, ResolvedProfile } from './provider-profiles';
+import { buildProfileHeaders, resolveProfile, ResolvedProfile } from './provider-profiles';
 import { deriveWireSpec, WireSpec } from './provider-wire-spec';
 import { injectOpenRouterCacheControl } from './cache-injection';
 import {
@@ -149,6 +149,7 @@ export class ProviderClient {
       endpoint,
       endpointKey,
       wire,
+      profile,
       bareModel,
       model,
       apiKey,
@@ -245,6 +246,7 @@ export class ProviderClient {
     endpoint: ProviderEndpoint;
     endpointKey: string;
     wire: WireSpec;
+    profile: ResolvedProfile | null;
     bareModel: string;
     model: string;
     apiKey: string;
@@ -267,6 +269,15 @@ export class ProviderClient {
     const requestSource =
       ctx.apiMode && ctx.apiMode !== 'chat_completions' ? (chatBody ?? body) : body;
 
+    // Migrated providers build their headers + URL from the declarative profile;
+    // unmigrated providers fall back to the registry's closures.
+    const headers = ctx.profile
+      ? buildProfileHeaders(ctx.profile.auth, apiKey)
+      : endpoint.buildHeaders(apiKey, authType);
+    const defaultUrl = ctx.profile
+      ? `${ctx.profile.baseUrl}${ctx.profile.path}`
+      : `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`;
+
     if (wire.transport === 'google') {
       // Google accepts the API key via header (set by buildHeaders below) so
       // we no longer need to embed it in the URL. Keeping the key out of the
@@ -287,7 +298,7 @@ export class ProviderClient {
         : innerBody;
       return {
         url,
-        headers: endpoint.buildHeaders(apiKey, authType),
+        headers,
         requestBody,
       };
     }
@@ -318,8 +329,8 @@ export class ProviderClient {
       requestBody.model = bareModel;
       if (stream) requestBody.stream = true;
       return {
-        url: `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`,
-        headers: endpoint.buildHeaders(apiKey, authType),
+        url: defaultUrl,
+        headers,
         requestBody,
       };
     }
@@ -354,8 +365,8 @@ export class ProviderClient {
         requestBody.stream = true;
       }
       return {
-        url: `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`,
-        headers: endpoint.buildHeaders(apiKey, authType),
+        url: defaultUrl,
+        headers,
         requestBody,
       };
     }
