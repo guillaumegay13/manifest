@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OPENAI_RESPONSES_ONLY_RE, stripVendorPrefix } from '../../common/constants/openai-models';
-import { XAI_RESPONSES_ONLY_RE } from '../../common/constants/xai-models';
+import { stripVendorPrefix } from '../../common/constants/openai-models';
 import { PROVIDER_ENDPOINTS, ProviderEndpoint, resolveEndpointKey } from './provider-endpoints';
 import { validatePublicUrl } from '../../common/utils/url-validation';
 import { isSelfHosted } from '../../common/utils/detect-self-hosted';
@@ -215,29 +214,12 @@ export class ProviderClient {
         profile,
       };
     }
+    // Remaining legacy path: only providers without a profile reach here
+    // (google/gemini subscription, kiro, unknown). Subscription endpoint
+    // overrides for migrated providers now live in their profile variants.
     if (authType === 'subscription') {
       const override = resolveSubscriptionEndpointKey(resolved);
       if (override) resolved = override;
-    }
-    if (apiMode === 'responses' && resolved === 'xai') {
-      resolved = 'xai-responses';
-    }
-    // xAI multi-agent models are Responses API-only; route them to /v1/responses
-    // while still accepting Chat Completions-shaped client requests.
-    if (resolved === 'xai' && XAI_RESPONSES_ONLY_RE.test(stripVendorPrefix(model))) {
-      resolved = 'xai-responses';
-    }
-    // Copilot serves Codex variants only at /responses; /chat/completions returns
-    // "Unsupported API for model" (gh issue mnfst/manifest#1849).
-    if (resolved === 'copilot' && OPENAI_RESPONSES_ONLY_RE.test(stripVendorPrefix(model))) {
-      resolved = 'copilot-responses';
-    }
-    if (resolved === 'opencode-go') {
-      // OpenCode Go uses two different API formats depending on the model:
-      // MiniMax models use Anthropic /v1/messages, all others use OpenAI /v1/chat/completions.
-      if (stripVendorPrefix(model).toLowerCase().startsWith('minimax-')) {
-        resolved = 'opencode-go-anthropic';
-      }
     }
     return { endpoint: PROVIDER_ENDPOINTS[resolved], endpointKey: resolved, profile: null };
   }
