@@ -193,6 +193,8 @@ describe('streamUsageOptions quirk matches legacy SUPPORTS_USAGE_STREAM_OPTIONS'
     qwen: true,
     xai: true,
     copilot: true,
+    zai: true,
+    'opencode-go': true,
   };
   for (const [id, want] of Object.entries(expected)) {
     it(`${id} → ${want}`, () => {
@@ -232,5 +234,35 @@ describe('responses-variant routing parity (xai / copilot)', () => {
   it('copilot does NOT route apiMode=responses to copilot-responses (legacy parity)', () => {
     const r = resolveProfile('copilot', { apiMode: 'responses', model: 'gpt-4o' })!;
     expect(r.endpointKey).toBe('copilot');
+  });
+});
+
+describe('subscription / anthropic-variant routing parity (zai / opencode-go)', () => {
+  const toLegacyFormat = (transport: string, wireApi: string): string =>
+    transport === 'openai' && wireApi === 'responses' ? 'chatgpt' : transport;
+  const expectMatchesRegistry = (r: NonNullable<ReturnType<typeof resolveProfile>>) => {
+    const ep = PROVIDER_ENDPOINTS[r.endpointKey];
+    expect(`${r.baseUrl}${r.path}`).toBe(`${ep.baseUrl}${ep.buildPath('m')}`);
+    expect(buildProfileHeaders(r.auth, 'KEY')).toEqual(ep.buildHeaders('KEY'));
+    expect(toLegacyFormat(r.transport, r.wireApi)).toBe(ep.format);
+  };
+
+  it('zai subscription → zai-subscription backend', () => {
+    const r = resolveProfile('zai', { authType: 'subscription', model: 'glm-4.6' })!;
+    expect(r.endpointKey).toBe('zai-subscription');
+    expectMatchesRegistry(r);
+  });
+
+  it('opencode-go routes minimax- models to the Anthropic protocol', () => {
+    const r = resolveProfile('opencode-go', { model: 'minimax-m2' })!;
+    expect(r.endpointKey).toBe('opencode-go-anthropic');
+    expect(r.transport).toBe('anthropic');
+    expectMatchesRegistry(r);
+  });
+
+  it('opencode-go keeps non-minimax models on the OpenAI protocol', () => {
+    const r = resolveProfile('opencode-go', { model: 'glm-4.6' })!;
+    expect(r.endpointKey).toBe('opencode-go');
+    expect(r.transport).toBe('openai');
   });
 });

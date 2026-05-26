@@ -277,6 +277,45 @@ export const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
       responses: { endpointKey: 'copilot-responses', wireApi: 'responses', path: '/responses' },
     },
   },
+  // Z.ai: subscription auth swaps to the Coding-Plan backend (still OpenAI-shaped).
+  zai: {
+    id: 'zai',
+    endpointKey: 'zai',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
+    baseUrl: 'https://api.z.ai',
+    path: '/api/paas/v4/chat/completions',
+    quirks: { streamUsageOptions: true },
+    variants: {
+      subscription: {
+        endpointKey: 'zai-subscription',
+        baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
+        path: '/chat/completions',
+      },
+    },
+  },
+  // OpenCode Go: MiniMax models speak the native Anthropic protocol (x-api-key,
+  // /v1/messages); everything else is OpenAI-shaped. Same base URL either way.
+  'opencode-go': {
+    id: 'opencode-go',
+    endpointKey: 'opencode-go',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
+    baseUrl: 'https://opencode.ai/zen/go',
+    path: '/v1/chat/completions',
+    quirks: { streamUsageOptions: true },
+    modelRouting: [{ match: /^minimax-/i, variant: 'anthropic' }],
+    variants: {
+      anthropic: {
+        endpointKey: 'opencode-go-anthropic',
+        transport: 'anthropic',
+        auth: { scheme: 'x-api-key', headers: { 'anthropic-version': '2023-06-01' } },
+        path: '/v1/messages',
+      },
+    },
+  },
 };
 
 /**
