@@ -187,10 +187,50 @@ describe('streamUsageOptions quirk matches legacy SUPPORTS_USAGE_STREAM_OPTIONS'
     mistral: true,
     moonshot: true,
     kilo: false,
+    openrouter: true,
+    ollama: true,
+    'ollama-cloud': true,
+    qwen: true,
+    xai: true,
+    copilot: true,
   };
   for (const [id, want] of Object.entries(expected)) {
     it(`${id} → ${want}`, () => {
       expect(PROVIDER_PROFILES[id].quirks?.streamUsageOptions).toBe(want);
     });
   }
+});
+
+describe('responses-variant routing parity (xai / copilot)', () => {
+  const toLegacyFormat = (transport: string, wireApi: string): string =>
+    transport === 'openai' && wireApi === 'responses' ? 'chatgpt' : transport;
+  const expectMatchesRegistry = (r: NonNullable<ReturnType<typeof resolveProfile>>) => {
+    const ep = PROVIDER_ENDPOINTS[r.endpointKey];
+    expect(`${r.baseUrl}${r.path}`).toBe(`${ep.baseUrl}${ep.buildPath('m')}`);
+    expect(buildProfileHeaders(r.auth, 'KEY')).toEqual(ep.buildHeaders('KEY'));
+    expect(toLegacyFormat(r.transport, r.wireApi)).toBe(ep.format);
+  };
+
+  it('xai routes apiMode=responses to xai-responses', () => {
+    const r = resolveProfile('xai', { apiMode: 'responses', model: 'grok-4' })!;
+    expect(r.endpointKey).toBe('xai-responses');
+    expectMatchesRegistry(r);
+  });
+
+  it('xai routes multi-agent models to xai-responses', () => {
+    const r = resolveProfile('xai', { model: 'grok-4-multi-agent' })!;
+    expect(r.endpointKey).toBe('xai-responses');
+    expectMatchesRegistry(r);
+  });
+
+  it('copilot routes responses-only models to copilot-responses', () => {
+    const r = resolveProfile('copilot', { model: 'gpt-5-codex' })!;
+    expect(r.endpointKey).toBe('copilot-responses');
+    expectMatchesRegistry(r);
+  });
+
+  it('copilot does NOT route apiMode=responses to copilot-responses (legacy parity)', () => {
+    const r = resolveProfile('copilot', { apiMode: 'responses', model: 'gpt-4o' })!;
+    expect(r.endpointKey).toBe('copilot');
+  });
 });

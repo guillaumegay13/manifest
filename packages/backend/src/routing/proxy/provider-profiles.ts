@@ -12,11 +12,16 @@
  * This file currently carries OpenAI only (the variant-heaviest provider) to
  * validate the shape against real behaviour.
  */
+import { OLLAMA_CLOUD_HOST, OLLAMA_HOST } from '../../common/constants/ollama';
 import { OPENAI_RESPONSES_ONLY_RE, stripVendorPrefix } from '../../common/constants/openai-models';
 import {
   CODEX_CLI_ORIGINATOR,
   CODEX_CLI_USER_AGENT,
+  COPILOT_EDITOR_VERSION,
+  COPILOT_PLUGIN_VERSION,
 } from '../../common/constants/subscription-clients';
+import { XAI_RESPONSES_ONLY_RE } from '../../common/constants/xai-models';
+import { getQwenCompatibleBaseUrl } from '../qwen-region';
 import { ForwardOptions } from './proxy-types';
 
 /**
@@ -67,6 +72,12 @@ export interface ProviderProfile extends WireShape {
   quirks?: ProviderQuirks;
   /** Named overlays selected by auth type / api mode (e.g. subscription, responses). */
   variants?: Record<string, ProviderVariant>;
+  /**
+   * Variant to select when the *inbound* request is the Responses API
+   * (`apiMode='responses'`). Opt-in: legacy only does this for openai + xai,
+   * NOT copilot (which routes to /responses purely by model family).
+   */
+  apiModeResponsesVariant?: string;
   /** Model-name → variant rules, replacing per-provider regex if-branches. */
   modelRouting?: { match: RegExp; variant: string }[];
 }
@@ -100,6 +111,7 @@ export const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
       maxCompletionTokensModels: /^(o\d|gpt-5)/i,
       streamUsageOptions: true,
     },
+    apiModeResponsesVariant: 'responses',
     modelRouting: [{ match: OPENAI_RESPONSES_ONLY_RE, variant: 'responses' }],
     variants: {
       // ChatGPT subscription OAuth → Codex backend (separate base + path),
@@ -176,6 +188,95 @@ export const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
     path: '/chat/completions',
     quirks: { streamUsageOptions: false },
   },
+  openrouter: {
+    id: 'openrouter',
+    endpointKey: 'openrouter',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: {
+      scheme: 'bearer',
+      headers: { 'HTTP-Referer': 'https://manifest.build', 'X-Title': 'Manifest' },
+    },
+    baseUrl: 'https://openrouter.ai',
+    path: '/api/v1/chat/completions',
+    quirks: { streamUsageOptions: true },
+  },
+  // Ollama (local) takes no auth header.
+  ollama: {
+    id: 'ollama',
+    endpointKey: 'ollama',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'none' },
+    baseUrl: OLLAMA_HOST,
+    path: '/v1/chat/completions',
+    quirks: { streamUsageOptions: true },
+  },
+  'ollama-cloud': {
+    id: 'ollama-cloud',
+    endpointKey: 'ollama-cloud',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
+    baseUrl: OLLAMA_CLOUD_HOST,
+    path: '/v1/chat/completions',
+    quirks: { streamUsageOptions: true },
+  },
+  // Qwen's region override is applied upstream via a customEndpoint (which
+  // bypasses profiles); the by-name path uses the default Beijing base.
+  qwen: {
+    id: 'qwen',
+    endpointKey: 'qwen',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
+    baseUrl: getQwenCompatibleBaseUrl('beijing'),
+    path: '/v1/chat/completions',
+    quirks: { streamUsageOptions: true },
+  },
+
+  // ── OpenAI-compatible base + Responses-API variant ──
+  // xAI: multi-agent Grok models are /v1/responses-only; the /v1/responses
+  // inbound mode also routes here.
+  xai: {
+    id: 'xai',
+    endpointKey: 'xai',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
+    baseUrl: 'https://api.x.ai',
+    path: '/v1/chat/completions',
+    quirks: { streamUsageOptions: true },
+    apiModeResponsesVariant: 'responses',
+    modelRouting: [{ match: XAI_RESPONSES_ONLY_RE, variant: 'responses' }],
+    variants: {
+      responses: { endpointKey: 'xai-responses', wireApi: 'responses', path: '/v1/responses' },
+    },
+  },
+  // GitHub Copilot: Codex variants are served only at /responses (by model
+  // family). Note: copilot does NOT route on apiMode='responses' (no
+  // apiModeResponsesVariant) — matches legacy.
+  copilot: {
+    id: 'copilot',
+    endpointKey: 'copilot',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: {
+      scheme: 'bearer',
+      headers: {
+        'Editor-Version': COPILOT_EDITOR_VERSION,
+        'Editor-Plugin-Version': COPILOT_PLUGIN_VERSION,
+        'Copilot-Integration-Id': 'vscode-chat',
+      },
+    },
+    baseUrl: 'https://api.githubcopilot.com',
+    path: '/chat/completions',
+    quirks: { streamUsageOptions: true },
+    modelRouting: [{ match: OPENAI_RESPONSES_ONLY_RE, variant: 'responses' }],
+    variants: {
+      responses: { endpointKey: 'copilot-responses', wireApi: 'responses', path: '/responses' },
+    },
+  },
 };
 
 /**
@@ -187,8 +288,8 @@ function selectVariant(base: ProviderProfile, opts: ResolveOptions): ProviderVar
   if (opts.authType === 'subscription' && base.variants?.subscription) {
     return base.variants.subscription;
   }
-  if (opts.apiMode === 'responses' && base.variants?.responses) {
-    return base.variants.responses;
+  if (opts.apiMode === 'responses' && base.apiModeResponsesVariant) {
+    return base.variants?.[base.apiModeResponsesVariant];
   }
   const bareModel = stripVendorPrefix(opts.model);
   for (const rule of base.modelRouting ?? []) {
