@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OPENAI_RESPONSES_ONLY_RE, stripVendorPrefix } from '../../common/constants/openai-models';
-import { XAI_RESPONSES_ONLY_RE } from '../../common/constants/xai-models';
+import { stripVendorPrefix } from '../../common/constants/openai-models';
 import { PROVIDER_ENDPOINTS, ProviderEndpoint, resolveEndpointKey } from './provider-endpoints';
 import { validatePublicUrl } from '../../common/utils/url-validation';
 import { isSelfHosted } from '../../common/utils/detect-self-hosted';
 import { resolveSubscriptionEndpointKey } from './provider-hooks';
+import { buildProfileHeaders, resolveProfile, ResolvedProfile } from './provider-profiles';
+import { deriveWireSpec, WireSpec } from './provider-wire-spec';
 import { injectOpenRouterCacheControl } from './cache-injection';
 import {
   applyAnthropicMessagesMutations,
@@ -106,17 +107,21 @@ export class ProviderClient {
       authType,
     } = opts;
 
-    const { endpoint, endpointKey } = this.resolveEndpoint(
+    const { endpoint, endpointKey, profile } = this.resolveEndpoint(
       customEndpoint,
       provider,
       authType,
       model,
       opts.apiMode,
     );
-    const isGoogle = endpoint.format === 'google';
-    const isAnthropic = endpoint.format === 'anthropic';
-    const isResponses = opts.apiMode === 'responses' && endpoint.format === 'chatgpt';
-    const isChatGpt = endpoint.format === 'chatgpt' && !isResponses;
+    // Dispatch on the (vendor, wire-shape) pair rather than the overloaded
+    // registry `format`. Migrated providers carry it on their profile;
+    // unmigrated ones derive it from `endpoint.format`.
+    const wire = deriveWireSpec(profile, endpoint.format);
+    const isGoogle = wire.transport === 'google';
+    const isAnthropic = wire.transport === 'anthropic';
+    const isResponses = opts.apiMode === 'responses' && wire.wireApi === 'responses';
+    const isChatGpt = wire.wireApi === 'responses' && !isResponses;
     const isCodeAssist = !!endpoint.codeAssistEnvelope;
 
     const bareModel = stripModelPrefix(model, endpointKey);
@@ -142,6 +147,8 @@ export class ProviderClient {
     const { url, headers, requestBody } = this.buildRequest({
       endpoint,
       endpointKey,
+      wire,
+      profile,
       bareModel,
       model,
       apiKey,
@@ -188,51 +195,40 @@ export class ProviderClient {
     authType: string | undefined,
     model: string,
     apiMode: ForwardOptions['apiMode'],
-  ): { endpoint: ProviderEndpoint; endpointKey: string } {
+  ): { endpoint: ProviderEndpoint; endpointKey: string; profile: ResolvedProfile | null } {
     if (customEndpoint) {
-      return { endpoint: customEndpoint, endpointKey: 'custom' };
+      return { endpoint: customEndpoint, endpointKey: 'custom', profile: null };
     }
     let resolved = resolveEndpointKey(provider);
     if (!resolved) {
       throw new Error(`No endpoint configured for provider: ${provider}`);
     }
+    // Providers migrated to declarative profiles resolve through the generic
+    // engine. Unmigrated providers return null and fall through to the legacy
+    // chain below. Migration status is tracked in provider-profiles.ts.
+    const profile = resolveProfile(resolved, { authType, apiMode, model });
+    if (profile) {
+      return {
+        endpoint: PROVIDER_ENDPOINTS[profile.endpointKey],
+        endpointKey: profile.endpointKey,
+        profile,
+      };
+    }
+    // Remaining legacy path: only providers without a profile reach here
+    // (google/gemini subscription, kiro, unknown). Subscription endpoint
+    // overrides for migrated providers now live in their profile variants.
     if (authType === 'subscription') {
       const override = resolveSubscriptionEndpointKey(resolved);
       if (override) resolved = override;
     }
-    if (apiMode === 'responses' && resolved === 'openai') {
-      resolved = 'openai-responses';
-    }
-    if (apiMode === 'responses' && resolved === 'xai') {
-      resolved = 'xai-responses';
-    }
-    // OpenAI rejects these models on /v1/chat/completions; forward to /v1/responses.
-    if (resolved === 'openai' && OPENAI_RESPONSES_ONLY_RE.test(stripVendorPrefix(model))) {
-      resolved = 'openai-responses';
-    }
-    // xAI multi-agent models are Responses API-only; route them to /v1/responses
-    // while still accepting Chat Completions-shaped client requests.
-    if (resolved === 'xai' && XAI_RESPONSES_ONLY_RE.test(stripVendorPrefix(model))) {
-      resolved = 'xai-responses';
-    }
-    // Copilot serves Codex variants only at /responses; /chat/completions returns
-    // "Unsupported API for model" (gh issue mnfst/manifest#1849).
-    if (resolved === 'copilot' && OPENAI_RESPONSES_ONLY_RE.test(stripVendorPrefix(model))) {
-      resolved = 'copilot-responses';
-    }
-    if (resolved === 'opencode-go') {
-      // OpenCode Go uses two different API formats depending on the model:
-      // MiniMax models use Anthropic /v1/messages, all others use OpenAI /v1/chat/completions.
-      if (stripVendorPrefix(model).toLowerCase().startsWith('minimax-')) {
-        resolved = 'opencode-go-anthropic';
-      }
-    }
-    return { endpoint: PROVIDER_ENDPOINTS[resolved], endpointKey: resolved };
+    return { endpoint: PROVIDER_ENDPOINTS[resolved], endpointKey: resolved, profile: null };
   }
 
   private buildRequest(ctx: {
     endpoint: ProviderEndpoint;
     endpointKey: string;
+    wire: WireSpec;
+    profile: ResolvedProfile | null;
     bareModel: string;
     model: string;
     apiKey: string;
@@ -246,7 +242,8 @@ export class ProviderClient {
     reasoningContentLookup?: ForwardOptions['reasoningContentLookup'];
     providerResource?: string;
   }): { url: string; headers: Record<string, string>; requestBody: Record<string, unknown> } {
-    const { endpoint, endpointKey, bareModel, apiKey, authType, body, chatBody, stream } = ctx;
+    const { endpoint, endpointKey, wire, bareModel, apiKey, authType, body, chatBody, stream } =
+      ctx;
     // For non-chat_completions inbound modes ('responses', 'messages'), the
     // routing layer pre-translated the request into chat_completions form
     // (`chatBody`). Provider adapters all consume chat_completions, so prefer
@@ -254,7 +251,16 @@ export class ProviderClient {
     const requestSource =
       ctx.apiMode && ctx.apiMode !== 'chat_completions' ? (chatBody ?? body) : body;
 
-    if (endpoint.format === 'google') {
+    // Migrated providers build their headers + URL from the declarative profile;
+    // unmigrated providers fall back to the registry's closures.
+    const headers = ctx.profile
+      ? buildProfileHeaders(ctx.profile.auth, apiKey)
+      : endpoint.buildHeaders(apiKey, authType);
+    const defaultUrl = ctx.profile
+      ? `${ctx.profile.baseUrl}${ctx.profile.path}`
+      : `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`;
+
+    if (wire.transport === 'google') {
       // Google accepts the API key via header (set by buildHeaders below) so
       // we no longer need to embed it in the URL. Keeping the key out of the
       // URL avoids leaking it into upstream proxy / LB access logs.
@@ -274,12 +280,12 @@ export class ProviderClient {
         : innerBody;
       return {
         url,
-        headers: endpoint.buildHeaders(apiKey, authType),
+        headers,
         requestBody,
       };
     }
 
-    if (endpoint.format === 'anthropic') {
+    if (wire.transport === 'anthropic') {
       const isSubscription = authType === 'subscription';
       // When the inbound request is already Anthropic Messages
       // (`POST /v1/messages`) and the resolved upstream is also Anthropic,
@@ -305,13 +311,13 @@ export class ProviderClient {
       requestBody.model = bareModel;
       if (stream) requestBody.stream = true;
       return {
-        url: `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`,
-        headers: endpoint.buildHeaders(apiKey, authType),
+        url: defaultUrl,
+        headers,
         requestBody,
       };
     }
 
-    if (endpoint.format === 'chatgpt') {
+    if (wire.wireApi === 'responses') {
       const requestBody =
         ctx.apiMode === 'responses'
           ? // ChatGPT subscription tokens hit the Codex Responses backend, which
@@ -341,8 +347,8 @@ export class ProviderClient {
         requestBody.stream = true;
       }
       return {
-        url: `${endpoint.baseUrl}${endpoint.buildPath(bareModel)}`,
-        headers: endpoint.buildHeaders(apiKey, authType),
+        url: defaultUrl,
+        headers,
         requestBody,
       };
     }
@@ -354,7 +360,12 @@ export class ProviderClient {
       ctx.model,
       ctx.reasoningContentLookup,
     );
-    if (stream && SUPPORTS_USAGE_STREAM_OPTIONS.has(endpointKey)) {
+    // Migrated providers declare this on their profile; unmigrated providers
+    // still consult the legacy Set until they get a profile.
+    const supportsUsageStreamOptions = wire.quirks
+      ? !!wire.quirks.streamUsageOptions
+      : SUPPORTS_USAGE_STREAM_OPTIONS.has(endpointKey);
+    if (stream && supportsUsageStreamOptions) {
       const existing =
         typeof sanitized.stream_options === 'object' && sanitized.stream_options !== null
           ? (sanitized.stream_options as Record<string, unknown>)
