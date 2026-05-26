@@ -7,7 +7,7 @@ import {
 
 describe('resolveProfile — OpenAI profile (migration spike)', () => {
   it('returns null for providers not yet migrated to a profile', () => {
-    expect(resolveProfile('mistral', { model: 'mistral-large-latest' })).toBeNull();
+    expect(resolveProfile('anthropic', { model: 'claude-sonnet-4' })).toBeNull();
   });
 
   it('resolves the base OpenAI profile to /v1/chat/completions', () => {
@@ -155,4 +155,42 @@ describe('OpenAI auth recipes match the legacy registry header closures (parity)
     expect(built.originator).toBe(CODEX_CLI_ORIGINATOR);
     expect(built['user-agent']).toBe(CODEX_CLI_USER_AGENT);
   });
+});
+
+/**
+ * Auto-parity: every migrated profile's *base* resolution must reproduce its
+ * legacy registry entry exactly (URL, headers, format). This fails the moment a
+ * new profile drifts from the registry it replaces. Variant-specific parity is
+ * covered by the targeted tests above.
+ */
+describe('every profile base ⇄ legacy registry (auto-parity)', () => {
+  const toLegacyFormat = (transport: string, wireApi: string): string =>
+    transport === 'openai' && wireApi === 'responses' ? 'chatgpt' : transport;
+
+  for (const id of Object.keys(PROVIDER_PROFILES)) {
+    it(`${id} base matches PROVIDER_ENDPOINTS`, () => {
+      const r = resolveProfile(id, { model: 'parity-probe' })!;
+      const ep = PROVIDER_ENDPOINTS[r.endpointKey];
+      expect(`${r.baseUrl}${r.path}`).toBe(`${ep.baseUrl}${ep.buildPath('parity-probe')}`);
+      expect(buildProfileHeaders(r.auth, 'KEY')).toEqual(ep.buildHeaders('KEY'));
+      expect(toLegacyFormat(r.transport, r.wireApi)).toBe(ep.format);
+    });
+  }
+});
+
+describe('streamUsageOptions quirk matches legacy SUPPORTS_USAGE_STREAM_OPTIONS', () => {
+  // Explicit expectations pin the Set membership the profile replaces.
+  const expected: Record<string, boolean> = {
+    openai: true,
+    deepseek: true,
+    groq: true,
+    mistral: true,
+    moonshot: true,
+    kilo: false,
+  };
+  for (const [id, want] of Object.entries(expected)) {
+    it(`${id} → ${want}`, () => {
+      expect(PROVIDER_PROFILES[id].quirks?.streamUsageOptions).toBe(want);
+    });
+  }
 });

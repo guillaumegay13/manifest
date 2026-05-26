@@ -123,6 +123,59 @@ export const PROVIDER_PROFILES: Record<string, ProviderProfile> = {
       },
     },
   },
+
+  // ── Plain OpenAI-compatible providers (bearer auth, /v1/chat/completions) ──
+  deepseek: {
+    id: 'deepseek',
+    endpointKey: 'deepseek',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
+    baseUrl: 'https://api.deepseek.com',
+    path: '/v1/chat/completions',
+    quirks: { streamUsageOptions: true },
+  },
+  groq: {
+    id: 'groq',
+    endpointKey: 'groq',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
+    baseUrl: 'https://api.groq.com/openai',
+    path: '/v1/chat/completions',
+    quirks: { streamUsageOptions: true },
+  },
+  mistral: {
+    id: 'mistral',
+    endpointKey: 'mistral',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
+    baseUrl: 'https://api.mistral.ai',
+    path: '/v1/chat/completions',
+    quirks: { streamUsageOptions: true },
+  },
+  moonshot: {
+    id: 'moonshot',
+    endpointKey: 'moonshot',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
+    baseUrl: 'https://api.moonshot.ai',
+    path: '/v1/chat/completions',
+    quirks: { streamUsageOptions: true },
+  },
+  // Kilo is the lone OpenAI-compatible provider NOT in SUPPORTS_USAGE_STREAM_OPTIONS.
+  kilo: {
+    id: 'kilo',
+    endpointKey: 'kilo',
+    transport: 'openai',
+    wireApi: 'chat_completions',
+    auth: { scheme: 'bearer' },
+    baseUrl: 'https://api.kilo.ai/api/gateway',
+    path: '/chat/completions',
+    quirks: { streamUsageOptions: false },
+  },
 };
 
 /**
