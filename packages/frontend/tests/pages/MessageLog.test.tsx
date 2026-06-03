@@ -212,11 +212,12 @@ describe("MessageLog", () => {
     const { container } = render(() => <MessageLog />);
     await vi.waitFor(() => {
       const selects = container.querySelectorAll('[data-testid="select"]');
-      expect(selects.length).toBeGreaterThanOrEqual(1);
+      // selects[0] = agent, selects[1] = provider, selects[2] = tier
+      expect(selects.length).toBeGreaterThanOrEqual(2);
     });
     const selects = container.querySelectorAll('[data-testid="select"]');
     mockGetMessages.mockResolvedValue({ items: [], next_cursor: null, total_count: 0, providers: ["openai"] });
-    await fireEvent.change(selects[0], { target: { value: "openai" } });
+    await fireEvent.change(selects[1], { target: { value: "anthropic" } });
     await vi.waitFor(() => {
       expect(container.textContent).toContain("No messages match your filters");
     });
@@ -257,14 +258,16 @@ describe("MessageLog", () => {
     mockGetMessages.mockResolvedValue(dataWithUnknown);
     const { container } = render(() => <MessageLog />);
     await vi.waitFor(() => {
-      const select = container.querySelector('[data-testid="select"]');
-      expect(select).not.toBeNull();
+      // selects[0] = agent filter, selects[1] = provider filter
+      const selects = container.querySelectorAll('[data-testid="select"]');
+      expect(selects.length).toBeGreaterThanOrEqual(2);
+      const select = selects[1] as HTMLSelectElement;
       // Known providers resolve to display names
-      expect(select!.textContent).toContain("Anthropic");
-      expect(select!.textContent).toContain("OpenAI");
+      expect(select.textContent).toContain("Anthropic");
+      expect(select.textContent).toContain("OpenAI");
       // Unknown providers fall back to the raw ID
-      expect(select!.textContent).toContain("unknown-provider");
-      expect(select!.textContent).toContain("All providers");
+      expect(select.textContent).toContain("unknown-provider");
+      expect(select.textContent).toContain("All providers");
     });
   });
 
@@ -500,12 +503,13 @@ describe("MessageLog", () => {
     const { container } = render(() => <MessageLog />);
     await vi.waitFor(() => {
       const selects = container.querySelectorAll('[data-testid="select"]');
-      expect(selects.length).toBeGreaterThanOrEqual(1);
+      // selects[0] = agent, selects[1] = provider, selects[2] = tier
+      expect(selects.length).toBeGreaterThanOrEqual(3);
     });
-    // Set a filter to trigger filtered empty state
+    // Set the provider filter (selects[1]) to trigger filtered empty state
     const selects = container.querySelectorAll('[data-testid="select"]');
     mockGetMessages.mockResolvedValue({ items: [], next_cursor: null, total_count: 0, providers: ["openai"] });
-    await fireEvent.change(selects[0], { target: { value: "openai" } });
+    await fireEvent.change(selects[1], { target: { value: "anthropic" } });
     await vi.waitFor(() => {
       expect(container.textContent).toContain("No messages match your filters");
     });
@@ -644,13 +648,14 @@ describe("MessageLog", () => {
       const { container } = render(() => <MessageLog />);
       await vi.waitFor(() => {
         const selects = container.querySelectorAll('[data-testid="select"]');
-        expect(selects.length).toBeGreaterThanOrEqual(1);
+        // selects[0] = agent, selects[1] = provider, selects[2] = tier
+        expect(selects.length).toBeGreaterThanOrEqual(3);
       });
 
-      // Set a filter
+      // Set the provider filter (selects[1]) to trigger filtered empty state
       const selects = container.querySelectorAll('[data-testid="select"]');
       mockGetMessages.mockResolvedValue({ items: [], next_cursor: null, total_count: 0, providers: ["openai"] });
-      await fireEvent.change(selects[0], { target: { value: "openai" } });
+      await fireEvent.change(selects[1], { target: { value: "anthropic" } });
 
       await vi.waitFor(() => {
         expect(container.textContent).toContain("No messages match your filters");
@@ -1169,11 +1174,11 @@ describe("MessageLog", () => {
       const { container } = render(() => <MessageLog />);
       await vi.waitFor(() => {
         const selects = container.querySelectorAll('[data-testid="select"]');
-        expect(selects.length).toBeGreaterThanOrEqual(2);
+        expect(selects.length).toBeGreaterThanOrEqual(3);
       });
       const selects = container.querySelectorAll('[data-testid="select"]');
-      // Second Select is the tier filter (first is providers).
-      const tierSelect = selects[1] as HTMLSelectElement;
+      // selects[0] = agent filter, selects[1] = provider filter, selects[2] = tier filter
+      const tierSelect = selects[2] as HTMLSelectElement;
       expect(tierSelect.textContent).toContain("All tiers");
       expect(tierSelect.textContent).toContain("Playground");
       expect(tierSelect.textContent).toContain("Simple");
@@ -1192,16 +1197,17 @@ describe("MessageLog", () => {
 
       const { container } = render(() => <MessageLog />);
       await vi.waitFor(() => {
+        // selects[0] = agent, selects[1] = provider, selects[2] = tier
         const tierSelect = container.querySelectorAll(
           '[data-testid="select"]',
-        )[1] as HTMLSelectElement;
+        )[2] as HTMLSelectElement;
         expect(tierSelect.textContent).toContain("Coding");
         expect(tierSelect.textContent).toContain("Premium");
       });
 
       const tierSelect = container.querySelectorAll(
         '[data-testid="select"]',
-      )[1] as HTMLSelectElement;
+      )[2] as HTMLSelectElement;
       expect(tierSelect.textContent).not.toContain("Trading");
       expect(tierSelect.textContent).toContain("Legacy");
       expect(tierSelect.textContent).not.toContain("Task:");
@@ -1212,13 +1218,14 @@ describe("MessageLog", () => {
       mockGetMessages.mockResolvedValue(messagesData);
       const { container } = render(() => <MessageLog />);
       await vi.waitFor(() => {
+        // selects[0] = agent, selects[1] = provider, selects[2] = tier
         expect(container.querySelectorAll('[data-testid="select"]').length).toBeGreaterThanOrEqual(
-          2,
+          3,
         );
       });
       const tierSelect = container.querySelectorAll(
         '[data-testid="select"]',
-      )[1] as HTMLSelectElement;
+      )[2] as HTMLSelectElement;
       mockGetMessages.mockClear();
       fireEvent.change(tierSelect, { target: { value: "playground" } });
       await vi.waitFor(() => {
@@ -1234,14 +1241,15 @@ describe("MessageLog", () => {
 
       const { container } = render(() => <MessageLog />);
       await vi.waitFor(() => {
+        // selects[0] = agent, selects[1] = provider, selects[2] = tier
         expect(container.querySelectorAll('[data-testid="select"]').length).toBeGreaterThanOrEqual(
-          2,
+          3,
         );
       });
 
       const tierSelect = container.querySelectorAll(
         '[data-testid="select"]',
-      )[1] as HTMLSelectElement;
+      )[2] as HTMLSelectElement;
       mockGetMessages.mockClear();
       fireEvent.change(tierSelect, { target: { value: "specificity:coding" } });
 
@@ -1259,14 +1267,15 @@ describe("MessageLog", () => {
 
       const { container } = render(() => <MessageLog />);
       await vi.waitFor(() => {
+        // selects[0] = agent, selects[1] = provider, selects[2] = tier
         expect(container.querySelectorAll('[data-testid="select"]').length).toBeGreaterThanOrEqual(
-          2,
+          3,
         );
       });
 
       const tierSelect = container.querySelectorAll(
         '[data-testid="select"]',
-      )[1] as HTMLSelectElement;
+      )[2] as HTMLSelectElement;
       mockGetMessages.mockClear();
       fireEvent.change(tierSelect, { target: { value: "header:ht-premium" } });
 

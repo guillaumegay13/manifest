@@ -486,6 +486,9 @@ const Routing: Component = () => {
               </span>
               Response mode: {defaultResponseMode() === 'stream' ? 'Stream' : 'Buffered'}
             </button>
+            <button class="btn btn--primary btn--sm" onClick={openProviderModal}>
+              Connect providers
+            </button>
           </div>
         </div>
       </Show>

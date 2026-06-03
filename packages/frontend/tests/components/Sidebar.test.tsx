@@ -132,9 +132,9 @@ describe("Sidebar AGENTS section", () => {
     mockAgentName = "test-agent";
   });
 
-  it("renders AGENTS section label", () => {
-    render(() => <Sidebar />);
-    expect(screen.getByText("AGENTS")).toBeDefined();
+  it("renders Agents link", () => {
+    const { container } = render(() => <Sidebar />);
+    expect(container.querySelector('a[href="/agents"]')).not.toBeNull();
   });
 
   it("has nav element with correct aria-label", () => {
@@ -169,9 +169,9 @@ describe("Sidebar workspace title", () => {
     mockPathname = "/overview";
   });
 
-  it("renders workspace title based on user name", () => {
+  it("renders Feedback section (workspace title removed in sidebar simplification)", () => {
     render(() => <Sidebar />);
-    expect(screen.getByText("Test's workspace")).toBeDefined();
+    expect(screen.getByText("Feedback")).toBeDefined();
   });
 });
 
@@ -246,29 +246,18 @@ describe("Sidebar agents collapse", () => {
     mockAgentName = "test-agent";
   });
 
-  it("shows collapse button for AGENTS section", () => {
+  it("renders Agents link when agent is active", () => {
     const { container } = render(() => <Sidebar />);
-    const caretBtn = container.querySelector("button.sidebar__section-caret");
-    expect(caretBtn).not.toBeNull();
+    expect(container.querySelector('a[href="/agents"]')).not.toBeNull();
   });
 
-  it("toggles agents list when caret is clicked", async () => {
-    const { container } = render(() => <Sidebar />);
-    const caretBtn = container.querySelector(
-      "button.sidebar__section-caret",
-    ) as HTMLButtonElement;
-
-    // Initially expanded
-    expect(caretBtn.getAttribute("aria-expanded")).toBe("true");
-
-    await fireEvent.click(caretBtn);
-
-    expect(caretBtn.getAttribute("aria-expanded")).toBe("false");
+  it("renders TOOLS section label", () => {
+    render(() => <Sidebar />);
+    expect(screen.getByText("TOOLS")).toBeDefined();
   });
 
-  it("shows add agent button", () => {
+  it("renders Playground link", () => {
     const { container } = render(() => <Sidebar />);
-    const addBtn = container.querySelector("button.sidebar__section-add");
-    expect(addBtn).not.toBeNull();
+    expect(container.querySelector('a[href="/playground"]')).not.toBeNull();
   });
 });

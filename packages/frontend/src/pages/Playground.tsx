@@ -464,7 +464,13 @@ const Playground: Component = () => {
             Send one prompt to multiple models and compare cost, speed, and quality.
           </p>
         </div>
-        {/* Agent resolved silently from user's first agent */}
+        <button
+          type="button"
+          class="btn btn--primary btn--sm"
+          onClick={() => setShowProviderModal(true)}
+        >
+          Connect providers
+        </button>
       </header>
 
       <Show when={!hasAgents() && agentList() !== undefined}>
