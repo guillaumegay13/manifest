@@ -18,15 +18,14 @@ const manifestVersion = (() => {
 export default defineConfig(({ command }) => ({
   define: {
     __MANIFEST_VERSION__: JSON.stringify(manifestVersion),
-    // Wingman and the orange "Dev" header badge are dev-only affordances.
-    // They ship only when Vite runs in dev mode (`vite serve`). Any
-    // production build — Docker self-hosted, Railway cloud, anything else
-    // — gets `__DEV_MODE__ = false`, so esbuild dead-code-eliminates the
-    // FAB, drawer, and badge.
+    // The Wingman drawer and the orange "Dev" header badge are dev-only
+    // affordances. They ship only when Vite runs in dev mode
+    // (`vite serve`). Any production build — Docker self-hosted, Railway
+    // cloud, anything else — gets `__DEV_MODE__ = false`, so esbuild
+    // dead-code-eliminates the FAB, drawer, and badge.
     __DEV_MODE__: JSON.stringify(command === 'serve'),
-    // Optional build-time override; otherwise the dashboard derives the URL
-    // at runtime from the current port (`port + 1`, or `:3002` when the Vite
-    // dev frontend is running on `:3000`).
+    // Optional build-time override for the Wingman drawer; otherwise it
+    // points at the hosted SPA at https://wingman.manifest.build.
     __WINGMAN_URL__: JSON.stringify(process.env.VITE_WINGMAN_URL || ''),
   },
   plugins: [
@@ -39,9 +38,19 @@ export default defineConfig(({ command }) => ({
   ],
   server: {
     port: 3000,
+    // Disable Vite's built-in CORS handler. Otherwise it short-circuits
+    // OPTIONS preflights for proxied paths (e.g. `/api`, `/v1`) and
+    // strips the backend's headers — including
+    // `Access-Control-Allow-Private-Network`, which Chrome's Private
+    // Network Access enforcement now requires when the hosted Wingman
+    // SPA (https://wingman.manifest.build) calls into a loopback dev
+    // backend. The dashboard itself is same-origin, so it doesn't need
+    // Vite's CORS at all.
+    cors: false,
     proxy: {
       '/api': `http://localhost:${process.env.VITE_BACKEND_PORT || '3001'}`,
       '/otlp': `http://localhost:${process.env.VITE_BACKEND_PORT || '3001'}`,
+      '/v1': `http://localhost:${process.env.VITE_BACKEND_PORT || '3001'}`,
     },
   },
   build: {
@@ -57,6 +66,18 @@ export default defineConfig(({ command }) => ({
           }
           if (id.includes('node_modules/better-auth')) {
             return 'auth';
+          }
+          // Syntax highlighting (highlight.js) is only pulled in by the
+          // recorded-message viewer. Pin it to a stable named chunk so it
+          // caches independently of the route chunks that lazy-load it.
+          if (id.includes('node_modules/highlight.js')) {
+            return 'syntax';
+          }
+          // Markdown rendering (marked + dompurify) is shared across the
+          // few surfaces that render model output. A dedicated chunk keeps
+          // its hash stable across route-chunk changes.
+          if (id.includes('node_modules/marked') || id.includes('node_modules/dompurify')) {
+            return 'markdown';
           }
         },
       },
@@ -79,7 +100,6 @@ export default defineConfig(({ command }) => ({
         'src/components/SingleTokenChart.tsx',
         'src/components/SavingsChart.tsx',
         'src/components/Sparkline.tsx',
-        'src/services/auth-client.ts',
       ],
     },
   },

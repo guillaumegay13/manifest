@@ -141,11 +141,21 @@ describe('HeaderTierService', () => {
       ).rejects.toThrow(/Header key is required/);
     });
 
-    it('rejects reserved header keys', async () => {
-      const reserved = [...RESERVED_HEADER_KEYS][0];
-      await expect(
-        svc.create('agent-1', 'user-1', null, validInput({ header_key: reserved })),
-      ).rejects.toThrow(/stripped for security/);
+    it('rejects all reserved header keys', async () => {
+      for (const key of RESERVED_HEADER_KEYS) {
+        await expect(
+          svc.create('agent-1', 'user-1', null, validInput({ header_key: key })),
+        ).rejects.toThrow(/stripped for security/);
+      }
+    });
+
+    it('rejects reserved header keys with mixed case and whitespace', async () => {
+      for (const key of RESERVED_HEADER_KEYS) {
+        const mutated = `  ${key.toUpperCase()}  `;
+        await expect(
+          svc.create('agent-1', 'user-1', null, validInput({ header_key: mutated })),
+        ).rejects.toThrow(/stripped for security/);
+      }
     });
 
     it('rejects empty header values', async () => {
@@ -281,6 +291,24 @@ describe('HeaderTierService', () => {
         /already matches/,
       );
     });
+
+    it('rejects reserved header keys when updating header_key field', async () => {
+      const row = {
+        id: 'h1',
+        agent_id: 'agent-1',
+        name: 'A',
+        header_key: 'x-tier',
+        header_value: 'v',
+      } as HeaderTier;
+      for (const key of RESERVED_HEADER_KEYS) {
+        repo.findOne.mockResolvedValue(row);
+        repo.find.mockResolvedValue([row]);
+        await expect(svc.update('agent-1', 'h1', { header_key: key })).rejects.toThrow(
+          /stripped for security/,
+        );
+      }
+      expect(repo.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('setEnabled', () => {
@@ -362,6 +390,28 @@ describe('HeaderTierService', () => {
       expect(result.override_route).toEqual(route('openai', 'api_key', 'gpt-4o'));
       expect(repo.save).toHaveBeenCalledWith(row);
       expect(routingCache.invalidateAgent).toHaveBeenCalledWith('agent-1');
+    });
+
+    it('persists keyLabel on explicit header-tier overrides', async () => {
+      const row = { id: 'h1', agent_id: 'agent-1', override_route: null } as HeaderTier;
+      repo.findOne.mockResolvedValue(row);
+
+      const result = await svc.setOverride(
+        'agent-1',
+        'h1',
+        'gpt-4o',
+        'openai',
+        'subscription',
+        'Personal',
+      );
+
+      expect(discoveryService.getModelsForAgent).not.toHaveBeenCalled();
+      expect(result.override_route).toEqual({
+        provider: 'openai',
+        authType: 'subscription',
+        model: 'gpt-4o',
+        keyLabel: 'Personal',
+      });
     });
 
     it('resolves via discovery when only the model is given', async () => {
@@ -508,9 +558,74 @@ describe('HeaderTierService', () => {
       expect(routingCache.invalidateAgent).toHaveBeenCalledWith('agent-1');
     });
 
+    it('rejects clearing the only stream-capable route while stream mode is active', async () => {
+      repo.findOne.mockResolvedValue({
+        id: 'h1',
+        name: 'Premium',
+        agent_id: 'agent-1',
+        override_route: route('custom:local', 'api_key', 'local-model'),
+        fallback_routes: [route('openai', 'api_key', 'gpt-4o')],
+        response_mode: 'stream',
+      } as HeaderTier);
+
+      await expect(svc.clearFallbacks('agent-1', 'h1')).rejects.toThrow(
+        /add at least one stream-capable model/,
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
     it('throws NotFound when row missing', async () => {
       repo.findOne.mockResolvedValue(null);
       await expect(svc.clearFallbacks('agent-1', 'h1')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('stream response mode enforcement', () => {
+    it('rejects stream mode when the custom tier has no primary route', async () => {
+      repo.findOne.mockResolvedValue({
+        id: 'h1',
+        name: 'Premium',
+        agent_id: 'agent-1',
+        override_route: null,
+        fallback_routes: null,
+      } as HeaderTier);
+
+      await expect(svc.setResponseMode('agent-1', 'h1', 'stream')).rejects.toThrow(
+        /add at least one stream-capable model/,
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('allows stream mode when only the custom tier primary is stream-capable', async () => {
+      const existing = {
+        id: 'h1',
+        name: 'Premium',
+        agent_id: 'agent-1',
+        override_route: route('openai', 'api_key', 'gpt-4o'),
+        fallback_routes: [route('custom:local', 'api_key', 'local-model')],
+      } as HeaderTier;
+      repo.findOne.mockResolvedValue(existing);
+
+      const result = await svc.setResponseMode('agent-1', 'h1', 'stream');
+
+      expect(result.response_mode).toBe('stream');
+      expect(repo.save).toHaveBeenCalledWith(existing);
+    });
+
+    it('rejects assigning a non-stream model while custom tier stream mode is active with no stream fallback', async () => {
+      repo.findOne.mockResolvedValue({
+        id: 'h1',
+        name: 'Premium',
+        agent_id: 'agent-1',
+        override_route: route('openai', 'api_key', 'gpt-4o'),
+        fallback_routes: null,
+        response_mode: 'stream',
+      } as HeaderTier);
+
+      await expect(
+        svc.setOverride('agent-1', 'h1', 'local-model', 'custom:local', 'api_key'),
+      ).rejects.toThrow(/add at least one stream-capable model/);
+      expect(repo.save).not.toHaveBeenCalled();
     });
   });
 });

@@ -32,6 +32,8 @@ interface GeminiFunctionResponse {
 
 interface GeminiPart {
   text?: string;
+  inlineData?: { mimeType: string; data: string };
+  fileData?: { fileUri: string };
   functionCall?: GeminiFunctionCall;
   functionResponse?: GeminiFunctionResponse;
   // Google attaches thoughtSignature at the Part level (sibling of functionCall),
@@ -39,6 +41,8 @@ interface GeminiPart {
   // that don't round-trip this field.
   thoughtSignature?: string;
 }
+
+const DATA_IMAGE_URL_RE = /^data:([^;,]+)(?:;[^,]*)?;base64,(.*)$/is;
 
 /**
  * JSON Schema fields not supported by the Gemini API.
@@ -73,6 +77,8 @@ const UNSUPPORTED_SCHEMA_FIELDS = new Set([
   'default',
   'const',
   'title',
+  'exclusiveMinimum',
+  'exclusiveMaximum',
 ]);
 
 function sanitizeSchema(schema: unknown, isPropertiesMap = false): unknown {
@@ -103,12 +109,40 @@ function safeParseArgs(args: string | undefined): Record<string, unknown> {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+}
+
 /* ── Request conversion ── */
 
 function mapRole(role: string): string {
   if (role === 'assistant') return 'model';
   if (role === 'system') return 'user'; // Gemini treats system as user
   return 'user';
+}
+
+function extractImageUrl(imageUrl: unknown): string | null {
+  if (typeof imageUrl === 'string') return imageUrl;
+  if (!isRecord(imageUrl) || typeof imageUrl.url !== 'string') return null;
+  return imageUrl.url;
+}
+
+function imageUrlToGooglePart(imageUrl: unknown): GeminiPart | null {
+  const url = extractImageUrl(imageUrl);
+  if (!url) return null;
+
+  const dataUrl = DATA_IMAGE_URL_RE.exec(url);
+  if (dataUrl) {
+    const mimeType = dataUrl[1] || 'image/png';
+    if (!mimeType.toLowerCase().startsWith('image/')) return null;
+    return { inlineData: { mimeType, data: dataUrl[2] } };
+  }
+
+  return { fileData: { fileUri: url } };
 }
 
 /**
@@ -141,8 +175,14 @@ function messageToContent(
     parts.push({ text: msg.content });
   } else if (Array.isArray(msg.content)) {
     for (const block of msg.content as Array<Record<string, unknown>>) {
-      if (block.type === 'text' && typeof block.text === 'string') {
+      if (
+        typeof block.text === 'string' &&
+        (block.type === 'text' || block.type === 'input_text' || block.type === 'output_text')
+      ) {
         parts.push({ text: block.text });
+      } else if (block.type === 'image_url' || block.type === 'input_image') {
+        const imagePart = imageUrlToGooglePart(block.image_url);
+        if (imagePart) parts.push(imagePart);
       }
     }
   }
@@ -249,8 +289,9 @@ export function toGoogleRequest(
   const tools = convertTools(body.tools as Record<string, unknown>[] | undefined);
   if (tools) result.tools = tools;
 
-  // Map generation config
-  const genConfig: Record<string, unknown> = {};
+  const genConfig: Record<string, unknown> = isRecord(body.generationConfig)
+    ? cloneRecord(body.generationConfig)
+    : {};
   if (body.max_tokens !== undefined) genConfig.maxOutputTokens = body.max_tokens;
   if (body.temperature !== undefined) genConfig.temperature = body.temperature;
   if (body.top_p !== undefined) genConfig.topP = body.top_p;

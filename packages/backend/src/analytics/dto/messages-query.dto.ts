@@ -1,5 +1,11 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsIn, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  ALL_TIERS,
+  SPECIFICITY_CATEGORIES,
+  type MessageTier,
+  type SpecificityCategory,
+} from 'manifest-shared';
 
 export const MESSAGE_STATUS_FILTER_VALUES = [
   'ok',
@@ -31,6 +37,7 @@ export class MessagesQueryDto {
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
   @Max(999999)
   @Type(() => Number)
   cost_max?: number;
@@ -55,4 +62,25 @@ export class MessagesQueryDto {
     message: `status must be one of: ${MESSAGE_STATUS_FILTER_VALUES.join(', ')}`,
   })
   status?: MessageStatusFilter;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  recorded?: boolean;
+
+  @IsOptional()
+  @IsIn(ALL_TIERS, {
+    message: `routing_tier must be one of: ${ALL_TIERS.join(', ')}`,
+  })
+  routing_tier?: MessageTier;
+
+  @IsOptional()
+  @IsIn(SPECIFICITY_CATEGORIES, {
+    message: `specificity_category must be one of: ${SPECIFICITY_CATEGORIES.join(', ')}`,
+  })
+  specificity_category?: SpecificityCategory;
+
+  @IsOptional()
+  @IsString()
+  header_tier_id?: string;
 }

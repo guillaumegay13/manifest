@@ -1,6 +1,6 @@
-import { HttpException } from '@nestjs/common';
+import { HttpException, HttpStatus } from '@nestjs/common';
 import { AnthropicOauthController } from './anthropic-oauth.controller';
-import { AnthropicOauthService } from './anthropic-oauth.service';
+import { AnthropicOauthExchangeError, AnthropicOauthService } from './anthropic-oauth.service';
 import { ResolveAgentService } from '../../routing-core/resolve-agent.service';
 import { ProviderService } from '../../routing-core/provider.service';
 
@@ -16,7 +16,7 @@ function build() {
     resolve: jest.fn().mockResolvedValue({ id: 'agent-1' }),
   } as unknown as ResolveAgentService;
   const providerService = {
-    removeProvider: jest.fn().mockResolvedValue(undefined),
+    removeProvider: jest.fn().mockResolvedValue({ notifications: [] }),
   } as unknown as ProviderService;
   return {
     ctrl: new AnthropicOauthController(oauth, resolveAgent, providerService),
@@ -62,7 +62,7 @@ describe('AnthropicOauthController', () => {
       await expect(ctrl.exchange('agent', 'auth-code', 'state-1', user)).resolves.toEqual({
         ok: true,
       });
-      expect(oauth.exchangeCode).toHaveBeenCalledWith('auth-code', 'state-1');
+      expect(oauth.exchangeCode).toHaveBeenCalledWith('auth-code', 'state-1', 'agent-1', 'user-1');
     });
 
     it('wraps service errors in a 400', async () => {
@@ -71,6 +71,21 @@ describe('AnthropicOauthController', () => {
       await expect(ctrl.exchange('agent', 'code', 'state', user)).rejects.toBeInstanceOf(
         HttpException,
       );
+    });
+
+    it('preserves rate-limit status from service errors', async () => {
+      const { ctrl, oauth } = build();
+      (oauth.exchangeCode as jest.Mock).mockRejectedValue(
+        new AnthropicOauthExchangeError('Anthropic rate-limited the OAuth token exchange.', 429),
+      );
+
+      try {
+        await ctrl.exchange('agent', 'code', 'state', user);
+        throw new Error('Expected exchange to fail');
+      } catch (err) {
+        expect(err).toBeInstanceOf(HttpException);
+        expect((err as HttpException).getStatus()).toBe(HttpStatus.TOO_MANY_REQUESTS);
+      }
     });
 
     it('wraps non-Error throws with a generic message', async () => {
@@ -90,14 +105,14 @@ describe('AnthropicOauthController', () => {
 
     it('returns the active state when one exists', async () => {
       const { ctrl, oauth } = build();
-      (oauth.findPendingForAgent as jest.Mock).mockReturnValue({ state: 'abc' });
+      (oauth.findPendingForAgent as jest.Mock).mockResolvedValue({ state: 'abc' });
       await expect(ctrl.pending('agent', user)).resolves.toEqual({ state: 'abc' });
-      expect(oauth.findPendingForAgent).toHaveBeenCalledWith('agent-1');
+      expect(oauth.findPendingForAgent).toHaveBeenCalledWith('agent-1', 'user-1');
     });
 
     it('returns {state: null} when no flow is pending', async () => {
       const { ctrl, oauth } = build();
-      (oauth.findPendingForAgent as jest.Mock).mockReturnValue(null);
+      (oauth.findPendingForAgent as jest.Mock).mockResolvedValue(null);
       await expect(ctrl.pending('agent', user)).resolves.toEqual({ state: null });
     });
   });
@@ -105,17 +120,45 @@ describe('AnthropicOauthController', () => {
   describe('revoke', () => {
     it('rejects missing agentName', async () => {
       const { ctrl } = build();
-      await expect(ctrl.revoke('', user)).rejects.toBeInstanceOf(HttpException);
+      await expect(ctrl.revoke('', undefined, user)).rejects.toBeInstanceOf(HttpException);
     });
 
-    it('removes the subscription provider record for the agent', async () => {
+    it('removes all Anthropic subscription records for the agent', async () => {
       const { ctrl, providerService } = build();
-      await expect(ctrl.revoke('agent', user)).resolves.toEqual({ ok: true });
+      await expect(ctrl.revoke('agent', undefined, user)).resolves.toEqual({
+        ok: true,
+        notifications: [],
+      });
       expect(providerService.removeProvider).toHaveBeenCalledWith(
         'agent-1',
         'anthropic',
         'subscription',
+        undefined,
       );
+    });
+
+    it('removes only the labeled Anthropic subscription record', async () => {
+      const { ctrl, providerService } = build();
+      await expect(ctrl.revoke('agent', 'Key 2', user)).resolves.toEqual({
+        ok: true,
+        notifications: [],
+      });
+      expect(providerService.removeProvider).toHaveBeenCalledWith(
+        'agent-1',
+        'anthropic',
+        'subscription',
+        'Key 2',
+      );
+    });
+
+    it('rejects repeated label query parameters', async () => {
+      const { ctrl, resolveAgent, providerService } = build();
+      await expect(ctrl.revoke('agent', ['Key 1', 'Key 2'], user)).rejects.toMatchObject({
+        message: 'label query parameter must be a string',
+        status: 400,
+      });
+      expect(resolveAgent.resolve).not.toHaveBeenCalled();
+      expect(providerService.removeProvider).not.toHaveBeenCalled();
     });
   });
 });

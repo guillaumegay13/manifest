@@ -1,3 +1,4 @@
+import { resolveProviderMetadataIdentity } from 'manifest-shared';
 import { PROVIDERS, type ProviderDef } from './providers.js';
 
 export function getProvider(id: string): ProviderDef | undefined {
@@ -32,6 +33,14 @@ export function validateApiKey(
 
 const SUBSCRIPTION_PREFIXES: Record<string, string> = {
   anthropic: 'sk-ant-oat',
+  minimax: 'sk-cp-',
+  qwen: 'sk-sp-',
+  xiaomi: 'tp-',
+};
+
+const SUBSCRIPTION_MIN_LENGTHS: Record<string, number> = {
+  qwen: 30,
+  xiaomi: 10,
 };
 
 /** Prefixes that identify API keys — reject these in subscription mode. */
@@ -45,12 +54,6 @@ export function validateSubscriptionKey(
 ): { valid: boolean; error?: string } {
   const trimmed = key.replace(/\s/g, '');
   if (!trimmed) return { valid: false, error: 'Token is required' };
-  if (trimmed.length < 10) {
-    return {
-      valid: false,
-      error: 'Token is too short (minimum 10 characters)',
-    };
-  }
   const prefix = SUBSCRIPTION_PREFIXES[provider.id];
   if (prefix && !trimmed.startsWith(prefix)) {
     return {
@@ -65,12 +68,37 @@ export function validateSubscriptionKey(
       error: 'This looks like an API key. Use the API Key tab instead.',
     };
   }
+  // Providers that expose a paste-token alternative alongside an OAuth flow
+  // (currently MiniMax) bring their full API-key length envelope with them —
+  // a real `sk-cp-` token is ~100 chars, not 11. Enforce that here so the
+  // backend doesn't persist obviously truncated values. Other subscription
+  // providers (Anthropic setup-token, OpenAI ChatGPT JWT) stay on the generic
+  // 10-char floor since their tokens can be legitimately shorter.
+  const minLength =
+    SUBSCRIPTION_MIN_LENGTHS[provider.id] ??
+    (provider.subscriptionTokenAlternative && provider.minKeyLength > 10
+      ? provider.minKeyLength
+      : 10);
+  if (trimmed.length < minLength) {
+    return {
+      valid: false,
+      error: `Token is too short (minimum ${minLength} characters)`,
+    };
+  }
   return { valid: true };
 }
 
 /** Format a model slug into a human-readable label. */
 function formatModelSlug(slug: string): string {
   return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function dotPrefixedModel(modelValue: string): { providerId: string; bare: string } | null {
+  const resolved = resolveProviderMetadataIdentity('bedrock', modelValue);
+  if (!resolved.provider || resolved.provider === 'bedrock' || resolved.model === modelValue) {
+    return null;
+  }
+  return { providerId: resolved.provider, bare: resolved.model };
 }
 
 export function getModelLabel(providerId: string, modelValue: string): string {
@@ -98,6 +126,17 @@ export function getModelLabel(providerId: string, modelValue: string): string {
       if (found) return found.label;
     }
     return formatModelSlug(bare);
+  }
+  if (prov.id === 'bedrock') {
+    // Bedrock/Mantle model IDs are routable AWS IDs like
+    // "us.anthropic.claude-sonnet-4.6"; display the underlying model label.
+    const dotPrefixed = dotPrefixedModel(modelValue);
+    if (dotPrefixed) {
+      const dotProvider = getProvider(dotPrefixed.providerId);
+      const found = dotProvider?.models.find((m) => m.value === dotPrefixed.bare);
+      if (found) return found.label;
+      return formatModelSlug(dotPrefixed.bare);
+    }
   }
   // Fallback: format the model slug as a readable label
   return formatModelSlug(modelValue);

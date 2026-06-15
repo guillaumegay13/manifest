@@ -5,6 +5,8 @@ import { ProxyMessageDedup } from '../proxy-message-dedup';
 import { IngestEventBusService } from '../../../common/services/ingest-event-bus.service';
 import { ThoughtSignatureCache } from '../thought-signature-cache';
 import { ThinkingBlockCache } from '../thinking-block-cache';
+import { ReasoningContentCache } from '../reasoning-content-cache';
+import { ResponsesSseError } from '../chatgpt-adapter';
 
 /**
  * Flush enough microtasks for the recorder's fire-and-forget chain to
@@ -154,6 +156,11 @@ describe('ProxyController', () => {
       { getTiers: jest.fn().mockResolvedValue([]) } as never,
       { getAssignments: jest.fn().mockResolvedValue([]) } as never,
       { list: jest.fn().mockResolvedValue([]) } as never,
+      {
+        getCostPerRequest: jest.fn().mockReturnValue(null),
+        resolveCostPerRequest: jest.fn().mockResolvedValue(null),
+      } as never,
+      { save: jest.fn() } as never,
     );
     controller = new ProxyController(
       proxyService as never,
@@ -162,11 +169,30 @@ describe('ProxyController', () => {
       recorder,
       new ThoughtSignatureCache(),
       new ThinkingBlockCache(),
+      new ReasoningContentCache(),
+      { isRecording: jest.fn().mockResolvedValue(false), invalidate: jest.fn() } as never,
     );
   });
 
   afterEach(() => {
     recorder.onModuleDestroy();
+  });
+
+  it('should expose /v1/models with the Manifest auto route', () => {
+    expect(controller.models()).toEqual({
+      object: 'list',
+      data: [
+        {
+          id: 'auto',
+          object: 'model',
+          type: 'model',
+          display_name: 'Manifest Auto',
+        },
+      ],
+      has_more: false,
+      first_id: 'auto',
+      last_id: 'auto',
+    });
   });
 
   it('should return JSON response for non-streaming OpenAI provider', async () => {
@@ -822,6 +848,36 @@ describe('ProxyController', () => {
         }),
       }),
     );
+  });
+
+  it('should surface collected Responses SSE failures as upstream errors', async () => {
+    proxyService.proxyRequest.mockRejectedValue(
+      new ResponsesSseError(
+        'Model unavailable',
+        404,
+        JSON.stringify({
+          error: {
+            message: 'Model unavailable',
+            code: 'model_not_found',
+            type: 'invalid_request_error',
+          },
+        }),
+      ),
+    );
+
+    const req = mockRequest({ messages: [{ role: 'user', content: 'test' }] });
+    const { res } = mockResponse();
+
+    await controller.chatCompletions(req as never, res as never);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({
+      error: {
+        message: 'Model unavailable',
+        type: 'upstream_error',
+        status: 404,
+      },
+    });
   });
 
   it('should forward HttpException as friendly chat message', async () => {
@@ -1907,6 +1963,11 @@ describe('ProxyController', () => {
         { getTiers: jest.fn().mockResolvedValue([]) } as never,
         { getAssignments: jest.fn().mockResolvedValue([]) } as never,
         { list: jest.fn().mockResolvedValue([]) } as never,
+        {
+          getCostPerRequest: jest.fn().mockReturnValue(null),
+          resolveCostPerRequest: jest.fn().mockResolvedValue(null),
+        } as never,
+        { save: jest.fn() } as never,
       );
 
       const cooldownMap = (timedRecorder as any).rateLimitCooldown as Map<string, number>;
@@ -1942,6 +2003,11 @@ describe('ProxyController', () => {
         { getTiers: jest.fn().mockResolvedValue([]) } as never,
         { getAssignments: jest.fn().mockResolvedValue([]) } as never,
         { list: jest.fn().mockResolvedValue([]) } as never,
+        {
+          getCostPerRequest: jest.fn().mockReturnValue(null),
+          resolveCostPerRequest: jest.fn().mockResolvedValue(null),
+        } as never,
+        { save: jest.fn() } as never,
       );
 
       timedRecorder.onModuleDestroy();
@@ -2070,8 +2136,8 @@ describe('ProxyController', () => {
 
     it('should transform Anthropic streaming through createAnthropicStreamTransformer', async () => {
       const mockProviderResp = createMockStreamResponse([
-        'event: message_start\n{"type":"message_start","message":{"usage":{"input_tokens":10}}}\n\n',
-        'event: content_block_delta\n{"type":"content_block_delta","delta":{"type":"text_delta","text":"hi"}}\n\n',
+        'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":10}}}\n\n',
+        'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hi"}}\n\n',
       ]);
 
       proxyService.proxyRequest.mockResolvedValue({

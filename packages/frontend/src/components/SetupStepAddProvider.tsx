@@ -10,14 +10,7 @@ import CodexSetup from './CodexSetup.jsx';
 import type { ToolkitId } from '../services/framework-snippets.js';
 
 type SetupTab = 'toolkits' | 'agents';
-type AgentId =
-  | 'openclaw'
-  | 'hermes'
-  | 'nanobot'
-  | 'craft'
-  | 'claude-code'
-  | 'opencode'
-  | 'codex';
+type AgentId = 'openclaw' | 'hermes' | 'nanobot' | 'craft' | 'claude-code' | 'opencode' | 'codex';
 
 interface Props {
   apiKey: string | null;

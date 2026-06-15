@@ -1,10 +1,8 @@
 import {
   chatCompletionsResponseToMessages,
   createMessagesStreamTransformer,
-  extractAnthropicServerTools,
   messagesToChatCompletionsRequest,
 } from '../anthropic-messages-adapter';
-import { toAnthropicRequest } from '../anthropic-adapter';
 
 describe('Anthropic Messages adapter', () => {
   describe('messagesToChatCompletionsRequest', () => {
@@ -232,7 +230,11 @@ describe('Anthropic Messages adapter', () => {
       expect(ignoredNamed.tool_choice).toBeUndefined();
     });
 
-    it('stashes Anthropic server tools and still exposes them to the scorer (issue #1886)', () => {
+    it('exposes Anthropic server tools to the scorer by function.name (issue #1886)', () => {
+      // chatBody is only consumed by the routing/scoring layer in messages
+      // mode — the wire body goes through applyAnthropicMessagesMutations
+      // direct from the inbound body, so server-tool `type` tags are
+      // preserved upstream. Scoring just needs tool count + function.name.
       const result = messagesToChatCompletionsRequest({
         messages: [{ role: 'user', content: 'x' }],
         tools: [
@@ -255,14 +257,6 @@ describe('Anthropic Messages adapter', () => {
         'my_custom',
         'explicit_custom',
       ]);
-
-      // Originals are stashed so toAnthropicRequest can re-emit them with the
-      // `type` tag intact.
-      expect(result._anthropicServerTools).toEqual([
-        { type: 'web_search_20250305', name: 'web_search' },
-        { type: 'bash_20250124', name: 'bash' },
-        { type: 'mcp_toolset', name: 'mcp' },
-      ]);
     });
 
     it('treats unknown non-custom tool types as custom tools with a safe empty schema (issue #1897)', () => {
@@ -271,7 +265,6 @@ describe('Anthropic Messages adapter', () => {
         tools: [{ type: 'advisor_20260301', name: 'advisor', description: 'Plan the task' }],
       });
 
-      expect(result._anthropicServerTools).toBeUndefined();
       expect(result.tools).toEqual([
         {
           type: 'function',
@@ -282,26 +275,6 @@ describe('Anthropic Messages adapter', () => {
           },
         },
       ]);
-    });
-
-    it('round-trips unknown typed tools back to Anthropic as custom tools (issue #1897)', () => {
-      const chatBody = messagesToChatCompletionsRequest({
-        messages: [{ role: 'user', content: 'x' }],
-        tools: [
-          { type: 'web_search_20250305', name: 'web_search' },
-          { type: 'advisor_20260301', name: 'advisor' },
-        ],
-      });
-
-      const anthropicBody = toAnthropicRequest(chatBody, 'claude-sonnet-4-20250514');
-      const tools = anthropicBody.tools as Array<Record<string, unknown>>;
-
-      expect(tools[0]).toMatchObject({ type: 'web_search_20250305', name: 'web_search' });
-      expect(tools[1]).toEqual({
-        name: 'advisor',
-        input_schema: { type: 'object', properties: {}, additionalProperties: false },
-        cache_control: { type: 'ephemeral' },
-      });
     });
 
     it('adds missing array items in Anthropic tool schemas before OpenAI forwarding', () => {
@@ -342,14 +315,6 @@ describe('Anthropic Messages adapter', () => {
         },
       });
       expect(inputSchema.properties.codebase_context.anyOf[2]).toEqual({ type: 'array' });
-    });
-
-    it('omits the stash when no server tools are present', () => {
-      const result = messagesToChatCompletionsRequest({
-        messages: [{ role: 'user', content: 'x' }],
-        tools: [{ name: 'plain', input_schema: { type: 'object' } }],
-      });
-      expect(result._anthropicServerTools).toBeUndefined();
     });
 
     it('forwards Anthropic-native thinking and top_k onto chatBody', () => {
@@ -451,32 +416,6 @@ describe('Anthropic Messages adapter', () => {
         messages: ['nope', null, { role: 'user', content: 'ok' }],
       } as Record<string, unknown>);
       expect(result.messages).toEqual([{ role: 'user', content: 'ok' }]);
-    });
-  });
-
-  describe('extractAnthropicServerTools', () => {
-    it('returns tools whose type matches a known Anthropic server-tool prefix', () => {
-      expect(
-        extractAnthropicServerTools([
-          { type: 'web_search_20250305', name: 'web_search' },
-          { type: 'custom', name: 'c1' },
-          { type: 'advisor_20260301', name: 'advisor' },
-          { type: 'mcp_toolset', name: 'mcp' },
-          { type: 'mcp_toolset_future', name: 'future_mcp' },
-          { name: 'c2' },
-          { type: 'text_editor_20250728', name: 'str_replace_editor' },
-          'not-a-record',
-        ]),
-      ).toEqual([
-        { type: 'web_search_20250305', name: 'web_search' },
-        { type: 'mcp_toolset', name: 'mcp' },
-        { type: 'text_editor_20250728', name: 'str_replace_editor' },
-      ]);
-    });
-
-    it('returns an empty array when no server tools are present', () => {
-      expect(extractAnthropicServerTools([{ type: 'custom', name: 'c' }])).toEqual([]);
-      expect(extractAnthropicServerTools([])).toEqual([]);
     });
   });
 
@@ -606,6 +545,44 @@ describe('Anthropic Messages adapter', () => {
         cache_read_input_tokens: 0,
       });
     });
+
+    it('skips nullish text/tool blocks without dropping valid sibling blocks', () => {
+      // Defensive: an upstream provider could send a content array where some
+      // blocks have `text: null` or a tool_call where `id`/`function.arguments`
+      // are null. These must not cause valid sibling blocks to be lost or the
+      // converter to crash.
+      const result = chatCompletionsResponseToMessages(
+        {
+          choices: [
+            {
+              message: {
+                content: [
+                  { type: 'text', text: null },
+                  { type: 'text', text: 'real text' },
+                ],
+                tool_calls: [
+                  { id: null, function: { name: 'tn', arguments: null } },
+                  { id: 'tc_ok', function: { name: 'ok', arguments: '{"a":1}' } },
+                ],
+              },
+              finish_reason: 'tool_calls',
+            },
+          ],
+        },
+        'fallback',
+      );
+
+      // text block: null text contributes nothing; "real text" survives.
+      expect(result.content).toEqual([
+        { type: 'text', text: 'real text' },
+        // tool_call with null id gets a synthesized toolu_* id; null arguments
+        // resolve via safeParseJson(undefined) → {} (no crash).
+        expect.objectContaining({ type: 'tool_use', name: 'tn', input: {} }),
+        { type: 'tool_use', id: 'tc_ok', name: 'ok', input: { a: 1 } },
+      ]);
+      const synthesized = (result.content as Array<Record<string, unknown>>)[1];
+      expect(synthesized.id).toMatch(/^toolu_[0-9a-f]{32}$/);
+    });
   });
 
   describe('createMessagesStreamTransformer', () => {
@@ -664,6 +641,48 @@ describe('Anthropic Messages adapter', () => {
       });
     });
 
+    it('surfaces upstream error chunks as a terminal Anthropic error event (issue #2212)', () => {
+      const t = createMessagesStreamTransformer('gpt-5');
+      const sse = flushChunks(t, [
+        'data: {"error":{"message":"Too many requests","type":"upstream_error","status":429,"code":"rate_limit_exceeded"}}\n\ndata: [DONE]\n\n',
+      ]);
+
+      expect(sse).toBe(
+        'event: error\ndata: {"type":"error","error":{"type":"rate_limit_error","message":"Too many requests"}}\n\n',
+      );
+      // No fabricated message_start / message_delta / message_stop around the error.
+      expect(sse).not.toContain('message_start');
+      expect(sse).not.toContain('message_stop');
+    });
+
+    it('ignores later stream payloads after a terminal error event', () => {
+      const t = createMessagesStreamTransformer('gpt-5');
+      const sse = flushChunks(t, [
+        'data: {"error":{"message":"Too many requests","status":429}}\n\ndata: {"choices":[{"delta":{"content":"same chunk"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"later chunk"}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+      ]);
+
+      expect(sse).toBe(
+        'event: error\ndata: {"type":"error","error":{"type":"rate_limit_error","message":"Too many requests"}}\n\n',
+      );
+    });
+
+    it('emits an error event mid-stream and suppresses the fabricated end_turn close', () => {
+      const t = createMessagesStreamTransformer('gpt-5');
+      const sse = flushChunks(t, [
+        'data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n',
+        'data: {"error":{}}\n\ndata: [DONE]\n\n',
+      ]);
+
+      expect(sse).toContain('event: message_start');
+      expect(sse).toContain(
+        'event: error\ndata: {"type":"error","error":{"type":"api_error","message":"Upstream provider stream failed"}}',
+      );
+      expect(sse).not.toContain('"stop_reason":"end_turn"');
+      expect(sse).not.toContain('message_stop');
+    });
+
     it('emits tool_use content_block_start and input_json_delta for tool calls', () => {
       const t = createMessagesStreamTransformer('claude-sonnet-4');
       const sse = flushChunks(t, [
@@ -679,6 +698,327 @@ describe('Anthropic Messages adapter', () => {
         'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"q"}}',
       );
       expect(sse).toContain('"stop_reason":"tool_use"');
+    });
+
+    it('translates DeepSeek-style delta.reasoning_content into a leading thinking block', () => {
+      // Without this, Claude clients lose the reasoning trace and the next turn
+      // gets rejected by DeepSeek: "The `reasoning_content` in the thinking
+      // mode must be passed back to the API."
+      const t = createMessagesStreamTransformer('deepseek-v4-flash');
+      const sse = flushChunks(t, [
+        'data: {"choices":[{"delta":{"reasoning_content":"Let me think "}}]}\n\n',
+        'data: {"choices":[{"delta":{"reasoning_content":"step by step."}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"42"}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+      ]);
+
+      const events = sse
+        .split('\n\n')
+        .filter(Boolean)
+        .map((block) => {
+          const [eventLine, dataLine] = block.split('\n');
+          return {
+            event: eventLine!.replace('event: ', ''),
+            data: JSON.parse(dataLine!.replace('data: ', '')),
+          };
+        });
+
+      expect(events.map((e) => e.event)).toEqual([
+        'message_start',
+        'content_block_start',
+        'content_block_delta',
+        'content_block_delta',
+        'content_block_stop',
+        'content_block_start',
+        'content_block_delta',
+        'content_block_stop',
+        'message_delta',
+        'message_stop',
+      ]);
+      expect(events[1].data).toEqual({
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'thinking', thinking: '' },
+      });
+      expect(events[2].data.delta).toEqual({ type: 'thinking_delta', thinking: 'Let me think ' });
+      expect(events[3].data.delta).toEqual({ type: 'thinking_delta', thinking: 'step by step.' });
+      expect(events[4].data).toEqual({ type: 'content_block_stop', index: 0 });
+      expect(events[5].data).toEqual({
+        type: 'content_block_start',
+        index: 1,
+        content_block: { type: 'text', text: '' },
+      });
+      expect(events[6].data.delta).toEqual({ type: 'text_delta', text: '42' });
+    });
+
+    it('closes the thinking block on finalize when the stream emits only reasoning_content', () => {
+      const t = createMessagesStreamTransformer('deepseek-v4-flash');
+      const sse = flushChunks(t, [
+        'data: {"choices":[{"delta":{"reasoning_content":"hmm"}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+      ]);
+      expect(sse).toContain(
+        'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}',
+      );
+      expect(sse).toContain('"delta":{"type":"thinking_delta","thinking":"hmm"}');
+      expect(sse).toContain(
+        'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}',
+      );
+    });
+
+    it('closes the thinking block before opening a tool_use block', () => {
+      const t = createMessagesStreamTransformer('deepseek-v4-flash');
+      const sse = flushChunks(t, [
+        'data: {"choices":[{"delta":{"reasoning_content":"plan"}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"tc_1","function":{"name":"search","arguments":"{}"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n',
+      ]);
+      const order = sse.match(/event: (\w+)/g)!.map((s) => s.replace('event: ', ''));
+      // thinking block must be stopped before the tool_use block starts
+      const thinkingStopAt = order.findIndex(
+        (_, i) =>
+          order[i] === 'content_block_stop' &&
+          // first stop in the stream corresponds to the thinking block
+          order.slice(0, i).filter((e) => e === 'content_block_stop').length === 0,
+      );
+      const toolStartAt = order.findIndex(
+        (e, i) =>
+          e === 'content_block_start' &&
+          order.slice(0, i).filter((x) => x === 'content_block_start').length === 1,
+      );
+      expect(thinkingStopAt).toBeGreaterThan(-1);
+      expect(toolStartAt).toBeGreaterThan(thinkingStopAt);
+      expect(sse).toContain('"content_block":{"type":"tool_use"');
+      expect(sse).toContain('"index":1'); // tool_use gets index 1, after thinking@0
+    });
+
+    it('reopens a fresh thinking block when reasoning_content arrives after text content', () => {
+      // Real providers don't always flush reasoning_content before content —
+      // a late reasoning chunk after text would previously emit a thinking_delta
+      // against an already-stopped block (Anthropic SSE spec violation).
+      const t = createMessagesStreamTransformer('deepseek-v4-flash');
+      const sse = flushChunks(t, [
+        'data: {"choices":[{"delta":{"reasoning_content":"first thought"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n',
+        'data: {"choices":[{"delta":{"reasoning_content":"afterthought"}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+      ]);
+
+      const events = sse
+        .split('\n\n')
+        .filter(Boolean)
+        .map((block) => {
+          const [eventLine, dataLine] = block.split('\n');
+          return {
+            event: eventLine!.replace('event: ', ''),
+            data: JSON.parse(dataLine!.replace('data: ', '')),
+          };
+        });
+
+      expect(events.map((e) => e.event)).toEqual([
+        'message_start',
+        'content_block_start', // thinking@0
+        'content_block_delta', // thinking_delta "first thought"
+        'content_block_stop', // thinking@0 closed by content
+        'content_block_start', // text@1
+        'content_block_delta', // text_delta "answer"
+        'content_block_stop', // text@1 closed by late reasoning
+        'content_block_start', // thinking@2 (reopen at fresh index)
+        'content_block_delta', // thinking_delta "afterthought"
+        'content_block_stop', // thinking@2 closed on finalize
+        'message_delta',
+        'message_stop',
+      ]);
+      // First thinking block is at index 0
+      expect(events[1].data).toMatchObject({ index: 0, content_block: { type: 'thinking' } });
+      expect(events[2].data).toMatchObject({
+        index: 0,
+        delta: { type: 'thinking_delta', thinking: 'first thought' },
+      });
+      expect(events[3].data).toEqual({ type: 'content_block_stop', index: 0 });
+      // Text takes index 1
+      expect(events[4].data).toMatchObject({ index: 1, content_block: { type: 'text' } });
+      expect(events[6].data).toEqual({ type: 'content_block_stop', index: 1 });
+      // Reopened thinking block must use a fresh index (2), not collide with 0
+      expect(events[7].data).toMatchObject({ index: 2, content_block: { type: 'thinking' } });
+      expect(events[8].data).toMatchObject({
+        index: 2,
+        delta: { type: 'thinking_delta', thinking: 'afterthought' },
+      });
+      expect(events[9].data).toEqual({ type: 'content_block_stop', index: 2 });
+    });
+
+    it('reopens a fresh text block when content arrives after late reasoning_content', () => {
+      // Symmetric case: content first, then a reasoning interlude, then more
+      // content. The second content chunk must open a new text block at a
+      // fresh index rather than emit deltas against the closed text@0.
+      const t = createMessagesStreamTransformer('deepseek-v4-flash');
+      const sse = flushChunks(t, [
+        'data: {"choices":[{"delta":{"content":"hello "}}]}\n\n',
+        'data: {"choices":[{"delta":{"reasoning_content":"second-guess"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"world"}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+      ]);
+
+      const events = sse
+        .split('\n\n')
+        .filter(Boolean)
+        .map((block) => {
+          const [eventLine, dataLine] = block.split('\n');
+          return {
+            event: eventLine!.replace('event: ', ''),
+            data: JSON.parse(dataLine!.replace('data: ', '')),
+          };
+        });
+
+      // text@0, thinking@1, text@2
+      expect(events[1].data).toMatchObject({ index: 0, content_block: { type: 'text' } });
+      expect(events[2].data).toMatchObject({
+        index: 0,
+        delta: { type: 'text_delta', text: 'hello ' },
+      });
+      expect(events[3].data).toEqual({ type: 'content_block_stop', index: 0 });
+      expect(events[4].data).toMatchObject({ index: 1, content_block: { type: 'thinking' } });
+      expect(events[5].data).toMatchObject({
+        index: 1,
+        delta: { type: 'thinking_delta', thinking: 'second-guess' },
+      });
+      expect(events[6].data).toEqual({ type: 'content_block_stop', index: 1 });
+      expect(events[7].data).toMatchObject({ index: 2, content_block: { type: 'text' } });
+      expect(events[8].data).toMatchObject({
+        index: 2,
+        delta: { type: 'text_delta', text: 'world' },
+      });
+      expect(events[9].data).toEqual({ type: 'content_block_stop', index: 2 });
+    });
+
+    it('drops reasoning_content arriving during an open tool_use to keep the tool_use block contiguous', () => {
+      // Manifest's Anthropic-compat layer assumes thinking blocks precede
+      // tool_use and replays them in that shape on the next turn. Emitting a
+      // post-tool thinking block would give clients a transcript shape
+      // (`thinking → tool_use → thinking`) we cannot safely replay, so late
+      // reasoning_content arriving while a tool_use is in-progress is dropped
+      // silently. The pre-tool thinking block and the tool_use itself stay
+      // intact.
+      const t = createMessagesStreamTransformer('deepseek-v4-flash');
+      const sse = flushChunks(t, [
+        'data: {"choices":[{"delta":{"reasoning_content":"plan A"}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"tc_1","function":{"name":"search","arguments":"{\\"q\\":1}"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"reasoning_content":"plan B"}}]}\n\n',
+        'data: {"choices":[{"delta":{"reasoning_content":" continued"}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+      ]);
+
+      const events = sse
+        .split('\n\n')
+        .filter(Boolean)
+        .map((block) => {
+          const [eventLine, dataLine] = block.split('\n');
+          return {
+            event: eventLine!.replace('event: ', ''),
+            data: JSON.parse(dataLine!.replace('data: ', '')),
+          };
+        });
+
+      expect(events.map((e) => e.event)).toEqual([
+        'message_start',
+        'content_block_start', // thinking@0
+        'content_block_delta', // thinking_delta "plan A"
+        'content_block_stop', // thinking@0 closed by tool_use
+        'content_block_start', // tool_use@1
+        'content_block_delta', // input_json_delta — "plan B" / " continued" dropped while open
+        'content_block_stop', // tool_use@1 closed on finalize
+        'message_delta',
+        'message_stop',
+      ]);
+      expect(events[4].data).toMatchObject({ index: 1, content_block: { type: 'tool_use' } });
+      expect(events[6].data).toEqual({ type: 'content_block_stop', index: 1 });
+      // No thinking block ever opens after tool_use@1.
+      const postToolThinking = events.find(
+        (e, i) =>
+          e.event === 'content_block_start' &&
+          i > 6 &&
+          (e.data.content_block as { type?: string })?.type === 'thinking',
+      );
+      expect(postToolThinking).toBeUndefined();
+    });
+
+    it('keeps a fragmented tool_call on a single tool_use block while dropping interleaved reasoning_content', () => {
+      // Regression for the #1907 review: late reasoning_content used to close
+      // the in-progress tool_use, then the next arg chunk for the same `index`
+      // re-emitted `content_block_start` against the already-stopped index,
+      // breaking monotonicity. Per the reviewer's follow-up, we now keep the
+      // tool_use contiguous AND drop the interleaved reasoning entirely
+      // rather than flushing a post-tool thinking block — emitting
+      // `thinking → tool_use → thinking` would produce an Anthropic-shaped
+      // transcript we cannot safely replay on the next turn.
+      const t = createMessagesStreamTransformer('deepseek-v4-flash');
+      const sse = flushChunks(t, [
+        'data: {"choices":[{"delta":{"reasoning_content":"plan"}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"tc_1","function":{"name":"search","arguments":"{\\"q\\":"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"reasoning_content":"late"}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"1}"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n',
+      ]);
+
+      const events = sse
+        .split('\n\n')
+        .filter(Boolean)
+        .map((block) => {
+          const [eventLine, dataLine] = block.split('\n');
+          return {
+            event: eventLine!.replace('event: ', ''),
+            data: JSON.parse(dataLine!.replace('data: ', '')),
+          };
+        });
+
+      expect(events.map((e) => e.event)).toEqual([
+        'message_start',
+        'content_block_start', // thinking@0
+        'content_block_delta', // thinking_delta "plan"
+        'content_block_stop', // thinking@0 stopped before tool_use opens
+        'content_block_start', // tool_use@1
+        'content_block_delta', // input_json_delta "{\"q\":"
+        'content_block_delta', // input_json_delta "1}" — same block, no reopen at @1
+        'content_block_stop', // tool_use@1 stopped on finalize
+        'message_delta',
+        'message_stop',
+      ]);
+
+      // tool_use stays at index 1 across both arg chunks.
+      expect(events[4].data).toMatchObject({
+        index: 1,
+        content_block: { type: 'tool_use', id: 'tc_1', name: 'search' },
+      });
+      expect(events[5].data).toMatchObject({
+        index: 1,
+        delta: { type: 'input_json_delta', partial_json: '{"q":' },
+      });
+      expect(events[6].data).toMatchObject({
+        index: 1,
+        delta: { type: 'input_json_delta', partial_json: '1}' },
+      });
+      expect(events[7].data).toEqual({ type: 'content_block_stop', index: 1 });
+
+      // Indices are strictly monotonic — no reuse of a stopped block index —
+      // and "late" reasoning never produces a third thinking block.
+      const blockIndices = events
+        .filter((e) => e.event === 'content_block_start')
+        .map((e) => e.data.index);
+      expect(blockIndices).toEqual([0, 1]);
+
+      // The dropped "late" reasoning is not surfaced as any thinking_delta.
+      const lateLeak = events.find(
+        (e) =>
+          e.event === 'content_block_delta' &&
+          (e.data.delta as { type?: string; thinking?: string })?.type === 'thinking_delta' &&
+          (e.data.delta as { thinking?: string })?.thinking?.includes('late'),
+      );
+      expect(lateLeak).toBeUndefined();
+
+      // stop_reason still propagates from the upstream finish_reason.
+      const messageDelta = events.find((e) => e.event === 'message_delta');
+      expect(messageDelta?.data.delta.stop_reason).toBe('tool_use');
     });
 
     it('finalize is idempotent — second call returns null', () => {
@@ -741,6 +1081,91 @@ describe('Anthropic Messages adapter', () => {
       const out = t.transform('{"choices":[{"delta":{"content":"raw"}}]}');
       expect(out).toContain('event: message_start');
       expect(out).toContain('"text":"raw"');
+    });
+
+    it('treats sequential zero-length deltas as no-ops and only opens a block on the first real content', () => {
+      // Realistic heartbeat / status pattern: providers can send several deltas
+      // with empty `reasoning_content`/`content` strings before any real text
+      // arrives. Empty deltas must not open blocks, consume block indices, or
+      // otherwise mutate state — so when "hello" finally lands, it opens
+      // text@0 (not text@2 or higher) and the stream stays valid.
+      const t = createMessagesStreamTransformer('m');
+      const sse = flushChunks(t, [
+        'data: {"choices":[{"delta":{"reasoning_content":""}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":""}}]}\n\n',
+        'data: {"choices":[{"delta":{"reasoning_content":""}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"hello"}}]}\n\n',
+        'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+      ]);
+
+      const events = sse
+        .split('\n\n')
+        .filter(Boolean)
+        .map((block) => {
+          const [eventLine, dataLine] = block.split('\n');
+          return {
+            event: eventLine!.replace('event: ', ''),
+            data: JSON.parse(dataLine!.replace('data: ', '')),
+          };
+        });
+
+      // No thinking block was ever opened (all reasoning_content was empty),
+      // and exactly one text block opens at the first non-empty content.
+      expect(events.map((e) => e.event)).toEqual([
+        'message_start',
+        'content_block_start',
+        'content_block_delta',
+        'content_block_stop',
+        'message_delta',
+        'message_stop',
+      ]);
+      expect(events[1].data).toEqual({
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'text', text: '' },
+      });
+      expect(events[2].data).toEqual({
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: 'hello' },
+      });
+    });
+
+    it('finalize closes an incomplete tool_use block opened mid-stream', () => {
+      // The stream opens a tool_use and emits a partial input_json_delta, then
+      // the upstream cuts off (no finish_reason, no second arg chunk, no usage).
+      // finalize() must emit the matching content_block_stop for the open
+      // tool_use plus the terminal message_delta / message_stop so clients
+      // don't hang on an orphan content_block_start.
+      const t = createMessagesStreamTransformer('m');
+      const opened = t.transform(
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"tc_partial","function":{"name":"search","arguments":"{\\"arg\\""}}]}}]}\n\n',
+      );
+      expect(opened).toContain('"content_block":{"type":"tool_use"');
+      expect(opened).toContain('"partial_json":"{\\"arg\\""');
+
+      const tail = t.finalize();
+      expect(tail).not.toBeNull();
+      const events = tail!
+        .split('\n\n')
+        .filter(Boolean)
+        .map((block) => {
+          const [eventLine, dataLine] = block.split('\n');
+          return {
+            event: eventLine!.replace('event: ', ''),
+            data: JSON.parse(dataLine!.replace('data: ', '')),
+          };
+        });
+
+      expect(events.map((e) => e.event)).toEqual([
+        'content_block_stop',
+        'message_delta',
+        'message_stop',
+      ]);
+      // Stop must reference the tool_use's index (0, the first/only block).
+      expect(events[0].data).toEqual({ type: 'content_block_stop', index: 0 });
+      // No finish_reason was ever seen, so stop_reason defaults to end_turn.
+      expect(events[1].data.delta.stop_reason).toBe('end_turn');
     });
   });
 });

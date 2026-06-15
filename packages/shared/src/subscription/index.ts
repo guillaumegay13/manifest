@@ -4,5 +4,7 @@ export {
   getSubscriptionProviderConfig,
   supportsSubscriptionProvider,
   getSubscriptionKnownModels,
+  getSubscriptionKnownModelsMatch,
+  getSubscriptionExcludedModels,
   getSubscriptionCapabilities,
 } from './helpers';

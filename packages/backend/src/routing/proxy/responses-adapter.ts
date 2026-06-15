@@ -216,7 +216,7 @@ function normalizeNativeResponsesInput(input: unknown): unknown {
 
   return input.map((item) => {
     if (!isRecord(item)) return item;
-    if (item.type === 'function_call' || item.type === 'function_call_output') return item;
+    if (!isNativeResponsesMessageItem(item)) return item;
 
     const role = typeof item.role === 'string' ? item.role : 'user';
     return { ...item, content: toNativeResponsesContent(item.content, role) };
@@ -233,13 +233,16 @@ function toNativeResponsesInput(input: unknown): unknown {
     if (typeof item === 'string') {
       return [{ role: 'user', content: [{ type: 'input_text', text: item }] }];
     }
-    if (!isRecord(item) || item.type === 'function_call' || item.type === 'function_call_output') {
-      return isRecord(item) ? [item] : [];
-    }
+    if (!isRecord(item)) return [];
+    if (!isNativeResponsesMessageItem(item)) return [item];
 
     const role = typeof item.role === 'string' ? item.role : 'user';
     return [{ ...item, role, content: toNativeResponsesContent(item.content, role) }];
   });
+}
+
+function isNativeResponsesMessageItem(item: JsonRecord): boolean {
+  return item.type === undefined || item.type === 'message';
 }
 
 function toNativeResponsesContent(content: unknown, role: string): unknown {
@@ -516,24 +519,11 @@ function safeParse(data: string): JsonRecord | null {
   }
 }
 
-export interface ChatToResponsesTransformer {
-  /** Convert one upstream chat-completions SSE event into a (possibly multi-event) Responses SSE payload. */
-  transform(chatChunk: string): string | null;
-  /** Emit the closing lifecycle events that codex requires before treating the stream as complete. */
-  finalize(): string | null;
+export interface ResponsesStreamTransformer {
+  transform: (chunk: string) => string | null;
+  finalize: () => string | null;
 }
 
-/**
- * Strict OpenAI Responses-API SSE encoder used when the calling agent's
- * platform is `codex`. Codex (Rust) refuses streams that skip the lifecycle
- * envelope — `response.created` / `output_item.added` / `output_item.done` /
- * `response.completed` with a populated `output[]`. This factory accumulates
- * chat-completions deltas, owns the response/message identifiers, and emits
- * the full event sequence so the codex client treats the stream as complete.
- *
- * Other agent platforms keep the legacy delta-only encoder
- * (`chatCompletionStreamChunkToResponses`) for backwards compatibility.
- */
 interface ToolCallState {
   output_index: number;
   item_id: string;
@@ -544,42 +534,80 @@ interface ToolCallState {
   done: boolean;
 }
 
-export function createStrictChatToResponsesTransformer(model: string): ChatToResponsesTransformer {
-  const responseId = `resp_${randomUUID().replace(/-/g, '')}`;
-  const messageId = `msg_${randomUUID().replace(/-/g, '')}`;
-  const createdAt = Math.floor(Date.now() / 1000);
-  let started = false;
-  let itemOpened = false;
-  let textOutputIndex: number | null = null;
-  let finalized = false;
-  let accumulatedText = '';
-  let lastUsage: unknown = null;
-  let upstreamModel: string = model;
-  // chat/completions streams a tool call as multiple deltas keyed by
-  // tool_calls[*].index. We accumulate per-index state and re-emit the
-  // Responses-API function-call lifecycle so codex can dispatch the tool.
-  const toolCalls = new Map<number, ToolCallState>();
-  let nextOutputIndex = 0;
-  // OpenAI's Responses streaming protocol stamps every event with a
-  // monotonically increasing sequence_number (zero-indexed). The Python SDK
-  // declares it as a required field on every ResponseStreamEvent variant,
-  // so strict pydantic consumers reject any event that omits it.
-  let sequenceNumber = 0;
+interface ResponsesStreamState {
+  responseId: string;
+  messageId: string;
+  model: string;
+  createdAt: number;
+  usage: unknown;
+  text: string;
+  createdEmitted: boolean;
+  itemOpened: boolean;
+  completed: boolean;
+  textOutputIndex: number | null;
+  nextOutputIndex: number;
+  sequenceNumber: number;
+  toolCalls: Map<number, ToolCallState>;
+}
 
-  const buildResponseEnvelope = (
-    status: 'in_progress' | 'completed',
-    output: JsonRecord[],
-  ): JsonRecord => ({
-    id: responseId,
+/**
+ * Converts an upstream Chat Completions SSE stream into a spec-compliant
+ * OpenAI Responses API event stream.
+ *
+ * Unlike a per-chunk mapper, this is stateful: the Responses API requires a
+ * message item or function-call item to be *opened*
+ * (`response.output_item.added`) before any deltas, and *closed*
+ * (`...done` / `response.completed`) before `[DONE]`. Strict clients
+ * (Pi/OpenClaw/Codex-style) reject or drop streams that skip those lifecycle
+ * events or omit required fields like `sequence_number`, `response_id`,
+ * function-call `name`, and item `status`.
+ *
+ * `transform` runs per upstream event; `finalize` closes the stream and emits
+ * the terminal `data: [DONE]`. When a `finalize` is supplied, `pipeStream`
+ * delegates termination to it (it does not add its own `[DONE]`).
+ */
+export function createResponsesStreamTransformer(model: string): ResponsesStreamTransformer {
+  const state: ResponsesStreamState = {
+    responseId: `resp_${randomUUID().replace(/-/g, '')}`,
+    messageId: `msg_${randomUUID().replace(/-/g, '')}`,
+    model,
+    // Stamp the creation time once so every response snapshot for this id
+    // (`response.created`, `.in_progress`, `.completed`) reports the same
+    // `created_at`, even on streams that span more than one second.
+    createdAt: Math.floor(Date.now() / 1000),
+    usage: undefined,
+    text: '',
+    createdEmitted: false,
+    itemOpened: false,
+    completed: false,
+    textOutputIndex: null,
+    nextOutputIndex: 0,
+    sequenceNumber: 0,
+    toolCalls: new Map(),
+  };
+
+  return {
+    transform: (chunk: string) => transformResponsesStreamChunk(chunk, state),
+    finalize: () => finalizeResponsesStream(state),
+  };
+}
+
+function responseEnvelope(
+  state: ResponsesStreamState,
+  status: 'in_progress' | 'completed',
+  output: JsonRecord[],
+): JsonRecord {
+  return {
+    id: state.responseId,
     object: 'response',
-    created_at: createdAt,
+    created_at: state.createdAt,
     status,
-    ...(status === 'completed' ? { completed_at: Math.floor(Date.now() / 1000) } : {}),
+    completed_at: status === 'completed' ? Math.floor(Date.now() / 1000) : null,
     error: null,
     incomplete_details: null,
     instructions: null,
     max_output_tokens: null,
-    model: upstreamModel,
+    model: state.model,
     output,
     parallel_tool_calls: true,
     previous_response_id: null,
@@ -591,408 +619,310 @@ export function createStrictChatToResponsesTransformer(model: string): ChatToRes
     tools: [],
     top_p: null,
     truncation: 'disabled',
-    usage: status === 'completed' ? toResponsesUsage(lastUsage) : null,
+    usage: status === 'completed' ? toResponsesUsage(state.usage) : null,
     user: null,
     metadata: {},
-  });
+  };
+}
 
-  const messageItem = (text: string, status: 'in_progress' | 'completed'): JsonRecord => ({
-    id: messageId,
+function messageItem(
+  state: ResponsesStreamState,
+  text: string,
+  status: 'in_progress' | 'completed',
+): JsonRecord {
+  return {
+    id: state.messageId,
     type: 'message',
     status,
     role: 'assistant',
     content: text ? [{ type: 'output_text', text, annotations: [] }] : [],
-  });
-
-  // Wrap formatResponsesEvent so every event auto-stamps sequence_number.
-  // Keeping the counter inside the transformer closure (instead of inside
-  // each call site) means we cannot accidentally skip or double-stamp.
-  const emit = (event: string, data: JsonRecord): string =>
-    formatResponsesEvent(event, { ...data, sequence_number: sequenceNumber++ });
-
-  return {
-    transform(chatChunk: string): string | null {
-      const payloads = extractDataPayloads(chatChunk);
-      const events: string[] = [];
-
-      const ensureStarted = () => {
-        if (started) return;
-        started = true;
-        events.push(
-          emit('response.created', {
-            type: 'response.created',
-            response: buildResponseEnvelope('in_progress', []),
-          }),
-          emit('response.in_progress', {
-            type: 'response.in_progress',
-            response: buildResponseEnvelope('in_progress', []),
-          }),
-        );
-      };
-
-      const ensureItemOpened = () => {
-        ensureStarted();
-        if (itemOpened) return;
-        itemOpened = true;
-        textOutputIndex = nextOutputIndex++;
-        events.push(
-          emit('response.output_item.added', {
-            type: 'response.output_item.added',
-            response_id: responseId,
-            output_index: textOutputIndex,
-            item: messageItem('', 'in_progress'),
-          }),
-          emit('response.content_part.added', {
-            type: 'response.content_part.added',
-            response_id: responseId,
-            item_id: messageId,
-            output_index: textOutputIndex,
-            content_index: 0,
-            part: { type: 'output_text', text: '', annotations: [] },
-          }),
-        );
-      };
-
-      for (const payload of payloads) {
-        if (payload === '[DONE]') continue;
-        const data = safeParse(payload);
-        if (!data) continue;
-
-        if (typeof data.model === 'string') upstreamModel = data.model;
-        if (isRecord(data.usage)) lastUsage = data.usage;
-
-        const choices = Array.isArray(data.choices) ? data.choices : [];
-        if (choices.length === 0) continue;
-
-        const choice = isRecord(choices[0]) ? choices[0] : null;
-        const delta = isRecord(choice?.delta) ? choice.delta : {};
-
-        if (typeof delta.content === 'string' && delta.content.length > 0) {
-          ensureItemOpened();
-          accumulatedText += delta.content;
-          events.push(
-            emit('response.output_text.delta', {
-              type: 'response.output_text.delta',
-              response_id: responseId,
-              item_id: messageId,
-              output_index: textOutputIndex ?? 0,
-              content_index: 0,
-              delta: delta.content,
-              logprobs: [],
-            }),
-          );
-        }
-
-        if (Array.isArray(delta.tool_calls)) {
-          for (const tc of delta.tool_calls) {
-            if (!isRecord(tc)) continue;
-            // chat/completions keys tool call streaming by `index` (the slot
-            // within tool_calls[]); id/name typically only appear on the first
-            // delta. Allocate per-slot state lazily.
-            const slot = typeof tc.index === 'number' ? tc.index : toolCalls.size;
-            let state = toolCalls.get(slot);
-            const fn = isRecord(tc.function) ? tc.function : {};
-            if (!state) {
-              ensureStarted();
-              state = {
-                output_index: nextOutputIndex++,
-                item_id: `fc_${randomUUID().replace(/-/g, '')}`,
-                call_id: typeof tc.id === 'string' ? tc.id : '',
-                name: typeof fn.name === 'string' ? fn.name : '',
-                args: '',
-                added: false,
-                done: false,
-              };
-              toolCalls.set(slot, state);
-            } else {
-              if (!state.call_id && typeof tc.id === 'string') state.call_id = tc.id;
-              if (!state.name && typeof fn.name === 'string') state.name = fn.name;
-            }
-
-            // Defer `response.output_item.added` until we have both call_id
-            // and name. Some providers split the initial header across two
-            // deltas (id first, then name) — codex requires both fields on
-            // the `added` event or it rejects the stream.
-            if (!state.added && state.call_id && state.name) {
-              state.added = true;
-              events.push(
-                emit('response.output_item.added', {
-                  type: 'response.output_item.added',
-                  response_id: responseId,
-                  output_index: state.output_index,
-                  item: {
-                    type: 'function_call',
-                    id: state.item_id,
-                    call_id: state.call_id,
-                    name: state.name,
-                    arguments: '',
-                    status: 'in_progress',
-                  },
-                }),
-              );
-              // Replay any argument fragments that arrived while the header
-              // was incomplete. Coalesced into a single delta so the SDK
-              // observes the same byte stream regardless of whether args led
-              // or trailed the id/name in the upstream chat-completions
-              // deltas.
-              if (state.args.length > 0) {
-                events.push(
-                  emit('response.function_call_arguments.delta', {
-                    type: 'response.function_call_arguments.delta',
-                    response_id: responseId,
-                    item_id: state.item_id,
-                    output_index: state.output_index,
-                    delta: state.args,
-                  }),
-                );
-              }
-            }
-
-            if (typeof fn.arguments === 'string' && fn.arguments.length > 0) {
-              state.args += fn.arguments;
-              if (state.added) {
-                events.push(
-                  emit('response.function_call_arguments.delta', {
-                    type: 'response.function_call_arguments.delta',
-                    response_id: responseId,
-                    item_id: state.item_id,
-                    output_index: state.output_index,
-                    delta: fn.arguments,
-                  }),
-                );
-              }
-              // If header is still incomplete, args are accumulated in
-              // state.args above and will be replayed once `added` fires.
-            }
-          }
-        }
-        // finish_reason is intentionally ignored here — terminal events are
-        // emitted by finalize() once the upstream stream actually closes,
-        // so usage chunks that arrive after finish_reason still get folded
-        // into the final response.completed envelope.
-      }
-
-      return events.length > 0 ? events.join('') : null;
-    },
-
-    finalize(): string | null {
-      if (finalized) return null;
-      finalized = true;
-
-      const events: string[] = [];
-
-      if (!started) {
-        events.push(
-          emit('response.created', {
-            type: 'response.created',
-            response: buildResponseEnvelope('in_progress', []),
-          }),
-          emit('response.in_progress', {
-            type: 'response.in_progress',
-            response: buildResponseEnvelope('in_progress', []),
-          }),
-          emit('response.completed', {
-            type: 'response.completed',
-            response: buildResponseEnvelope('completed', []),
-          }),
-        );
-        return events.join('');
-      }
-
-      if (itemOpened) {
-        const textIdx = textOutputIndex ?? 0;
-        events.push(
-          emit('response.output_text.done', {
-            type: 'response.output_text.done',
-            response_id: responseId,
-            item_id: messageId,
-            output_index: textIdx,
-            content_index: 0,
-            text: accumulatedText,
-            logprobs: [],
-          }),
-          emit('response.content_part.done', {
-            type: 'response.content_part.done',
-            response_id: responseId,
-            item_id: messageId,
-            output_index: textIdx,
-            content_index: 0,
-            part: { type: 'output_text', text: accumulatedText, annotations: [] },
-          }),
-          emit('response.output_item.done', {
-            type: 'response.output_item.done',
-            response_id: responseId,
-            output_index: textIdx,
-            item: messageItem(accumulatedText, 'completed'),
-          }),
-        );
-      }
-
-      // Close out every accumulated function_call. Even if the header never
-      // completed (no name/call_id), surface what we have so codex can fail
-      // loudly rather than silently dropping the call.
-      for (const state of [...toolCalls.values()].sort((a, b) => a.output_index - b.output_index)) {
-        const finalCallId = state.call_id || state.item_id;
-        const finalName = state.name || 'unknown';
-        if (!state.added) {
-          // Header was never complete — synthesize a best-effort placeholder
-          // so the lifecycle stays well-formed.
-          state.added = true;
-          events.push(
-            emit('response.output_item.added', {
-              type: 'response.output_item.added',
-              response_id: responseId,
-              output_index: state.output_index,
-              item: {
-                type: 'function_call',
-                id: state.item_id,
-                call_id: finalCallId,
-                name: finalName,
-                arguments: '',
-                status: 'in_progress',
-              },
-            }),
-          );
-          if (state.args) {
-            events.push(
-              emit('response.function_call_arguments.delta', {
-                type: 'response.function_call_arguments.delta',
-                response_id: responseId,
-                item_id: state.item_id,
-                output_index: state.output_index,
-                delta: state.args,
-              }),
-            );
-          }
-        }
-        if (!state.done) {
-          state.done = true;
-          const finalItem = {
-            type: 'function_call',
-            id: state.item_id,
-            call_id: finalCallId,
-            name: finalName,
-            arguments: state.args,
-            status: 'completed',
-          };
-          events.push(
-            // OpenAI's Responses stream sends both the top-level `arguments`
-            // string and the final `item` payload on the done event. SDK
-            // consumers that only read one of the two shapes still get the
-            // complete function-call back.
-            emit('response.function_call_arguments.done', {
-              type: 'response.function_call_arguments.done',
-              response_id: responseId,
-              item_id: state.item_id,
-              output_index: state.output_index,
-              name: finalName,
-              arguments: state.args,
-              item: finalItem,
-            }),
-            emit('response.output_item.done', {
-              type: 'response.output_item.done',
-              response_id: responseId,
-              output_index: state.output_index,
-              item: finalItem,
-            }),
-          );
-        }
-      }
-
-      const ordered: { idx: number; item: JsonRecord }[] = [];
-      if (accumulatedText) {
-        ordered.push({
-          idx: textOutputIndex ?? 0,
-          item: messageItem(accumulatedText, 'completed'),
-        });
-      }
-      for (const state of toolCalls.values()) {
-        ordered.push({
-          idx: state.output_index,
-          item: {
-            type: 'function_call',
-            id: state.item_id,
-            call_id: state.call_id || state.item_id,
-            name: state.name || 'unknown',
-            arguments: state.args,
-            status: 'completed',
-          },
-        });
-      }
-      ordered.sort((a, b) => a.idx - b.idx);
-      const finalOutput = ordered.map((entry) => entry.item);
-
-      events.push(
-        emit('response.completed', {
-          type: 'response.completed',
-          response: buildResponseEnvelope('completed', finalOutput),
-        }),
-      );
-
-      return events.join('');
-    },
   };
 }
 
-export function chatCompletionStreamChunkToResponses(chunk: string): string | null {
-  const payloads = extractDataPayloads(chunk);
+function emitResponsesEvent(state: ResponsesStreamState, event: string, data: JsonRecord): string {
+  return formatResponsesEvent(event, { ...data, sequence_number: state.sequenceNumber++ });
+}
+
+function emitCreated(state: ResponsesStreamState): string[] {
+  if (state.createdEmitted) return [];
+  state.createdEmitted = true;
+  const response = responseEnvelope(state, 'in_progress', []);
+  return [
+    emitResponsesEvent(state, 'response.created', { type: 'response.created', response }),
+    emitResponsesEvent(state, 'response.in_progress', { type: 'response.in_progress', response }),
+  ];
+}
+
+function emitItemOpen(state: ResponsesStreamState): string[] {
+  if (state.itemOpened) return [];
+  state.itemOpened = true;
+  state.textOutputIndex = state.nextOutputIndex++;
+  const outputIndex = state.textOutputIndex;
+  return [
+    emitResponsesEvent(state, 'response.output_item.added', {
+      type: 'response.output_item.added',
+      response_id: state.responseId,
+      output_index: outputIndex,
+      item: messageItem(state, '', 'in_progress'),
+    }),
+    emitResponsesEvent(state, 'response.content_part.added', {
+      type: 'response.content_part.added',
+      response_id: state.responseId,
+      item_id: state.messageId,
+      output_index: outputIndex,
+      content_index: 0,
+      part: { type: 'output_text', text: '', annotations: [] },
+    }),
+  ];
+}
+
+function maybeEmitToolCallAdded(state: ResponsesStreamState, toolCall: ToolCallState): string[] {
+  if (toolCall.added || !toolCall.call_id || !toolCall.name) return [];
+  toolCall.added = true;
+  const events = [
+    emitResponsesEvent(state, 'response.output_item.added', {
+      type: 'response.output_item.added',
+      response_id: state.responseId,
+      output_index: toolCall.output_index,
+      item: {
+        type: 'function_call',
+        id: toolCall.item_id,
+        call_id: toolCall.call_id,
+        name: toolCall.name,
+        arguments: '',
+        status: 'in_progress',
+      },
+    }),
+  ];
+  if (toolCall.args.length > 0) {
+    events.push(
+      emitResponsesEvent(state, 'response.function_call_arguments.delta', {
+        type: 'response.function_call_arguments.delta',
+        response_id: state.responseId,
+        item_id: toolCall.item_id,
+        output_index: toolCall.output_index,
+        delta: toolCall.args,
+      }),
+    );
+  }
+  return events;
+}
+
+function transformResponsesStreamChunk(chunk: string, state: ResponsesStreamState): string | null {
   const events: string[] = [];
 
-  for (const payload of payloads) {
+  for (const payload of extractDataPayloads(chunk)) {
     if (payload === '[DONE]') continue;
     const data = safeParse(payload);
     if (!data) continue;
-    const choices = Array.isArray(data.choices) ? data.choices : [];
-    if (choices.length === 0 && isRecord(data.usage)) {
-      events.push(
-        formatResponsesEvent('response.completed', {
-          type: 'response.completed',
-          response: fromChatCompletionResponse(
-            {
-              model: typeof data.model === 'string' ? data.model : undefined,
-              usage: data.usage,
-              choices: [{ message: { content: '' } }],
-            },
-            typeof data.model === 'string' ? data.model : 'unknown',
-          ),
-        }),
-      );
-      continue;
-    }
 
+    if (typeof data.model === 'string') state.model = data.model;
+    if (isRecord(data.usage)) state.usage = data.usage;
+
+    events.push(...emitCreated(state));
+
+    const choices = Array.isArray(data.choices) ? data.choices : [];
     const choice = isRecord(choices[0]) ? choices[0] : null;
     const delta = isRecord(choice?.delta) ? choice.delta : {};
 
     if (typeof delta.content === 'string' && delta.content.length > 0) {
+      events.push(...emitItemOpen(state));
+      state.text += delta.content;
       events.push(
-        formatResponsesEvent('response.output_text.delta', {
+        emitResponsesEvent(state, 'response.output_text.delta', {
           type: 'response.output_text.delta',
-          item_id: 'msg_0',
-          output_index: 0,
+          response_id: state.responseId,
+          item_id: state.messageId,
+          output_index: state.textOutputIndex ?? 0,
           content_index: 0,
           delta: delta.content,
+          logprobs: [],
         }),
       );
     }
 
-    if (choice?.finish_reason) {
+    if (Array.isArray(delta.tool_calls)) {
+      for (const rawToolCall of delta.tool_calls) {
+        if (!isRecord(rawToolCall)) continue;
+        const slot =
+          typeof rawToolCall.index === 'number' ? rawToolCall.index : state.toolCalls.size;
+        const fn = isRecord(rawToolCall.function) ? rawToolCall.function : {};
+        let toolCall = state.toolCalls.get(slot);
+        if (!toolCall) {
+          toolCall = {
+            output_index: state.nextOutputIndex++,
+            item_id: `fc_${randomUUID().replace(/-/g, '')}`,
+            call_id: typeof rawToolCall.id === 'string' ? rawToolCall.id : '',
+            name: typeof fn.name === 'string' ? fn.name : '',
+            args: '',
+            added: false,
+            done: false,
+          };
+          state.toolCalls.set(slot, toolCall);
+        } else {
+          if (!toolCall.call_id && typeof rawToolCall.id === 'string') {
+            toolCall.call_id = rawToolCall.id;
+          }
+          if (!toolCall.name && typeof fn.name === 'string') {
+            toolCall.name = fn.name;
+          }
+        }
+
+        events.push(...maybeEmitToolCallAdded(state, toolCall));
+
+        if (typeof fn.arguments === 'string' && fn.arguments.length > 0) {
+          toolCall.args += fn.arguments;
+          if (toolCall.added) {
+            events.push(
+              emitResponsesEvent(state, 'response.function_call_arguments.delta', {
+                type: 'response.function_call_arguments.delta',
+                response_id: state.responseId,
+                item_id: toolCall.item_id,
+                output_index: toolCall.output_index,
+                delta: fn.arguments,
+              }),
+            );
+          }
+        }
+      }
+    }
+  }
+
+  return events.length > 0 ? events.join('') : null;
+}
+
+function finalizeResponsesStream(state: ResponsesStreamState): string | null {
+  if (state.completed) return null;
+  state.completed = true;
+
+  const events: string[] = [...emitCreated(state)];
+
+  if (state.itemOpened) {
+    const outputIndex = state.textOutputIndex ?? 0;
+    events.push(
+      emitResponsesEvent(state, 'response.output_text.done', {
+        type: 'response.output_text.done',
+        response_id: state.responseId,
+        item_id: state.messageId,
+        output_index: outputIndex,
+        content_index: 0,
+        text: state.text,
+        logprobs: [],
+      }),
+      emitResponsesEvent(state, 'response.content_part.done', {
+        type: 'response.content_part.done',
+        response_id: state.responseId,
+        item_id: state.messageId,
+        output_index: outputIndex,
+        content_index: 0,
+        part: { type: 'output_text', text: state.text, annotations: [] },
+      }),
+      emitResponsesEvent(state, 'response.output_item.done', {
+        type: 'response.output_item.done',
+        response_id: state.responseId,
+        output_index: outputIndex,
+        item: messageItem(state, state.text, 'completed'),
+      }),
+    );
+  }
+
+  for (const toolCall of [...state.toolCalls.values()].sort(
+    (a, b) => a.output_index - b.output_index,
+  )) {
+    const finalCallId = toolCall.call_id || toolCall.item_id;
+    const finalName = toolCall.name || 'unknown';
+    if (!toolCall.added) {
+      toolCall.added = true;
       events.push(
-        formatResponsesEvent('response.completed', {
-          type: 'response.completed',
-          response: fromChatCompletionResponse(
-            {
-              model: typeof data.model === 'string' ? data.model : undefined,
-              usage: data.usage,
-              choices: [{ message: { content: '' } }],
-            },
-            typeof data.model === 'string' ? data.model : 'unknown',
-          ),
+        emitResponsesEvent(state, 'response.output_item.added', {
+          type: 'response.output_item.added',
+          response_id: state.responseId,
+          output_index: toolCall.output_index,
+          item: {
+            type: 'function_call',
+            id: toolCall.item_id,
+            call_id: finalCallId,
+            name: finalName,
+            arguments: '',
+            status: 'in_progress',
+          },
+        }),
+      );
+      if (toolCall.args.length > 0) {
+        events.push(
+          emitResponsesEvent(state, 'response.function_call_arguments.delta', {
+            type: 'response.function_call_arguments.delta',
+            response_id: state.responseId,
+            item_id: toolCall.item_id,
+            output_index: toolCall.output_index,
+            delta: toolCall.args,
+          }),
+        );
+      }
+    }
+    if (!toolCall.done) {
+      toolCall.done = true;
+      const finalItem: JsonRecord = {
+        type: 'function_call',
+        id: toolCall.item_id,
+        call_id: finalCallId,
+        name: finalName,
+        arguments: toolCall.args,
+        status: 'completed',
+      };
+      events.push(
+        emitResponsesEvent(state, 'response.function_call_arguments.done', {
+          type: 'response.function_call_arguments.done',
+          response_id: state.responseId,
+          item_id: toolCall.item_id,
+          output_index: toolCall.output_index,
+          name: finalName,
+          arguments: toolCall.args,
+          item: finalItem,
+        }),
+        emitResponsesEvent(state, 'response.output_item.done', {
+          type: 'response.output_item.done',
+          response_id: state.responseId,
+          output_index: toolCall.output_index,
+          item: finalItem,
         }),
       );
     }
   }
 
-  return events.length > 0 ? events.join('') : null;
+  const ordered: { idx: number; item: JsonRecord }[] = [];
+  if (state.text) {
+    ordered.push({
+      idx: state.textOutputIndex ?? 0,
+      item: messageItem(state, state.text, 'completed'),
+    });
+  }
+  for (const toolCall of state.toolCalls.values()) {
+    ordered.push({
+      idx: toolCall.output_index,
+      item: {
+        type: 'function_call',
+        id: toolCall.item_id,
+        call_id: toolCall.call_id || toolCall.item_id,
+        name: toolCall.name || 'unknown',
+        arguments: toolCall.args,
+        status: 'completed',
+      },
+    });
+  }
+  ordered.sort((a, b) => a.idx - b.idx);
+  const response = responseEnvelope(
+    state,
+    'completed',
+    ordered.map((entry) => entry.item),
+  );
+
+  events.push(
+    emitResponsesEvent(state, 'response.completed', { type: 'response.completed', response }),
+    'data: [DONE]\n\n',
+  );
+
+  return events.join('');
 }
 
 function extractDataPayloads(chunk: string): string[] {

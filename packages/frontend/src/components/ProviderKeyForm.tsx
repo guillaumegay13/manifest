@@ -23,6 +23,7 @@ import {
   getRoutingProviderApiKeyUrl,
   getSubscriptionProviderKeyUrl,
 } from '../services/provider-api-key-urls.js';
+import { suggestNextProviderKeyLabel } from '../services/provider-key-labels.js';
 import { toast } from '../services/toast-store.js';
 
 export const MAX_KEYS_PER_PROVIDER = 5;
@@ -64,12 +65,24 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
   const isApiKeyCredential = () =>
     !props.isSubMode() || props.provDef.subscriptionCredentialKind === 'api-key';
   const credentialNoun = () => (isApiKeyCredential() ? 'API key' : 'setup token');
-  const inputAriaLabel = () => `${props.provDef.name} ${credentialNoun()}`;
-  const editAriaLabel = () => `New ${props.provDef.name} ${credentialNoun()}`;
+  const credentialOwnerName = () =>
+    props.isSubMode() && props.provDef.subscriptionCredentialName
+      ? props.provDef.subscriptionCredentialName
+      : props.provDef.name;
+  const inputAriaLabel = () => `${credentialOwnerName()} ${credentialNoun()}`;
+  const editAriaLabel = () => `New ${credentialOwnerName()} ${credentialNoun()}`;
   const placeholder = () =>
     props.isSubMode()
       ? (props.provDef.subscriptionKeyPlaceholder ?? 'Paste token')
       : props.provDef.keyPlaceholder;
+  const endpointRegions = () =>
+    props.isSubMode()
+      ? (props.provDef.subscriptionEndpointRegions ?? [])
+      : (props.provDef.apiKeyEndpointRegions ?? []);
+  const hasEndpointRegions = () => endpointRegions().length > 0;
+  const defaultEndpointRegion = () => endpointRegions()[0]?.value;
+  const endpointRegionLabel = (value: string | null | undefined) =>
+    endpointRegions().find((region) => region.value === value)?.label;
   const whereToGetUrl = () =>
     props.isSubMode()
       ? getSubscriptionProviderKeyUrl(props.provId)
@@ -95,6 +108,56 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
   });
 
   const isListMode = () => supportsMultiKey() && activeKeys().length > 1;
+  const savedEndpointRegion = () => activeKeys()[0]?.region;
+  const [selectedEndpointRegion, setSelectedEndpointRegion] = createSignal<string | undefined>();
+
+  createEffect(() => {
+    if (!hasEndpointRegions()) {
+      setSelectedEndpointRegion(undefined);
+      return;
+    }
+    if (props.connected()) {
+      if (activeKeys().length > 0) {
+        setSelectedEndpointRegion(savedEndpointRegion() ?? defaultEndpointRegion());
+      } else {
+        setSelectedEndpointRegion(undefined);
+      }
+      return;
+    }
+    const selected = selectedEndpointRegion();
+    if (!selected || !endpointRegions().some((region) => region.value === selected)) {
+      setSelectedEndpointRegion(defaultEndpointRegion());
+    }
+  });
+
+  const displayedEndpointRegion = () => selectedEndpointRegion() ?? defaultEndpointRegion();
+  const endpointRegionPayload = () => {
+    if (!hasEndpointRegions()) return undefined;
+    const selected = selectedEndpointRegion();
+    if (selected) return selected;
+    return props.connected() ? undefined : defaultEndpointRegion();
+  };
+
+  const EndpointRegionSelect = (selectProps: { id: string; disabled?: boolean }) => (
+    <Show when={hasEndpointRegions()}>
+      <div class="provider-detail__field">
+        <label class="provider-detail__label" for={selectProps.id}>
+          Region
+        </label>
+        <select
+          id={selectProps.id}
+          class="provider-detail__input"
+          value={displayedEndpointRegion()}
+          disabled={selectProps.disabled}
+          onChange={(e) => setSelectedEndpointRegion(e.currentTarget.value)}
+        >
+          <For each={endpointRegions()}>
+            {(region) => <option value={region.value}>{region.label}</option>}
+          </For>
+        </select>
+      </div>
+    </Show>
+  );
 
   const fieldLabel = () => {
     if (isListMode()) return 'API Keys';
@@ -116,6 +179,7 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
         provider: props.provId,
         apiKey: props.keyInput().replace(/\s/g, ''),
         authType: props.selectedAuthType(),
+        ...(endpointRegionPayload() && { region: endpointRegionPayload() }),
         ...(label && { label }),
       });
       toast.success(`${props.provDef.name} connected`);
@@ -143,6 +207,7 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
         provider: props.provId,
         apiKey: props.keyInput().replace(/\s/g, ''),
         authType: props.selectedAuthType(),
+        ...(endpointRegionPayload() && { region: endpointRegionPayload() }),
         ...(label && { label }),
       });
       const noun = props.isSubMode() && !isApiKeyCredential() ? 'token' : 'key';
@@ -198,6 +263,7 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
     <>
       {/* Not yet connected — first key */}
       <Show when={!props.connected()}>
+        <EndpointRegionSelect id={`${props.provId}-subscription-endpoint`} />
         <div class="provider-detail__field">
           <label class="provider-detail__label">{fieldLabel()}</label>
           <input
@@ -228,7 +294,7 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Get {props.provDef.name} {credentialNoun()}
+                Get {credentialOwnerName()} {credentialNoun()}
               </a>
             </p>
           </Show>
@@ -297,20 +363,25 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
             </div>
             <Show when={supportsMultiKey() && activeKeys().length < MAX_KEYS_PER_PROVIDER}>
               <AddAnotherKeyAction
-                onAdd={(label, apiKey) => handleAddKey(props, label, apiKey)}
+                onAdd={(label, apiKey, region) => handleAddKey(props, label, apiKey, region)}
                 busy={props.busy}
                 setBusy={props.setBusy}
                 provDef={props.provDef}
                 placeholder={placeholder() ?? 'Paste API key'}
                 whereToGetUrl={whereToGetUrl}
                 credentialNoun={credentialNoun}
+                credentialOwnerName={credentialOwnerName}
                 existingLabels={() => activeKeys().map((k) => k.label)}
                 open={props.addKeyOpen}
                 setOpen={props.setAddKeyOpen}
+                isSubscription={props.isSubMode()}
+                endpointRegions={endpointRegions()}
+                initialEndpointRegion={displayedEndpointRegion()}
               />
             </Show>
           </Show>
           <Show when={props.editing()}>
+            <EndpointRegionSelect id={`${props.provId}-subscription-endpoint-edit`} />
             <input
               class="provider-detail__input provider-detail__input--masked"
               classList={{ 'provider-detail__input--error': !!props.validationError() }}
@@ -338,7 +409,7 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Get {props.provDef.name} {credentialNoun()}
+                  Get {credentialOwnerName()} {credentialNoun()}
                 </a>
               </p>
             </Show>
@@ -366,9 +437,12 @@ const ProviderKeyForm: Component<ProviderKeyFormProps> = (props) => {
           setBusy={props.setBusy}
           placeholder={placeholder() ?? 'Paste API key'}
           credentialNoun={credentialNoun}
+          credentialOwnerName={credentialOwnerName}
           whereToGetUrl={whereToGetUrl}
           addKeyOpen={props.addKeyOpen}
           setAddKeyOpen={props.setAddKeyOpen}
+          endpointRegions={endpointRegions()}
+          endpointRegionLabel={endpointRegionLabel}
           onUpdate={props.onUpdate}
           onDelete={(label) => handleDisconnect(label)}
         />
@@ -381,6 +455,7 @@ async function handleAddKey(
   props: ProviderKeyFormProps,
   label: string,
   apiKey: string,
+  region?: string,
 ): Promise<boolean> {
   // Subscription-mode providers (Anthropic Pro, ChatGPT Plus, etc.) often
   // validate paste tokens with a different prefix/format than their api_key
@@ -400,6 +475,7 @@ async function handleAddKey(
       apiKey: apiKey.replace(/\s/g, ''),
       authType: props.selectedAuthType(),
       label,
+      ...(region && { region }),
     });
     toast.success(`${props.provDef.name} key "${label}" added`);
     props.onUpdate();
@@ -411,20 +487,26 @@ async function handleAddKey(
   }
 }
 
-interface AddAnotherKeyActionProps {
-  onAdd: (label: string, apiKey: string) => Promise<boolean>;
+/** @internal Exported for testing only. */
+export interface AddAnotherKeyActionProps {
+  onAdd: (label: string, apiKey: string, region?: string) => Promise<boolean>;
   busy: Accessor<boolean>;
   setBusy: Setter<boolean>;
   provDef: ProviderDef;
   placeholder: string;
   whereToGetUrl: () => string | undefined;
   credentialNoun: () => string;
+  credentialOwnerName: () => string;
   existingLabels: () => string[];
   open?: Accessor<boolean>;
   setOpen?: Setter<boolean>;
+  isSubscription?: boolean;
+  endpointRegions?: { value: string; label: string }[];
+  initialEndpointRegion?: string;
 }
 
-const AddAnotherKeyAction: Component<AddAnotherKeyActionProps> = (props) => {
+/** @internal Exported for testing only. */
+export const AddAnotherKeyAction: Component<AddAnotherKeyActionProps> = (props) => {
   const [localOpen, setLocalOpen] = createSignal(false);
   const isOpen = () => (props.open ?? localOpen)();
   const setIsOpen = (v: boolean) => {
@@ -432,19 +514,30 @@ const AddAnotherKeyAction: Component<AddAnotherKeyActionProps> = (props) => {
   };
   const [label, setLabel] = createSignal('');
   const [apiKey, setApiKey] = createSignal('');
+  const [endpointRegion, setEndpointRegion] = createSignal<string | undefined>(
+    props.initialEndpointRegion ?? props.endpointRegions?.[0]?.value,
+  );
+  let apiKeyInputRef: HTMLInputElement | undefined;
 
-  const defaultLabel = () => suggestNextLabel(props.existingLabels());
+  const defaultLabel = () => suggestNextProviderKeyLabel(props.existingLabels());
 
-  // Sync label suggestion when opened externally
+  // Sync label suggestion when opened externally and auto-focus the API key field
   createEffect(() => {
     if (isOpen() && !label().trim()) {
       setLabel(defaultLabel());
+    }
+    const defaultEndpointRegion = props.endpointRegions?.[0]?.value;
+    if (isOpen() && defaultEndpointRegion && !endpointRegion()) {
+      setEndpointRegion(props.initialEndpointRegion ?? defaultEndpointRegion);
+    }
+    if (isOpen()) {
+      requestAnimationFrame(() => apiKeyInputRef?.focus());
     }
   });
 
   const submit = async () => {
     const labelToUse = (label().trim() || defaultLabel()).slice(0, MAX_LABEL_LENGTH);
-    const ok = await props.onAdd(labelToUse, apiKey().trim());
+    const ok = await props.onAdd(labelToUse, apiKey().trim(), endpointRegion());
     if (ok) {
       setIsOpen(false);
       setLabel('');
@@ -466,7 +559,18 @@ const AddAnotherKeyAction: Component<AddAnotherKeyActionProps> = (props) => {
               setIsOpen(true);
             }}
           >
-            + Add another key
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              style="vertical-align: -2px; margin-right: 2px;"
+            >
+              <path d="M4 11h11v2H4zm0-5h16v2H4zm0 10h8v2H4zm15-3h-2v3h-3v2h3v3h2v-3h3v-2h-3z" />
+            </svg>
+            {props.isSubscription ? ' Add connection' : ' Add another key'}
           </button>
         ) : undefined
       }
@@ -488,15 +592,32 @@ const AddAnotherKeyAction: Component<AddAnotherKeyActionProps> = (props) => {
           placeholder={defaultLabel()}
           onInput={(e) => setLabel(e.currentTarget.value)}
         />
+        <Show when={props.endpointRegions?.length}>
+          <label class="provider-detail__label" for="add-key-endpoint" style="margin-top: 8px;">
+            Region
+          </label>
+          <select
+            id="add-key-endpoint"
+            class="provider-detail__input"
+            value={endpointRegion()}
+            disabled={props.busy()}
+            onChange={(e) => setEndpointRegion(e.currentTarget.value)}
+          >
+            <For each={props.endpointRegions ?? []}>
+              {(region) => <option value={region.value}>{region.label}</option>}
+            </For>
+          </select>
+        </Show>
         <label class="provider-detail__label" for="add-key-value" style="margin-top: 8px;">
-          {props.provDef.name} {props.credentialNoun()}
+          {props.credentialOwnerName()} {props.credentialNoun()}
         </label>
         <input
+          ref={apiKeyInputRef}
           id="add-key-value"
           class="provider-detail__input provider-detail__input--masked"
           type="text"
           autocomplete="off"
-          aria-label={`New ${props.provDef.name} ${props.credentialNoun()}`}
+          aria-label={`New ${props.credentialOwnerName()} ${props.credentialNoun()}`}
           placeholder={props.placeholder}
           value={apiKey()}
           onInput={(e) => setApiKey(e.currentTarget.value)}
@@ -512,7 +633,7 @@ const AddAnotherKeyAction: Component<AddAnotherKeyActionProps> = (props) => {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Get {props.provDef.name} {props.credentialNoun()}
+              Get {props.credentialOwnerName()} {props.credentialNoun()}
             </a>
           </p>
         </Show>
@@ -549,9 +670,12 @@ interface KeyChainViewProps {
   setBusy: Setter<boolean>;
   placeholder: string;
   credentialNoun: () => string;
+  credentialOwnerName: () => string;
   whereToGetUrl: () => string | undefined;
   addKeyOpen?: Accessor<boolean>;
   setAddKeyOpen?: Setter<boolean>;
+  endpointRegions: { value: string; label: string }[];
+  endpointRegionLabel: (value: string | null | undefined) => string | undefined;
   onUpdate: () => void;
   onDelete: (label: string) => void;
 }
@@ -604,7 +728,12 @@ const KeyChainView: Component<KeyChainViewProps> = (props) => {
                         {k.label}
                       </div>
                       <div style="font-size: var(--font-size-xs); color: hsl(var(--muted-foreground));">
-                        {k.key_prefix ? `${k.key_prefix}${'•'.repeat(12)}` : '••••••••••••'}
+                        {[
+                          k.key_prefix ? `${k.key_prefix}${'•'.repeat(12)}` : '••••••••••••',
+                          props.endpointRegionLabel(k.region),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </div>
                     </div>
                     <button
@@ -674,7 +803,7 @@ const KeyChainView: Component<KeyChainViewProps> = (props) => {
       </ul>
       <Show when={props.activeKeys().length < MAX_KEYS_PER_PROVIDER}>
         <AddAnotherKeyAction
-          onAdd={async (label, apiKey) => {
+          onAdd={async (label, apiKey, region) => {
             // Subscription chains paste setup tokens, which validate
             // differently from api keys. Pick the right validator based on
             // the chain's auth_type.
@@ -693,6 +822,7 @@ const KeyChainView: Component<KeyChainViewProps> = (props) => {
                 apiKey: apiKey.replace(/\s/g, ''),
                 authType: props.authType(),
                 label,
+                ...(region && { region }),
               });
               toast.success(`${props.provDef.name} key "${label}" added`);
               props.onUpdate();
@@ -709,25 +839,17 @@ const KeyChainView: Component<KeyChainViewProps> = (props) => {
           placeholder={props.placeholder}
           whereToGetUrl={props.whereToGetUrl}
           credentialNoun={props.credentialNoun}
+          credentialOwnerName={props.credentialOwnerName}
           existingLabels={() => props.activeKeys().map((k) => k.label)}
           open={props.addKeyOpen}
           setOpen={props.setAddKeyOpen}
+          isSubscription={props.authType() === 'subscription'}
+          endpointRegions={props.endpointRegions}
+          initialEndpointRegion={props.activeKeys()[0]?.region ?? props.endpointRegions[0]?.value}
         />
       </Show>
     </div>
   );
 };
-
-function suggestNextLabel(existing: string[]): string {
-  const lower = new Set(existing.map((l) => l.toLowerCase()));
-  // Skip "Default" — it's the legacy single-key label and doesn't suggest
-  // a numbered sibling. The next user-named key reads more naturally as
-  // "Key 2", "Key 3", … starting from the count of named keys.
-  for (let n = existing.length + 1; n < 100; n++) {
-    const candidate = `Key ${n}`;
-    if (!lower.has(candidate.toLowerCase())) return candidate;
-  }
-  return `Key ${existing.length + 1}`;
-}
 
 export default ProviderKeyForm;

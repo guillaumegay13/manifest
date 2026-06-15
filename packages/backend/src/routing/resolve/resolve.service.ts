@@ -4,20 +4,35 @@ import { Repository } from 'typeorm';
 import type { IncomingHttpHeaders } from 'http';
 import { TierService } from '../routing-core/tier.service';
 import { ProviderKeyService } from '../routing-core/provider-key.service';
+import { RoutingCacheService } from '../routing-core/routing-cache.service';
 import { SpecificityService } from '../routing-core/specificity.service';
 import { SpecificityPenaltyService } from '../routing-core/specificity-penalty.service';
 import { HeaderTierService } from '../header-tiers/header-tier.service';
 import { ModelPricingCacheService } from '../../model-prices/model-pricing-cache.service';
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { readFallbackRoutes, readOverrideRoute } from '../routing-core/route-helpers';
+import { effectiveRoutesForResponseMode } from '../routing-core/response-mode-guard';
 import { scoreRequest, ScorerInput, MomentumInput, scanMessages } from '../../scoring';
 import { ResolveResponse } from '../dto/resolve-response';
 import { inferProviderFromModelName } from '../../common/utils/provider-aliases';
 import { Agent } from '../../entities/agent.entity';
-import type { AuthType, ModelRoute, SpecificityCategory, TierSlot } from 'manifest-shared';
+import { DEFAULT_RESPONSE_MODE, DEFAULT_OUTPUT_MODALITY } from 'manifest-shared';
+import type {
+  AuthType,
+  ModelRoute,
+  ResponseMode,
+  OutputModality,
+  SpecificityCategory,
+  TierSlot,
+} from 'manifest-shared';
 import type { HeaderTier } from '../../entities/header-tier.entity';
 import type { TierAssignment } from '../../entities/tier-assignment.entity';
 import type { SpecificityAssignment } from '../../entities/specificity-assignment.entity';
+
+interface ResolvedRouteChain {
+  primaryRoute: ModelRoute | null;
+  fallbackRoutes: ModelRoute[] | null;
+}
 
 /**
  * When specificity detection is below this confidence, skip specificity
@@ -45,7 +60,16 @@ export class ResolveService {
     private readonly headerTierService: HeaderTierService,
     @InjectRepository(Agent)
     private readonly agentRepo: Repository<Agent>,
-  ) {}
+    private readonly routingCache: RoutingCacheService,
+  ) {
+    // Bridge the central routing-cache invalidation to the discovered-model
+    // cache. Every provider mutation already calls routingCache.invalidateAgent;
+    // forwarding it here keeps ModelDiscoveryService's per-agent model cache
+    // fresh without a cross-module dependency (which would cycle).
+    this.routingCache.addInvalidationListener((agentId) =>
+      this.discoveryService.invalidate(agentId),
+    );
+  }
 
   async resolve(
     agentId: string,
@@ -96,8 +120,16 @@ export class ResolveService {
       return this.resolveForTier(agentId, 'default', 'default');
     }
 
-    const route = await this.buildResolvedRoute(agentId, assignment);
-    if (!route) {
+    const outputModality = outputModalityFor(assignment);
+    const responseMode = responseModeFor(assignment);
+    const fallbackRoutes = readFallbackRoutes(assignment);
+    const routeChain = await this.buildResolvedRouteChain(agentId, assignment, fallbackRoutes);
+    const effectiveRoutes = effectiveRoutesForResponseMode(
+      responseMode,
+      routeChain.primaryRoute,
+      routeChain.fallbackRoutes,
+    );
+    if (!effectiveRoutes.primaryRoute) {
       this.logger.warn(
         `No route resolved for agent=${agentId} tier=${result.tier} ` +
           `(override=${assignment.override_route?.model ?? 'null'} ` +
@@ -106,22 +138,24 @@ export class ResolveService {
       return {
         tier: result.tier,
         route: null,
-        fallback_routes: readFallbackRoutes(assignment),
+        fallback_routes: effectiveRoutes.fallbackRoutes,
+        output_modality: outputModality,
+        response_mode: responseMode,
         confidence: result.confidence,
         score: result.score,
         reason: result.reason,
-        param_defaults: assignment.param_defaults,
       };
     }
 
     return {
       tier: result.tier,
-      route,
-      fallback_routes: readFallbackRoutes(assignment),
+      route: effectiveRoutes.primaryRoute,
+      fallback_routes: effectiveRoutes.fallbackRoutes,
+      output_modality: outputModality,
+      response_mode: responseMode,
       confidence: result.confidence,
       score: result.score,
       reason: result.reason,
-      param_defaults: assignment.param_defaults,
     };
   }
 
@@ -134,18 +168,36 @@ export class ResolveService {
     const assignment = tiers.find((t) => t.tier === tier);
 
     if (!assignment) {
-      return { tier, route: null, fallback_routes: null, confidence: 1, score: 0, reason };
+      return {
+        tier,
+        route: null,
+        fallback_routes: null,
+        output_modality: DEFAULT_OUTPUT_MODALITY,
+        response_mode: DEFAULT_RESPONSE_MODE,
+        confidence: 1,
+        score: 0,
+        reason,
+      };
     }
 
-    const route = await this.buildResolvedRoute(agentId, assignment);
+    const outputModality = outputModalityFor(assignment);
+    const responseMode = responseModeFor(assignment);
+    const fallbackRoutes = readFallbackRoutes(assignment);
+    const routeChain = await this.buildResolvedRouteChain(agentId, assignment, fallbackRoutes);
+    const effectiveRoutes = effectiveRoutesForResponseMode(
+      responseMode,
+      routeChain.primaryRoute,
+      routeChain.fallbackRoutes,
+    );
     return {
       tier,
-      route,
-      fallback_routes: readFallbackRoutes(assignment),
+      route: effectiveRoutes.primaryRoute,
+      fallback_routes: effectiveRoutes.fallbackRoutes,
+      output_modality: outputModality,
+      response_mode: responseMode,
       confidence: 1,
       score: 0,
       reason,
-      param_defaults: assignment.param_defaults,
     };
   }
 
@@ -189,10 +241,17 @@ export class ResolveService {
         : null;
     const route = baseRoute ? await this.enrichRouteKeyLabel(agentId, baseRoute) : null;
 
+    const outputModality = outputModalityFor(match);
+    const responseMode = responseModeFor(match);
+    const fallbackRoutes = readFallbackRoutes(match);
+    const effectiveRoutes = effectiveRoutesForResponseMode(responseMode, route, fallbackRoutes);
+
     return {
       tier: 'standard',
-      route,
-      fallback_routes: readFallbackRoutes(match),
+      route: effectiveRoutes.primaryRoute,
+      fallback_routes: effectiveRoutes.fallbackRoutes,
+      output_modality: outputModality,
+      response_mode: responseMode,
       confidence: 1,
       score: 0,
       reason: 'header-match',
@@ -259,40 +318,68 @@ export class ResolveService {
       return null;
     }
 
+    const outputModality = outputModalityFor(assignment);
+    const responseMode = responseModeFor(assignment);
+    const fallbackRoutes = readFallbackRoutes(assignment);
+    const enrichedRoute = await this.enrichRouteKeyLabel(agentId, route);
+    const effectiveRoutes = effectiveRoutesForResponseMode(
+      responseMode,
+      enrichedRoute,
+      fallbackRoutes,
+    );
+
     return {
       tier: 'standard',
-      route: await this.enrichRouteKeyLabel(agentId, route),
-      fallback_routes: readFallbackRoutes(assignment),
+      route: effectiveRoutes.primaryRoute,
+      fallback_routes: effectiveRoutes.fallbackRoutes,
+      output_modality: outputModality,
+      response_mode: responseMode,
       confidence: detected.confidence,
       score: 0,
       reason: 'specificity',
       specificity_category: detected.category,
-      param_defaults: assignment.param_defaults,
     };
   }
 
   /**
-   * Build the resolved route for a tier assignment. Validates the override
-   * still points to an available model; falls through to auto-assigned when
-   * the override is orphaned. Enriches with the default key label when no
-   * explicit pin is present.
+   * Build the resolved route chain for a tier assignment. Validates the
+   * override still points to an available model; when an override is orphaned,
+   * walk configured fallbacks before trying the auto-assigned route. Enriches
+   * routes with the default key label when no explicit pin is present.
    */
-  private async buildResolvedRoute(
+  private async buildResolvedRouteChain(
     agentId: string,
     assignment: TierAssignment | SpecificityAssignment,
-  ): Promise<ModelRoute | null> {
+    fallbackRoutes: ModelRoute[] | null,
+  ): Promise<ResolvedRouteChain> {
     const override = readOverrideRoute(assignment);
     if (override) {
       if (await this.providerKeyService.isModelAvailable(agentId, override.model)) {
-        return this.enrichRouteKeyLabel(agentId, override);
+        return {
+          primaryRoute: await this.enrichRouteKeyLabel(agentId, override),
+          fallbackRoutes,
+        };
       }
       this.logger.warn(
-        `Override ${override.model} unavailable for agent=${agentId} — falling back to auto`,
+        `Override ${override.model} unavailable for agent=${agentId} — ` +
+          `falling back to configured routes`,
       );
+      const candidates = [
+        ...(fallbackRoutes ?? []),
+        ...(assignment.auto_assigned_route ? [assignment.auto_assigned_route] : []),
+      ];
+      const [primaryRoute, ...remainingFallbacks] = candidates;
+      return {
+        primaryRoute: primaryRoute ? await this.enrichRouteKeyLabel(agentId, primaryRoute) : null,
+        fallbackRoutes: remainingFallbacks.length > 0 ? remainingFallbacks : null,
+      };
     }
-    return assignment.auto_assigned_route
-      ? this.enrichRouteKeyLabel(agentId, assignment.auto_assigned_route)
-      : null;
+    return {
+      primaryRoute: assignment.auto_assigned_route
+        ? await this.enrichRouteKeyLabel(agentId, assignment.auto_assigned_route)
+        : null,
+      fallbackRoutes,
+    };
   }
 
   /**
@@ -343,4 +430,12 @@ function matchesHeaderRule(headers: IncomingHttpHeaders, tier: HeaderTier): bool
   // Node gives repeated headers as string[]; match if any entry equals the rule.
   if (Array.isArray(raw)) return raw.some((v) => v === tier.header_value);
   return raw === tier.header_value;
+}
+
+function outputModalityFor(row: { output_modality?: OutputModality | null }): OutputModality {
+  return row.output_modality ?? DEFAULT_OUTPUT_MODALITY;
+}
+
+function responseModeFor(row: { response_mode?: ResponseMode | null }): ResponseMode {
+  return row.response_mode ?? DEFAULT_RESPONSE_MODE;
 }

@@ -16,7 +16,12 @@ function createDatabaseConnection() {
   const { Pool } = require('pg');
   const databaseUrl =
     process.env['DATABASE_URL'] ?? 'postgresql://myuser:mypassword@localhost:5432/mydatabase';
-  return new Pool({ connectionString: databaseUrl });
+  // Cap Better Auth's own pool (separate from the TypeORM pool) so the two
+  // connection pools don't jointly exhaust Postgres's max_connections. Auth
+  // traffic is light relative to ingest, hence a smaller default than the app
+  // pool. Idle connections are reaped after 30s to free server-side slots.
+  const max = Number(process.env['AUTH_DB_POOL_MAX'] ?? 10);
+  return new Pool({ connectionString: databaseUrl, max, idleTimeoutMillis: 30000 });
 }
 
 const database = createDatabaseConnection();
@@ -37,10 +42,18 @@ function buildTrustedOrigins(): string[] {
     origins.push(process.env['CORS_ORIGIN']);
   }
   if (isDev) {
-    origins.push(`http://localhost:3000`, `http://localhost:${port}`);
+    origins.push(
+      `http://localhost:3000`,
+      `http://127.0.0.1:3000`,
+      `http://localhost:${port}`,
+      `http://127.0.0.1:${port}`,
+    );
   }
   if (process.env['FRONTEND_PORT']) {
-    origins.push(`http://localhost:${process.env['FRONTEND_PORT']}`);
+    origins.push(
+      `http://localhost:${process.env['FRONTEND_PORT']}`,
+      `http://127.0.0.1:${process.env['FRONTEND_PORT']}`,
+    );
   }
   return origins;
 }

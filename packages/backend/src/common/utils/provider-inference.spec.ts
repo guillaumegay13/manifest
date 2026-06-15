@@ -57,6 +57,10 @@ describe('inferProviderFromModel', () => {
     expect(inferProviderFromModel('MiniMax-M2.5')).toBe('minimax');
   });
 
+  it('returns "xiaomi" for mimo-v prefix', () => {
+    expect(inferProviderFromModel('mimo-v2.5-pro')).toBe('xiaomi');
+  });
+
   it('returns "zai" for glm- prefix', () => {
     expect(inferProviderFromModel('glm-5')).toBe('zai');
   });
@@ -65,6 +69,11 @@ describe('inferProviderFromModel', () => {
     expect(inferProviderFromModel('qwen2.5-72b-instruct')).toBe('qwen');
     expect(inferProviderFromModel('qwen3-235b-a22b')).toBe('qwen');
     expect(inferProviderFromModel('qwq-32b')).toBe('qwen');
+  });
+
+  it('returns "kiro" for Kiro subscription model IDs before generic vendor fallback', () => {
+    expect(inferProviderFromModel('kiro/auto')).toBe('kiro');
+    expect(inferProviderFromModel('kiro/claude-sonnet-4.5')).toBe('kiro');
   });
 
   it('returns "openrouter" for vendor/model format', () => {

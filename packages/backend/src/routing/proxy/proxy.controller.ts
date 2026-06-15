@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Post,
   Req,
   Res,
@@ -19,8 +20,11 @@ import { ProviderClient } from './provider-client';
 import { ProxyMessageRecorder } from './proxy-message-recorder';
 import { ThoughtSignatureCache } from './thought-signature-cache';
 import { ThinkingBlockCache } from './thinking-block-cache';
+import { ReasoningContentCache } from './reasoning-content-cache';
 import { classifyCaller } from './caller-classifier';
 import { sanitizeRequestHeaders } from './request-headers';
+import { createCaptureSink, CaptureSink } from './recording-capture';
+import { AgentRecordingCacheService } from '../../common/services/agent-recording-cache.service';
 import {
   buildMetaHeaders,
   handleProviderError,
@@ -33,6 +37,8 @@ import { ProxyExceptionFilter, isChatRenderingClient } from './proxy-exception.f
 import { sendFriendlyResponse } from './proxy-friendly-response';
 import { formatManifestError } from '../../common/errors/error-codes';
 import type { ProxyApiMode } from './proxy-types';
+import { ResponsesSseError } from './chatgpt-adapter';
+import { sanitizeProviderError } from './proxy-error-sanitizer';
 
 const MAX_SEEN_USERS = 10_000;
 const SEEN_USER_TTL_MS = 24 * 60 * 60 * 1000;
@@ -53,7 +59,27 @@ export class ProxyController {
     private readonly recorder: ProxyMessageRecorder,
     private readonly signatureCache: ThoughtSignatureCache,
     private readonly thinkingCache: ThinkingBlockCache,
+    private readonly reasoningCache: ReasoningContentCache,
+    private readonly recordingCache: AgentRecordingCacheService,
   ) {}
+
+  @Get('models')
+  models(): Record<string, unknown> {
+    return {
+      object: 'list',
+      data: [
+        {
+          id: 'auto',
+          object: 'model',
+          type: 'model',
+          display_name: 'Manifest Auto',
+        },
+      ],
+      has_more: false,
+      first_id: 'auto',
+      last_id: 'auto',
+    };
+  }
 
   @Post('chat/completions')
   async chatCompletions(
@@ -93,6 +119,9 @@ export class ProxyController {
     const isStream = body.stream === true;
     let headersSent = false;
     let slotAcquired = false;
+
+    const recordingEnabled = await this.recordingCache.isRecording(req.ingestionContext.agentId);
+    const capture: CaptureSink | undefined = recordingEnabled ? createCaptureSink() : undefined;
 
     const clientAbort = new AbortController();
     res.once('close', () => clientAbort.abort());
@@ -151,7 +180,9 @@ export class ProxyController {
 
       let streamUsage = null;
 
-      if (isStream && providerResponse.body) {
+      const shouldStreamResponse = isStream || meta.response_mode === 'stream';
+
+      if (shouldStreamResponse && providerResponse.body) {
         headersSent = true;
         streamUsage = await handleStreamResponse(
           res,
@@ -163,7 +194,8 @@ export class ProxyController {
           sessionKey,
           this.thinkingCache,
           apiMode,
-          req.ingestionContext.agentPlatform,
+          capture,
+          this.reasoningCache,
         );
       } else {
         streamUsage = await handleNonStreamResponse(
@@ -176,6 +208,8 @@ export class ProxyController {
           sessionKey,
           this.thinkingCache,
           apiMode,
+          capture,
+          this.reasoningCache,
         );
       }
 
@@ -190,6 +224,7 @@ export class ProxyController {
         startTime,
         callerAttribution,
         requestHeaders,
+        capture ? { capture, requestBody: body } : undefined,
       );
     } catch (err: unknown) {
       this.handleProxyError(
@@ -223,11 +258,17 @@ export class ProxyController {
     }
 
     const message = err instanceof Error ? err.message : String(err);
-    const status = err instanceof HttpException ? err.getStatus() : 500;
+    const status =
+      err instanceof ResponsesSseError
+        ? err.status
+        : err instanceof HttpException
+          ? err.getStatus()
+          : 500;
+    const providerErrorBody = err instanceof ResponsesSseError ? err.body : message;
     this.logger.error(`Proxy error: ${message}`);
 
     this.recorder
-      .recordProviderError(req.ingestionContext, status, message, {
+      .recordProviderError(req.ingestionContext, status, providerErrorBody, {
         traceId,
         callerAttribution,
         requestHeaders,
@@ -236,6 +277,17 @@ export class ProxyController {
 
     if (headersSent) {
       if (!res.writableEnded) res.end();
+      return;
+    }
+
+    if (err instanceof ResponsesSseError) {
+      res.status(err.status).json({
+        error: {
+          message: sanitizeProviderError(err.status, err.body, process.env.NODE_ENV),
+          type: 'upstream_error',
+          status: err.status,
+        },
+      });
       return;
     }
 

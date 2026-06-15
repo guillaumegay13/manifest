@@ -1,7 +1,6 @@
 import { Entity, Column, PrimaryColumn, Index } from 'typeorm';
 import { timestampType } from '../common/utils/postgres-sql';
 import type { CallerAttribution } from '../routing/proxy/caller-classifier';
-import type { RequestParamDefaults } from 'manifest-shared';
 
 @Entity('agent_messages')
 @Index(['tenant_id', 'agent_id', 'timestamp'])
@@ -11,6 +10,9 @@ import type { RequestParamDefaults } from 'manifest-shared';
 @Index(['tenant_id', 'trace_id'])
 @Index(['tenant_id', 'model'])
 @Index(['tenant_id', 'agent_id', 'status'])
+// Per-completion success dedup (ProxyMessageDedup.findExistingSuccessMessage)
+// filters tenant_id + agent_id + model + status='ok' and orders by timestamp.
+@Index(['tenant_id', 'agent_id', 'model', 'status', 'timestamp'])
 export class AgentMessage {
   @PrimaryColumn('varchar')
   id!: string;
@@ -108,6 +110,9 @@ export class AgentMessage {
   @Column('boolean', { default: false })
   specificity_miscategorized!: boolean;
 
+  @Column('boolean', { default: false })
+  recorded!: boolean;
+
   @Column('simple-json', { nullable: true })
   caller_attribution!: CallerAttribution | null;
 
@@ -115,7 +120,7 @@ export class AgentMessage {
   request_headers!: Record<string, string> | null;
 
   @Column('jsonb', { nullable: true })
-  request_params!: RequestParamDefaults | null;
+  request_params!: object | null;
 
   @Column('varchar', { nullable: true })
   header_tier_id!: string | null;

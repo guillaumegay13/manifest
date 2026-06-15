@@ -19,13 +19,21 @@ describe('ProviderModelFetcherService', () => {
     const expected = [
       'openai',
       'openai-subscription',
+      'bedrock',
       'deepseek',
+      'byteplus',
+      'commandcode',
+      'fireworks',
       'groq',
+      'kilo',
       'mistral',
       'moonshot',
+      'nvidia',
       'xai',
       'minimax',
       'minimax-subscription',
+      'xiaomi',
+      'xiaomi-subscription',
       'qwen',
       'zai',
       'zai-subscription',
@@ -35,10 +43,41 @@ describe('ProviderModelFetcherService', () => {
       'ollama',
       'ollama-cloud',
       'copilot',
+      'opencode-zen',
     ];
     for (const id of expected) {
       expect(PROVIDER_CONFIGS[id]).toBeDefined();
     }
+  });
+
+  it('should fetch AWS Bedrock models from the selected Mantle region', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 'mistral.ministral-3-8b-instruct' },
+          { id: 'mistral.voxtral-small-24b-2507' },
+          { id: 'amazon.titan-embed-text-v2:0' },
+        ],
+      }),
+    });
+
+    const result = await service.fetch(
+      'bedrock',
+      'bedrock-api-key-test',
+      'api_key',
+      'https://bedrock-mantle.eu-west-1.api.aws',
+    );
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://bedrock-mantle.eu-west-1.api.aws/v1/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer bedrock-api-key-test',
+        }),
+      }),
+    );
+    expect(result.map((m) => m.id)).toEqual(['mistral.ministral-3-8b-instruct']);
   });
 
   /* ── Unknown provider ── */
@@ -289,6 +328,175 @@ describe('ProviderModelFetcherService', () => {
     });
   });
 
+  /* ── xAI provider ── */
+
+  describe('xai provider', () => {
+    it('uses the dynamic xAI models endpoint for subscription auth', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [{ id: 'grok-3' }, { id: 'grok-4' }],
+        }),
+      });
+
+      const result = await service.fetch('xai', 'xai-test-key', 'subscription');
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://api.x.ai/v1/models',
+        expect.objectContaining({
+          headers: { Authorization: 'Bearer xai-test-key' },
+        }),
+      );
+      expect(result.map((m) => m.id)).toEqual(['grok-3', 'grok-4']);
+      expect(result.every((m) => m.provider === 'xai')).toBe(true);
+    });
+  });
+
+  /* ── Fireworks provider ── */
+
+  describe('fireworks provider', () => {
+    it('fetches serverless models from the Fireworks account API with pagination', async () => {
+      fetchSpy
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            models: [
+              {
+                name: 'accounts/fireworks/models/deepseek-v3p1',
+                displayName: 'DeepSeek V3.1',
+                contextLength: 160000,
+                supportsServerless: true,
+                supportsTools: true,
+              },
+            ],
+            nextPageToken: 'page-2',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            models: [
+              {
+                name: 'accounts/fireworks/models/flux-1-schnell',
+                displayName: 'FLUX.1 schnell',
+                contextLength: 4096,
+                supportsServerless: true,
+              },
+              {
+                name: 'accounts/fireworks/models/kimi-k2-instruct',
+                displayName: 'Kimi K2',
+                supportsServerless: true,
+                supportsTools: false,
+              },
+            ],
+          }),
+        });
+
+      const result = await service.fetch('fireworks', 'fw-test-key');
+
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        1,
+        'https://api.fireworks.ai/v1/accounts/fireworks/models?filter=supports_serverless%3Dtrue&pageSize=200',
+        expect.objectContaining({
+          headers: { Authorization: 'Bearer fw-test-key' },
+        }),
+      );
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        2,
+        'https://api.fireworks.ai/v1/accounts/fireworks/models?filter=supports_serverless%3Dtrue&pageSize=200&pageToken=page-2',
+        expect.objectContaining({
+          headers: { Authorization: 'Bearer fw-test-key' },
+        }),
+      );
+      expect(result.map((m) => m.id)).toEqual([
+        'accounts/fireworks/models/deepseek-v3p1',
+        'accounts/fireworks/models/kimi-k2-instruct',
+      ]);
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          displayName: 'DeepSeek V3.1',
+          contextWindow: 160000,
+          provider: 'fireworks',
+          capabilityCode: true,
+        }),
+      );
+      expect(result[1]).toEqual(
+        expect.objectContaining({
+          displayName: 'Kimi K2',
+          contextWindow: 128000,
+          provider: 'fireworks',
+          capabilityCode: false,
+        }),
+      );
+    });
+
+    it('stops pagination when Fireworks repeats a page token', async () => {
+      const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+
+      fetchSpy
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            models: [{ name: 'accounts/fireworks/models/chat-a', supportsServerless: true }],
+            nextPageToken: 'page-2',
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            models: [{ name: 'accounts/fireworks/models/chat-b', supportsServerless: true }],
+            nextPageToken: 'page-2',
+          }),
+        });
+
+      const result = await service.fetch('fireworks', 'fw-test-key');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(result.map((m) => m.id)).toEqual([
+        'accounts/fireworks/models/chat-a',
+        'accounts/fireworks/models/chat-b',
+      ]);
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Stopping Fireworks model pagination after repeated token page-2',
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it('caps Fireworks pagination when unique page tokens never stop', async () => {
+      const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+
+      Array.from({ length: 25 }, (_, index) => {
+        fetchSpy.mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            models: [
+              {
+                name: `accounts/fireworks/models/chat-${index}`,
+                supportsServerless: true,
+              },
+            ],
+            nextPageToken: `page-${index + 1}`,
+          }),
+        });
+      });
+
+      const result = await service.fetch('fireworks', 'fw-test-key');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(20);
+      expect(fetchSpy).toHaveBeenLastCalledWith(
+        'https://api.fireworks.ai/v1/accounts/fireworks/models?filter=supports_serverless%3Dtrue&pageSize=200&pageToken=page-19',
+        expect.objectContaining({
+          headers: { Authorization: 'Bearer fw-test-key' },
+        }),
+      );
+      expect(result).toHaveLength(20);
+      expect(warnSpy).toHaveBeenCalledWith('Stopping Fireworks model pagination after 20 pages');
+
+      warnSpy.mockRestore();
+    });
+  });
+
   /* ── Mistral-specific filter ── */
 
   describe('parseMistralChatOnly (via mistral provider)', () => {
@@ -417,6 +625,30 @@ describe('ProviderModelFetcherService', () => {
 
   /* ── Z.ai subscription routing ── */
 
+  it('should fetch BytePlus ModelArk Coding Plan models with Bearer auth', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 'ark-code-latest' },
+          { id: 'deepseek-v4-flash' },
+          { id: 'seedream-3-0-t2i-250415' },
+        ],
+      }),
+    });
+
+    const result = await service.fetch('byteplus', 'bp-sub-key', 'subscription');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://ark.ap-southeast.bytepluses.com/api/coding/v3/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer bp-sub-key' }),
+      }),
+    );
+    expect(result.map((m) => m.id)).toEqual(['ark-code-latest', 'deepseek-v4-flash']);
+    expect(result.every((m) => m.provider === 'byteplus')).toBe(true);
+  });
+
   it('should return glm-5.1 from zai models (no longer blocklisted)', async () => {
     fetchSpy.mockResolvedValue({
       ok: true,
@@ -438,12 +670,31 @@ describe('ProviderModelFetcherService', () => {
     const result = await service.fetch('zai', 'zai-sub-key', 'subscription');
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      'https://open.bigmodel.cn/api/coding/paas/v4/models',
+      'https://api.z.ai/api/coding/paas/v4/models',
       expect.objectContaining({
         headers: expect.objectContaining({ Authorization: 'Bearer zai-sub-key' }),
       }),
     );
     expect(result.map((m) => m.id)).toEqual(['glm-5.1', 'glm-4.7']);
+  });
+
+  it('should route zai+subscription endpoint override to selected Coding Plan models endpoint', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ id: 'glm-5.1' }] }),
+    });
+
+    await service.fetch(
+      'zai',
+      'zai-sub-key',
+      'subscription',
+      'https://open.bigmodel.cn/api/coding/paas/v4',
+    );
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://open.bigmodel.cn/api/coding/paas/v4/models',
+      expect.any(Object),
+    );
   });
 
   it('should route zai+api_key to standard models endpoint', async () => {
@@ -458,6 +709,236 @@ describe('ProviderModelFetcherService', () => {
       'https://open.bigmodel.cn/api/paas/v4/models',
       expect.any(Object),
     );
+  });
+
+  /* ── Qwen Token Plan subscription routing ── */
+
+  it('should fetch Qwen Token Plan models and filter image-only models', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 'qwen3.6-plus', object: 'model' },
+          { id: 'qwen-image-2.0', object: 'model' },
+          { id: 'wan2.7-image-pro', object: 'model' },
+          { id: 'deepseek-v4-pro', object: 'model' },
+        ],
+      }),
+    });
+
+    const result = await service.fetch('qwen', 'sk-sp-token-plan-key', 'subscription');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1/models',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer sk-sp-token-plan-key' },
+      }),
+    );
+    expect(result.map((m) => m.id)).toEqual(['qwen3.6-plus', 'deepseek-v4-pro']);
+    expect(result[0]).toMatchObject({
+      contextWindow: 991000,
+      inputPricePerToken: 0,
+      outputPricePerToken: 0,
+    });
+  });
+
+  it('should apply endpoint override for Qwen Token Plan subscription discovery', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [] }),
+    });
+
+    await service.fetch(
+      'qwen',
+      'sk-sp-token-plan-key',
+      'subscription',
+      'https://dashscope-intl.aliyuncs.com/compatible-mode',
+    );
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer sk-sp-token-plan-key' },
+      }),
+    );
+  });
+
+  /* ── Xiaomi MiMo Token Plan subscription routing ── */
+
+  it('should fetch Xiaomi MiMo API-key models and filter media-only models', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 'mimo-v2.5-pro' },
+          { id: 'mimo-v2.5' },
+          { id: 'mimo-v2.5-asr-preview' },
+          { id: 'mimo-v2.5-tts-preview' },
+          { id: 'not-mimo-chat' },
+        ],
+      }),
+    });
+
+    const result = await service.fetch('xiaomi', 'sk-mimo-test');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.xiaomimimo.com/v1/models',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer sk-mimo-test' },
+      }),
+    );
+    expect(result.map((m) => m.id)).toEqual(['mimo-v2.5-pro', 'mimo-v2.5']);
+    expect(result[0]).toMatchObject({
+      provider: 'xiaomi',
+      contextWindow: 1048576,
+      inputPricePerToken: null,
+      outputPricePerToken: null,
+      capabilityCode: true,
+    });
+  });
+
+  it('should route Xiaomi subscription discovery to the default Token Plan models endpoint', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [{ id: 'mimo-v2.5-pro' }, { id: 'mimo-v2-flash' }],
+      }),
+    });
+
+    const result = await service.fetch('xiaomi', 'tp-mimo-token', 'subscription');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://token-plan-cn.xiaomimimo.com/v1/models',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer tp-mimo-token' },
+      }),
+    );
+    expect(result.map((m) => m.id)).toEqual(['mimo-v2.5-pro', 'mimo-v2-flash']);
+    expect(result[1].contextWindow).toBe(262144);
+  });
+
+  it('should apply endpoint override for Xiaomi MiMo Token Plan subscription discovery', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [] }),
+    });
+
+    await service.fetch(
+      'xiaomi',
+      'tp-mimo-token',
+      'subscription',
+      'https://token-plan-ams.xiaomimimo.com',
+    );
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://token-plan-ams.xiaomimimo.com/v1/models',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer tp-mimo-token' },
+      }),
+    );
+  });
+
+  /* ── Kimi Coding Plan subscription routing ── */
+
+  it('should skip live model fetching for moonshot subscription auth', async () => {
+    const result = await service.fetch('moonshot', 'kimi-code-key', 'subscription');
+
+    expect(result).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  /* ── Kiro subscription provider ── */
+
+  it('should fetch Kiro models dynamically through the Kiro model-list operation', async () => {
+    fetchSpy
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          models: [
+            {
+              model_id: 'auto',
+              model_name: 'auto',
+              context_window_tokens: 1000000,
+            },
+          ],
+          nextToken: 'next-page',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          models: [
+            {
+              modelId: 'claude-sonnet-4.5',
+              modelName: 'Claude Sonnet 4.5',
+              tokenLimits: { maxInputTokens: 200000 },
+            },
+          ],
+        }),
+      });
+
+    const result = await service.fetch('kiro', 'ksk_test', 'subscription');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenNthCalledWith(
+      1,
+      'https://q.us-east-1.amazonaws.com',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ksk_test',
+          'Content-Type': 'application/x-amz-json-1.0',
+          'x-amz-target': 'AmazonCodeWhispererService.ListAvailableModels',
+        },
+      }),
+    );
+    expect(JSON.parse(fetchSpy.mock.calls[0][1].body)).toEqual({
+      origin: 'KIRO_CLI',
+      maxResults: 100,
+    });
+    expect(JSON.parse(fetchSpy.mock.calls[1][1].body)).toEqual({
+      origin: 'KIRO_CLI',
+      maxResults: 100,
+      nextToken: 'next-page',
+    });
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'kiro/auto',
+        displayName: 'auto',
+        provider: 'kiro',
+        contextWindow: 1000000,
+        inputPricePerToken: 0,
+        outputPricePerToken: 0,
+        capabilityCode: true,
+      }),
+      expect.objectContaining({
+        id: 'kiro/claude-sonnet-4.5',
+        displayName: 'Claude Sonnet 4.5',
+        contextWindow: 200000,
+      }),
+    ]);
+  });
+
+  it('should return [] when Kiro model discovery rejects the API key', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 403,
+    });
+
+    const result = await service.fetch('kiro', 'ksk_bad', 'subscription');
+
+    expect(result).toEqual([]);
+  });
+
+  it('should clear the Kiro model discovery timeout when fetch rejects', async () => {
+    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+    fetchSpy.mockRejectedValue(new Error('network failure'));
+
+    const result = await service.fetch('kiro', 'ksk_test', 'subscription');
+
+    expect(result).toEqual([]);
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+    clearTimeoutSpy.mockRestore();
   });
 
   /* ── Groq provider ── */
@@ -511,6 +992,136 @@ describe('ProviderModelFetcherService', () => {
           headers: { Authorization: 'Bearer gsk_test_key' },
         }),
       );
+    });
+  });
+
+  describe('kilo provider', () => {
+    it('fetches the public Kilo Gateway model catalog with bearer auth', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            {
+              id: 'kilo-auto/frontier',
+              name: 'Auto Frontier',
+              context_length: 1000000,
+              pricing: { prompt: '0.000005', completion: '0.000025' },
+              supported_parameters: ['max_tokens', 'temperature', 'tools', 'reasoning'],
+              architecture: { output_modalities: ['text'] },
+            },
+            {
+              id: 'anthropic/claude-sonnet-4.5',
+              name: 'Claude Sonnet 4.5',
+              top_provider: { context_length: 200000 },
+              supported_parameters: ['max_tokens', 'tools'],
+              architecture: { output_modalities: ['text'] },
+            },
+          ],
+        }),
+      });
+
+      const result = await service.fetch('kilo', 'kilo-token');
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://api.kilo.ai/api/gateway/models',
+        expect.objectContaining({
+          headers: { Authorization: 'Bearer kilo-token' },
+        }),
+      );
+      expect(result).toEqual([
+        expect.objectContaining({
+          id: 'kilo-auto/frontier',
+          displayName: 'Auto Frontier',
+          provider: 'kilo',
+          contextWindow: 1000000,
+          inputPricePerToken: 0.000005,
+          outputPricePerToken: 0.000025,
+          capabilityReasoning: true,
+          capabilityCode: true,
+        }),
+        expect.objectContaining({
+          id: 'anthropic/claude-sonnet-4.5',
+          displayName: 'Claude Sonnet 4.5',
+          provider: 'kilo',
+          contextWindow: 200000,
+          capabilityReasoning: false,
+          capabilityCode: true,
+        }),
+      ]);
+    });
+
+    it('filters non-text output models from the Kilo catalog', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            { id: 'openai/gpt-5.4', architecture: { output_modalities: ['text'] } },
+            { id: 'openai/gpt-image-2', architecture: { output_modalities: ['image'] } },
+          ],
+        }),
+      });
+
+      const result = await service.fetch('kilo', 'kilo-token');
+
+      expect(result.map((m) => m.id)).toEqual(['openai/gpt-5.4']);
+    });
+
+    it('returns [] when the Kilo catalog data field is missing', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      });
+
+      const result = await service.fetch('kilo', 'kilo-token');
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  /* ── NVIDIA NIM provider ── */
+
+  describe('nvidia provider', () => {
+    it('should hit the hosted NVIDIA NIM models endpoint with bearer auth', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({ data: [] }),
+      });
+
+      await service.fetch('nvidia', 'nvapi-test-key');
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://integrate.api.nvidia.com/v1/models',
+        expect.objectContaining({
+          headers: { Authorization: 'Bearer nvapi-test-key' },
+        }),
+      );
+    });
+
+    it('should deduplicate models and filter non-chat NIM catalog entries', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            { id: 'deepseek-ai/deepseek-v4-pro' },
+            { id: 'deepseek-ai/deepseek-v4-pro' },
+            { id: 'nvidia/nemotron-3-super-120b-a12b' },
+            { id: 'openai/gpt-oss-20b' },
+            { id: 'nvidia/embed-qa-4' },
+            { id: 'black-forest-labs/flux_1-schnell' },
+            { id: 'nvidia/ai-synthetic-video-detector' },
+            { id: 'nvidia/nemotron-4-340b-reward' },
+            { id: 'nvidia/llama-3.1-nemoguard-8b-content-safety' },
+          ],
+        }),
+      });
+
+      const result = await service.fetch('nvidia', 'nvapi-test-key');
+      expect(result.map((m) => m.id)).toEqual([
+        'deepseek-ai/deepseek-v4-pro',
+        'nvidia/nemotron-3-super-120b-a12b',
+        'openai/gpt-oss-20b',
+      ]);
+      expect(result.every((m) => m.provider === 'nvidia')).toBe(true);
     });
   });
 
@@ -698,7 +1309,7 @@ describe('ProviderModelFetcherService', () => {
       );
     });
 
-    it('should send bearer header + beta for subscription auth', async () => {
+    it('should send Claude Code-shaped bearer headers for subscription auth', async () => {
       fetchSpy.mockResolvedValue({
         ok: true,
         json: async () => ({ data: [] }),
@@ -712,10 +1323,15 @@ describe('ProviderModelFetcherService', () => {
           headers: expect.objectContaining({
             'anthropic-version': '2023-06-01',
             Authorization: 'Bearer token',
-            'anthropic-beta': 'oauth-2025-04-20',
+            'anthropic-beta': expect.stringContaining('claude-code-20250219'),
+            'anthropic-dangerous-direct-browser-access': 'true',
+            'user-agent': expect.stringContaining('claude-cli/'),
+            'x-app': 'cli',
           }),
         }),
       );
+      const headers = fetchSpy.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(headers['anthropic-beta']).toContain('oauth-2025-04-20');
     });
   });
 
@@ -883,6 +1499,15 @@ describe('ProviderModelFetcherService', () => {
         expect.stringContaining('key=my-gem-key'),
         expect.objectContaining({ headers: {} }),
       );
+    });
+
+    it('should return [] immediately without any HTTP call when authType is subscription', async () => {
+      // CodeAssist does not expose a /models endpoint; the discovery fallback
+      // chain handles Gemini subscription models via the OpenRouter cache.
+      const result = await service.fetch('gemini', 'ya29.some-oauth-access-token', 'subscription');
+
+      expect(result).toEqual([]);
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -1220,16 +1845,16 @@ describe('ProviderModelFetcherService', () => {
         json: async () => ({
           models: [
             {
-              slug: 'gpt-5.3-codex',
-              display_name: 'GPT-5.3 Codex',
+              slug: 'gpt-5.5',
+              display_name: 'GPT-5.5',
               context_window: 192000,
               visibility: 'list',
               supported_in_api: true,
               priority: 10,
             },
             {
-              slug: 'gpt-5.2-codex',
-              display_name: 'GPT-5.2 Codex',
+              slug: 'gpt-5.4',
+              display_name: 'GPT-5.4',
               context_window: 200000,
               visibility: 'list',
               supported_in_api: true,
@@ -1242,8 +1867,8 @@ describe('ProviderModelFetcherService', () => {
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual(
         expect.objectContaining({
-          id: 'gpt-5.3-codex',
-          displayName: 'GPT-5.3 Codex',
+          id: 'gpt-5.5',
+          displayName: 'GPT-5.5',
           provider: 'openai',
           contextWindow: 192000,
           inputPricePerToken: 0,
@@ -1252,7 +1877,28 @@ describe('ProviderModelFetcherService', () => {
           qualityScore: 3,
         }),
       );
-      expect(result[1].id).toBe('gpt-5.2-codex');
+      expect(result[1].id).toBe('gpt-5.4');
+    });
+
+    it('should filter ChatGPT-account unsupported Codex models from the models response', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          models: [
+            { slug: 'gpt-5.5', visibility: 'list' },
+            { slug: 'gpt-5.3-codex', visibility: 'list' },
+            { slug: 'gpt-5.2-codex', visibility: 'list' },
+            { slug: 'gpt-5.2', visibility: 'list' },
+            { slug: 'gpt-5.1-codex-max', visibility: 'list' },
+            { slug: 'gpt-5.1-codex', visibility: 'list' },
+            { slug: 'gpt-5.3-codex-spark', visibility: 'list' },
+          ],
+        }),
+      });
+
+      const result = await service.fetch('openai', 'oauth-token', 'subscription');
+
+      expect(result.map((m) => m.id)).toEqual(['gpt-5.5', 'gpt-5.3-codex-spark']);
     });
 
     it('should filter out models with visibility !== list', async () => {
@@ -1361,7 +2007,11 @@ describe('ProviderModelFetcherService', () => {
         ok: true,
         json: async () => ({
           data: [
-            { id: 'claude-opus-4.6', object: 'model' },
+            {
+              id: 'claude-opus-4.6',
+              object: 'model',
+              supported_endpoints: ['/chat/completions', '/v1/messages'],
+            },
             { id: 'gpt-4o', object: 'model' },
           ],
         }),
@@ -1378,6 +2028,7 @@ describe('ProviderModelFetcherService', () => {
           inputPricePerToken: 0,
           outputPricePerToken: 0,
           qualityScore: 3,
+          supportedEndpoints: ['/chat/completions', '/v1/messages'],
         }),
       );
       expect(result[1].id).toBe('copilot/gpt-4o');
@@ -1490,6 +2141,88 @@ describe('ProviderModelFetcherService', () => {
       const result = await service.fetch('opencode-go', 'og-token', 'subscription');
       expect(result).toEqual([]);
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('commandcode provider', () => {
+    it('fetches the Provider API /models catalog with Bearer auth and namespaces model ids', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            {
+              id: 'claude-sonnet-4-6',
+              name: 'Claude Sonnet 4.6',
+              context_length: 1000000,
+            },
+            {
+              id: 'deepseek/deepseek-v4-flash',
+              name: 'DeepSeek V4 Flash',
+              context_length: 1000000,
+            },
+          ],
+        }),
+      });
+
+      const result = await service.fetch('commandcode', 'user_test', 'subscription');
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://api.commandcode.ai/provider/v1/models',
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer user_test' }),
+        }),
+      );
+      expect(result).toEqual([
+        expect.objectContaining({
+          id: 'commandcode/claude-sonnet-4-6',
+          displayName: 'Claude Sonnet 4.6',
+          provider: 'commandcode',
+          contextWindow: 1000000,
+          capabilityCode: true,
+        }),
+        expect.objectContaining({
+          id: 'commandcode/deepseek/deepseek-v4-flash',
+          displayName: 'DeepSeek V4 Flash',
+          provider: 'commandcode',
+          contextWindow: 1000000,
+          capabilityCode: true,
+        }),
+      ]);
+    });
+  });
+
+  describe('opencode-zen provider', () => {
+    it('fetches the OpenAI-compatible /v1/models catalog with Bearer auth and namespaces every model id', async () => {
+      fetchSpy.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [
+            { id: 'qwen3.6-plus', object: 'model', owned_by: 'opencode' },
+            { id: 'claude-opus-4-7', object: 'model', owned_by: 'opencode' },
+            { id: 'gemini-3-flash', object: 'model', owned_by: 'opencode' },
+          ],
+        }),
+      });
+
+      const result = await service.fetch('opencode-zen', 'oz-token');
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://opencode.ai/zen/v1/models',
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer oz-token' }),
+        }),
+      );
+      expect(result).toHaveLength(3);
+      // IDs must be prefixed so they cannot collide with the same bare model
+      // names served by a directly-connected Google/Qwen/Anthropic provider.
+      expect(result.map((m) => m.id)).toEqual([
+        'opencode-zen/qwen3.6-plus',
+        'opencode-zen/claude-opus-4-7',
+        'opencode-zen/gemini-3-flash',
+      ]);
+      expect(result[0]).toEqual(
+        expect.objectContaining({ provider: 'opencode-zen', displayName: 'qwen3.6-plus' }),
+      );
     });
   });
 

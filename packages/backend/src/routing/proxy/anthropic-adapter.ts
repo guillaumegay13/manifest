@@ -11,6 +11,7 @@ import type { ThinkingBlock } from './thinking-block-cache';
 interface ContentBlock {
   type: string;
   text?: string;
+  source?: { type: string; media_type?: string; data?: string; url?: string };
   id?: string;
   name?: string;
   input?: unknown;
@@ -32,6 +33,30 @@ interface AnthropicTool {
 }
 
 const CACHE = { type: 'ephemeral' } as const;
+const MAX_CACHE_CONTROL_BLOCKS = 4;
+const ANTHROPIC_PREFIX = 'anthropic/';
+const DATA_IMAGE_URL_RE = /^data:([^;,]+)(?:;[^,]*)?;base64,(.*)$/is;
+
+function bareAnthropicModel(model: string): string {
+  return model.startsWith(ANTHROPIC_PREFIX) ? model.slice(ANTHROPIC_PREFIX.length) : model;
+}
+
+function isClaudeHaikuModel(model: string): boolean {
+  const bare = bareAnthropicModel(model).replace(/\./g, '-');
+  return bare.startsWith('claude-haiku-');
+}
+
+function shouldForwardAnthropicThinking(thinking: unknown, model: string): boolean {
+  if (
+    thinking &&
+    typeof thinking === 'object' &&
+    !Array.isArray(thinking) &&
+    (thinking as Record<string, unknown>).type === 'adaptive'
+  ) {
+    return !isClaudeHaikuModel(model);
+  }
+  return true;
+}
 
 /**
  * System prompt required by Anthropic's subscription OAuth API to unlock
@@ -42,7 +67,6 @@ const CACHE = { type: 'ephemeral' } as const;
 const SUBSCRIPTION_IDENTITY_BLOCK: ContentBlock = {
   type: 'text',
   text: "You are a Claude agent, built on Anthropic's Claude Agent SDK.",
-  cache_control: { type: 'ephemeral' },
 };
 
 function safeParseArgs(args: string | undefined): unknown {
@@ -53,7 +77,49 @@ function safeParseArgs(args: string | undefined): unknown {
   }
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function countCacheControlBlocks(value: unknown): number {
+  if (!value || typeof value !== 'object') return 0;
+
+  let count = !Array.isArray(value) && 'cache_control' in value ? 1 : 0;
+  const children = Array.isArray(value) ? value : Object.values(value);
+  for (const child of children) count += countCacheControlBlocks(child);
+  return count;
+}
+
+function tryAddCacheControl(
+  block: { cache_control?: unknown } | undefined,
+  budget: { remaining: number },
+): void {
+  if (!block || block.cache_control || budget.remaining <= 0) return;
+  block.cache_control = CACHE;
+  budget.remaining -= 1;
+}
+
+function isClaudeSonnetModel(model: string | undefined): boolean {
+  if (!model) return false;
+  return bareAnthropicModel(model).replace(/\./g, '-').startsWith('claude-sonnet-');
+}
+
+function normalizeOutputConfigForModel(outputConfig: unknown, model: string | undefined): unknown {
+  if (!isObjectRecord(outputConfig)) return outputConfig;
+  if (outputConfig.effort !== 'xhigh' || !isClaudeSonnetModel(model)) return outputConfig;
+  return { ...outputConfig, effort: 'high' };
+}
+
 /* ── Request helpers ── */
+
+function isTextContentPart(part: Record<string, unknown>): part is Record<string, unknown> & {
+  text: string;
+} {
+  return (
+    typeof part.text === 'string' &&
+    (part.type === 'text' || part.type === 'input_text' || part.type === 'output_text')
+  );
+}
 
 function extractSystemBlocks(messages: OpenAIMessage[]): ContentBlock[] {
   const blocks: ContentBlock[] = [];
@@ -63,7 +129,7 @@ function extractSystemBlocks(messages: OpenAIMessage[]): ContentBlock[] {
       blocks.push({ type: 'text', text: msg.content });
     } else if (Array.isArray(msg.content)) {
       for (const part of msg.content as Array<Record<string, unknown>>) {
-        if (part.type === 'text' && typeof part.text === 'string') {
+        if (isObjectRecord(part) && isTextContentPart(part)) {
           blocks.push({ type: 'text', text: part.text });
         }
       }
@@ -72,12 +138,61 @@ function extractSystemBlocks(messages: OpenAIMessage[]): ContentBlock[] {
   return blocks;
 }
 
-function toContentBlocks(content: unknown): ContentBlock[] {
+function extractOpenAiImageUrl(imageUrl: unknown): string | null {
+  if (typeof imageUrl === 'string') return imageUrl;
+  if (!isObjectRecord(imageUrl) || typeof imageUrl.url !== 'string') return null;
+  return imageUrl.url;
+}
+
+function imageUrlToAnthropicBlock(imageUrl: unknown): ContentBlock | null {
+  const url = extractOpenAiImageUrl(imageUrl);
+  if (!url) return null;
+
+  const dataUrl = DATA_IMAGE_URL_RE.exec(url);
+  if (dataUrl) {
+    const mediaType = dataUrl[1] || 'image/png';
+    if (!mediaType.toLowerCase().startsWith('image/')) return null;
+    return {
+      type: 'image',
+      source: { type: 'base64', media_type: mediaType, data: dataUrl[2] },
+    };
+  }
+
+  return { type: 'image', source: { type: 'url', url } };
+}
+
+function normalizeAnthropicImageBlock(part: Record<string, unknown>): ContentBlock | null {
+  if (part.type !== 'image' || !isObjectRecord(part.source)) return null;
+  const source = part.source;
+  if (source.type === 'base64' && typeof source.data === 'string') {
+    const mediaType = typeof source.media_type === 'string' ? source.media_type : 'image/png';
+    return { type: 'image', source: { type: 'base64', media_type: mediaType, data: source.data } };
+  }
+  if (source.type === 'url' && typeof source.url === 'string') {
+    return { type: 'image', source: { type: 'url', url: source.url } };
+  }
+  return null;
+}
+
+function toContentBlocks(content: unknown, includeImages = false): ContentBlock[] {
   if (typeof content === 'string') return content ? [{ type: 'text', text: content }] : [];
   if (Array.isArray(content)) {
-    return (content as Array<Record<string, unknown>>)
-      .filter((b) => b.type === 'text' && typeof b.text === 'string')
-      .map((b) => ({ type: 'text', text: b.text as string }));
+    const blocks: ContentBlock[] = [];
+    for (const part of content) {
+      if (!isObjectRecord(part)) continue;
+      if (isTextContentPart(part)) {
+        blocks.push({ type: 'text', text: part.text });
+      } else if (includeImages) {
+        const imageBlock =
+          part.type === 'image_url'
+            ? imageUrlToAnthropicBlock(part.image_url)
+            : part.type === 'input_image'
+              ? imageUrlToAnthropicBlock(part.image_url)
+              : normalizeAnthropicImageBlock(part);
+        if (imageBlock) blocks.push(imageBlock);
+      }
+    }
+    return blocks;
   }
   return [];
 }
@@ -133,7 +248,7 @@ function convertMessage(
     return blocks.length > 0 ? { role: 'assistant', content: blocks } : null;
   }
 
-  const blocks = toContentBlocks(msg.content);
+  const blocks = toContentBlocks(msg.content, true);
   return blocks.length > 0 ? { role: 'user', content: blocks } : null;
 }
 
@@ -152,12 +267,12 @@ function convertTools(tools?: Array<Record<string, unknown>>): AnthropicTool[] |
 /* ── Request conversion ── */
 
 export interface AnthropicRequestOptions {
-  /** When false, cache_control fields are omitted from the request. Defaults to true. */
-  injectCacheControl?: boolean;
   /** When true, prepends the Claude Code agent system prompt required for subscription OAuth tokens. */
   injectSubscriptionIdentity?: boolean;
   /** Lookup for re-injecting cached extended-thinking blocks. */
   thinkingLookup?: ThinkingBlockLookup;
+  /** Resolved Anthropic upstream model, used for model-specific body normalization. */
+  targetModel?: string;
 }
 
 export function toAnthropicRequest(
@@ -165,10 +280,9 @@ export function toAnthropicRequest(
   _model: string,
   options?: AnthropicRequestOptions,
 ): Record<string, unknown> {
-  const shouldCache = options?.injectCacheControl !== false;
   const messages = (body.messages as OpenAIMessage[]) || [];
   const systemBlocks = extractSystemBlocks(messages);
-  if (systemBlocks.length > 0 && shouldCache) {
+  if (systemBlocks.length > 0) {
     systemBlocks[systemBlocks.length - 1].cache_control = CACHE;
   }
 
@@ -186,43 +300,15 @@ export function toAnthropicRequest(
   };
   if (systemBlocks.length > 0) result.system = systemBlocks;
 
-  // Re-emit Anthropic server tools (web_search_*, bash_*, text_editor_*, etc.)
-  // unchanged when the inbound request was Anthropic Messages and stashed them
-  // on the body. The OpenAI tool shape can't represent a server tool's `type`
-  // tag, so convertTools would produce nameless customs that Anthropic rejects
-  // (issue #1886). Drop function-shaped entries whose name collides with a
-  // stashed server tool, then prepend the originals.
-  //
-  // Filter to plain objects up front so a malformed stash element (null,
-  // primitive, array) doesn't throw on spread or break the name index.
-  const stashedServerTools = Array.isArray(body._anthropicServerTools)
-    ? body._anthropicServerTools.filter(
-        (t): t is Record<string, unknown> => !!t && typeof t === 'object' && !Array.isArray(t),
-      )
-    : [];
-  const serverToolNames = new Set<string>();
-  for (const t of stashedServerTools) {
-    if (typeof t.name === 'string') serverToolNames.add(t.name);
-  }
-  const convertedTools = convertTools(body.tools as Array<Record<string, unknown>> | undefined);
-  const customTools: AnthropicTool[] = convertedTools
-    ? convertedTools.filter((t) => !serverToolNames.has(t.name))
-    : [];
-  // Strip any pre-existing cache_control on stashed entries when caching is
-  // disabled (e.g. subscription OAuth path) — otherwise a client-supplied
-  // breakpoint would leak through and Anthropic would still treat the
-  // request as cached.
-  const combinedTools: AnthropicTool[] = [
-    ...stashedServerTools.map((t) => {
-      const clone = { ...t } as Record<string, unknown>;
-      if (!shouldCache) delete clone.cache_control;
-      return clone as unknown as AnthropicTool;
-    }),
-    ...customTools,
-  ];
-  if (combinedTools.length > 0) {
-    if (shouldCache) combinedTools[combinedTools.length - 1].cache_control = CACHE;
-    result.tools = combinedTools;
+  // This path runs only for chat_completions inbound requests resolving to an
+  // Anthropic upstream. Anthropic Messages inbound requests (POST /v1/messages)
+  // bypass translation entirely via applyAnthropicMessagesMutations, so
+  // server tools never reach this code path and the OpenAI function-shape
+  // assumption is safe.
+  const tools = convertTools(body.tools as Array<Record<string, unknown>> | undefined);
+  if (tools) {
+    tools[tools.length - 1].cache_control = CACHE;
+    result.tools = tools;
   }
 
   if (body.temperature !== undefined) result.temperature = body.temperature;
@@ -231,7 +317,9 @@ export function toAnthropicRequest(
   // Anthropic-native fields forwarded when the inbound request originated as
   // Anthropic Messages (POST /v1/messages). Chat-completions clients won't
   // set these, so this is a no-op for the OpenAI-compat path.
-  if (body.thinking !== undefined) result.thinking = body.thinking;
+  if (body.thinking !== undefined && shouldForwardAnthropicThinking(body.thinking, _model)) {
+    result.thinking = body.thinking;
+  }
   // chat_completions `stop` accepts string OR string[]; Anthropic
   // `stop_sequences` is always an array. Wrap a bare string so a single
   // stop sequence isn't silently dropped.
@@ -240,6 +328,125 @@ export function toAnthropicRequest(
   } else if (typeof body.stop === 'string' && body.stop) {
     result.stop_sequences = [body.stop];
   }
+  return result;
+}
+
+/**
+ * Walk a native Anthropic Messages response body and pull out extended-thinking
+ * blocks keyed by the first `tool_use` id, for the thinking-block cache. The
+ * body itself is not mutated — used by the messages-passthrough response path
+ * where we forward Anthropic content blocks unchanged (so `server_tool_use` /
+ * `web_search_tool_result` and other Anthropic-only block types survive).
+ */
+export function extractThinkingBlocksFromMessagesResponse(
+  body: Record<string, unknown>,
+): ExtractedThinkingBlocks | undefined {
+  const content = body.content;
+  if (!Array.isArray(content)) return undefined;
+  let firstToolUseId: string | null = null;
+  const blocks: ThinkingBlock[] = [];
+  for (const block of content as Array<Record<string, unknown>>) {
+    if (block.type === 'thinking' || block.type === 'redacted_thinking') {
+      blocks.push(block as ThinkingBlock);
+    } else if (
+      block.type === 'tool_use' &&
+      firstToolUseId === null &&
+      typeof block.id === 'string'
+    ) {
+      firstToolUseId = block.id;
+    }
+  }
+  if (blocks.length === 0 || firstToolUseId === null) return undefined;
+  return { firstToolUseId, blocks };
+}
+
+/**
+ * Apply additive mutations to a body that is ALREADY in Anthropic Messages
+ * shape (inbound `POST /v1/messages` forwarded to an Anthropic upstream).
+ * Bypasses the lossy OpenAI round-trip used by `toAnthropicRequest`: server
+ * tools keep their `type` discriminator, `cache_control` placement matches
+ * what Anthropic would see natively, and Anthropic-only fields don't leak
+ * through a chat-completions stencil. Mutations:
+ *
+ * - Default `max_tokens` to 4096 if unset.
+ * - Inject the subscription-identity system block for OAuth tokens.
+ * - Place a `cache_control` breakpoint on the last system block and last tool.
+ * - Replay cached extended-thinking blocks at the head of assistant turns
+ *   whose first content block is a `tool_use`.
+ */
+export function applyAnthropicMessagesMutations(
+  body: Record<string, unknown>,
+  options?: AnthropicRequestOptions,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...body };
+  const cacheBudget = {
+    remaining: Math.max(0, MAX_CACHE_CONTROL_BLOCKS - countCacheControlBlocks(body)),
+  };
+
+  // Normalize `system` to a content-block array so cache_control + identity
+  // injection have a uniform target. Anthropic accepts either a bare string
+  // or an array of blocks; we always emit the array form when either
+  // mutation needs to happen, otherwise we leave a string system intact.
+  const needsBlockSystem =
+    options?.injectSubscriptionIdentity ||
+    (typeof body.system === 'string' ? body.system : Array.isArray(body.system));
+  if (needsBlockSystem) {
+    let systemBlocks: ContentBlock[] = [];
+    if (typeof body.system === 'string') {
+      if (body.system) systemBlocks.push({ type: 'text', text: body.system });
+    } else if (Array.isArray(body.system)) {
+      systemBlocks = (body.system as ContentBlock[]).map((b) => ({ ...b }));
+    }
+    tryAddCacheControl(systemBlocks[systemBlocks.length - 1], cacheBudget);
+    if (options?.injectSubscriptionIdentity) {
+      systemBlocks.unshift({ ...SUBSCRIPTION_IDENTITY_BLOCK });
+    }
+    if (systemBlocks.length > 0) {
+      result.system = systemBlocks;
+    } else {
+      delete result.system;
+    }
+  }
+
+  // Tools: shallow-clone the array + last entry so the cache_control mutation
+  // doesn't bleed back into the inbound body. Server tools' `type` tag and
+  // custom tools' `input_schema` both survive unchanged.
+  if (Array.isArray(body.tools)) {
+    const tools = (body.tools as Array<Record<string, unknown>>).map((t) => ({ ...t }));
+    tryAddCacheControl(tools[tools.length - 1], cacheBudget);
+    result.tools = tools;
+  }
+
+  if (result.max_tokens === undefined) result.max_tokens = 4096;
+  if (result.output_config !== undefined) {
+    result.output_config = normalizeOutputConfigForModel(
+      result.output_config,
+      options?.targetModel,
+    );
+  }
+
+  const thinkingLookup = options?.thinkingLookup;
+  if (thinkingLookup && Array.isArray(body.messages)) {
+    result.messages = (body.messages as Array<Record<string, unknown>>).map((m) => {
+      if (m.role !== 'assistant' || !Array.isArray(m.content)) return m;
+      const content = m.content as ContentBlock[];
+      const firstToolUse = content.find((b) => b.type === 'tool_use');
+      if (!firstToolUse || typeof firstToolUse.id !== 'string') return m;
+      // Native Messages clients may already echo the previous assistant's
+      // signed thinking blocks before the tool_use block. Prepending the
+      // cached copy in that case would duplicate signed blocks and the
+      // upstream would reject the conversation. Only replay when the turn
+      // is missing the thinking prelude.
+      const alreadyHasThinking = content.some(
+        (b) => b.type === 'thinking' || b.type === 'redacted_thinking',
+      );
+      if (alreadyHasThinking) return m;
+      const cached = thinkingLookup(firstToolUse.id);
+      if (!cached || cached.length === 0) return m;
+      return { ...m, content: [...(cached as ContentBlock[]), ...content] };
+    });
+  }
+
   return result;
 }
 
@@ -412,6 +619,20 @@ function handleMessageStart(state: StreamState, data: Record<string, unknown>): 
   return makeChunkSse(state.model, { role: 'assistant', content: '' }, null);
 }
 
+function applyMessageDeltaUsage(
+  state: StreamState,
+  usage: Record<string, unknown> | undefined,
+): void {
+  if (!usage) return;
+  if (typeof usage.input_tokens === 'number') state.inputTokens = usage.input_tokens;
+  if (typeof usage.cache_read_input_tokens === 'number') {
+    state.cacheReadTokens = usage.cache_read_input_tokens;
+  }
+  if (typeof usage.cache_creation_input_tokens === 'number') {
+    state.cacheCreationTokens = usage.cache_creation_input_tokens;
+  }
+}
+
 function handleContentBlockStart(state: StreamState, data: Record<string, unknown>): string | null {
   const block = data.content_block as Record<string, unknown> | undefined;
   const blockIndex = data.index as number;
@@ -509,8 +730,9 @@ function flushThinkingBlocks(state: StreamState): void {
 function handleMessageDelta(state: StreamState, data: Record<string, unknown>): string {
   flushThinkingBlocks(state);
   const delta = data.delta as Record<string, unknown> | undefined;
-  const usage = data.usage as Record<string, number> | undefined;
-  const outputTokens = usage?.output_tokens ?? 0;
+  const usage = data.usage as Record<string, unknown> | undefined;
+  applyMessageDeltaUsage(state, usage);
+  const outputTokens = typeof usage?.output_tokens === 'number' ? usage.output_tokens : 0;
   // inputTokens is non-cached only; total = non-cached + cache reads + cache creation
   const totalInput = state.inputTokens + state.cacheReadTokens + state.cacheCreationTokens;
 

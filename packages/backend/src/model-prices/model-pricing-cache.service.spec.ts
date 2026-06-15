@@ -32,7 +32,13 @@ function makeMockModelsDevSync() {
     lookupModel: jest.fn().mockReturnValue(null),
     getModelsForProvider: jest.fn().mockReturnValue([]),
     isProviderSupported: jest.fn().mockReturnValue(false),
+    whenInitialized: jest.fn().mockResolvedValue(undefined),
   };
+}
+
+/** Flush the fire-and-forget warmup chain (whenInitialized + reload microtasks). */
+function flushWarmup(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
 }
 
 describe('ModelPricingCacheService', () => {
@@ -40,23 +46,50 @@ describe('ModelPricingCacheService', () => {
   let mockGetAll: jest.Mock;
   let mockRegistry: ReturnType<typeof makeMockRegistry>;
   let mockModelsDevSync: ReturnType<typeof makeMockModelsDevSync>;
+  let mockPricingSync: { getAll: jest.Mock; whenInitialized: jest.Mock };
 
   beforeEach(() => {
     mockGetAll = jest.fn().mockReturnValue(new Map<string, OpenRouterPricingEntry>());
-    const mockSync = { getAll: mockGetAll } as unknown as PricingSyncService;
+    mockPricingSync = {
+      getAll: mockGetAll,
+      whenInitialized: jest.fn().mockResolvedValue(undefined),
+    };
     mockModelsDevSync = makeMockModelsDevSync();
     mockRegistry = makeMockRegistry();
     service = new ModelPricingCacheService(
-      mockSync,
+      mockPricingSync as unknown as PricingSyncService,
       mockModelsDevSync as unknown as ModelsDevSyncService,
       mockRegistry as unknown as ProviderModelRegistryService,
     );
   });
 
   describe('onApplicationBootstrap', () => {
-    it('should call reload()', async () => {
+    it('warms up the cache after the upstream syncs settle', async () => {
       const spy = jest.spyOn(service, 'reload').mockResolvedValue();
-      await service.onApplicationBootstrap();
+      // onApplicationBootstrap is fire-and-forget so it can't delay boot (#1894).
+      service.onApplicationBootstrap();
+      await flushWarmup();
+      expect(mockPricingSync.whenInitialized).toHaveBeenCalledTimes(1);
+      expect(mockModelsDevSync.whenInitialized).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it('swallows errors when reload fails during warmup', async () => {
+      jest.spyOn(service, 'reload').mockRejectedValue(new Error('boom'));
+      service.onApplicationBootstrap();
+      // warmup's try/catch handles it — no unhandled rejection
+      await expect(flushWarmup()).resolves.toBeUndefined();
+    });
+
+    it('tolerates a missing models.dev sync', async () => {
+      const soloService = new ModelPricingCacheService(
+        mockPricingSync as unknown as PricingSyncService,
+        null,
+        mockRegistry as unknown as ProviderModelRegistryService,
+      );
+      const spy = jest.spyOn(soloService, 'reload').mockResolvedValue();
+      soloService.onApplicationBootstrap();
+      await flushWarmup();
       expect(spy).toHaveBeenCalledTimes(1);
     });
   });
@@ -187,6 +220,53 @@ describe('ModelPricingCacheService', () => {
       const result = service.getByModel('claude-opus-4.6');
       expect(result).toBeDefined();
       expect(result!.provider).toBe('Anthropic');
+    });
+
+    it('does not resolve Bedrock vendor-prefixed model ids through underlying pricing aliases', async () => {
+      const orMap = new Map<string, OpenRouterPricingEntry>([
+        ['anthropic/claude-opus-4-6', makeEntry(0.015, 0.075)],
+      ]);
+      mockGetAll.mockReturnValue(orMap);
+      await service.reload();
+
+      const direct = service.getByModel('anthropic.claude-opus-4.6');
+      const crossRegion = service.getByModel('us.anthropic.claude-opus-4.6');
+
+      expect(direct).toBeUndefined();
+      expect(crossRegion).toBeUndefined();
+    });
+
+    it('does not resolve Bedrock short vendor model ids through provider-prefixed pricing aliases', async () => {
+      const orMap = new Map<string, OpenRouterPricingEntry>([
+        ['deepseek/deepseek-v3.2', makeEntry(0.0000002, 0.0000008)],
+      ]);
+      mockGetAll.mockReturnValue(orMap);
+      await service.reload();
+
+      const result = service.getByModel('deepseek.v3.2');
+
+      expect(result).toBeUndefined();
+    });
+
+    it('uses exact Bedrock models.dev pricing entries when present', async () => {
+      mockModelsDevSync.getModelsForProvider.mockImplementation((providerId: string) => {
+        if (providerId !== 'bedrock') return [];
+        return [
+          {
+            id: 'us.anthropic.claude-opus-4.6',
+            name: 'AWS Claude Opus 4.6',
+            inputPricePerToken: 0.000016,
+            outputPricePerToken: 0.00008,
+          },
+        ];
+      });
+      await service.reload();
+
+      const result = service.getByModel('us.anthropic.claude-opus-4.6');
+
+      expect(result).toBeDefined();
+      expect(result!.provider).toBe('AWS Bedrock');
+      expect(result!.input_price_per_token).toBe(0.000016);
     });
 
     it('should resolve dash-variant when cached Anthropic model uses dots', async () => {
@@ -422,6 +502,32 @@ describe('ModelPricingCacheService', () => {
       expect(entry).toBeDefined();
       expect(entry!.display_name).toBe('GPT-4o Enhanced');
       expect(entry!.source).toBe('models.dev');
+    });
+
+    it('should preserve models.dev cache pricing on pricing entries', async () => {
+      mockGetAll.mockReturnValue(new Map());
+      mockModelsDevSync.getModelsForProvider.mockImplementation((providerId: string) => {
+        if (providerId === 'deepseek') {
+          return [
+            {
+              id: 'deepseek-v4-pro',
+              name: 'DeepSeek V4 Pro',
+              inputPricePerToken: 0.435 / 1_000_000,
+              outputPricePerToken: 0.87 / 1_000_000,
+              cacheReadPricePerToken: 0.003625 / 1_000_000,
+              cacheWritePricePerToken: 0.435 / 1_000_000,
+            },
+          ];
+        }
+        return [];
+      });
+
+      await service.reload();
+
+      const entry = service.getByModel('deepseek-v4-pro');
+      expect(entry).toBeDefined();
+      expect(entry!.cache_read_price_per_token).toBe(0.003625 / 1_000_000);
+      expect(entry!.cache_write_price_per_token).toBe(0.435 / 1_000_000);
     });
 
     it('should set display_name to null when models.dev entry has no name', async () => {

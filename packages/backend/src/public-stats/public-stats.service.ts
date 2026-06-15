@@ -16,6 +16,12 @@ import { computeCutoff, sqlDateBucket } from '../common/utils/postgres-sql';
 
 const MAX_RESULTS = 10;
 const EXCLUDED_PROVIDERS = new Set(['Unknown']);
+// Upper bounds for the unbounded GROUP BY aggregations below. The endpoint is
+// public and uncached, so these caps stop a high-volume install (thousands of
+// distinct models) from materialising an unbounded result set on every call.
+// Both limits sit far above any realistic distinct-model count.
+const MAX_MODEL_ROWS = 1000;
+const MAX_PROVIDER_DAILY_ROWS = 50000;
 const EXCLUDED_AGENT_PLATFORMS = new Set<string>(['other']);
 const VALID_AGENT_CATEGORIES = new Set<string>(AGENT_CATEGORIES);
 const VALID_AGENT_PLATFORMS = new Set<string>(AGENT_PLATFORMS);
@@ -56,10 +62,17 @@ export interface ModelBreakdown {
   daily: DailyModelTokens[];
 }
 
+export interface ProviderAuthBreakdown {
+  auth_type: string;
+  total_tokens: number;
+  model_count: number;
+}
+
 export interface ProviderDailyTokens {
   provider: string;
   total_tokens: number;
   models: ModelBreakdown[];
+  auth_types: ProviderAuthBreakdown[];
 }
 
 export interface AgentDailyTokens {
@@ -97,6 +110,7 @@ export class PublicStatsService {
         .where('at.model IS NOT NULL')
         .groupBy('at.model')
         .orderBy('usage_count', 'DESC')
+        .limit(MAX_MODEL_ROWS)
         .getRawMany(),
       this.messageRepo
         .createQueryBuilder('at')
@@ -200,6 +214,7 @@ export class PublicStatsService {
       .addGroupBy('date')
       .addGroupBy('at.auth_type')
       .orderBy('date', 'ASC')
+      .limit(MAX_PROVIDER_DAILY_ROWS)
       .getRawMany();
 
     const modelMap = new Map<
@@ -243,12 +258,19 @@ export class PublicStatsService {
       entry.daily.set(r.date, (entry.daily.get(r.date) ?? 0) + tokens);
     }
 
-    const providerMap = new Map<string, { total: number; models: ModelBreakdown[] }>();
+    const providerMap = new Map<
+      string,
+      {
+        total: number;
+        models: ModelBreakdown[];
+        authTotals: Map<string, { total: number; modelCount: number }>;
+      }
+    >();
 
     for (const [, entry] of modelMap) {
       let prov = providerMap.get(entry.provider);
       if (!prov) {
-        prov = { total: 0, models: [] };
+        prov = { total: 0, models: [], authTotals: new Map() };
         providerMap.set(entry.provider, prov);
       }
       prov.total += entry.total;
@@ -261,6 +283,20 @@ export class PublicStatsService {
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([date, tokens]) => ({ date, tokens })),
       });
+
+      // Break each provider's usage down by auth type so the public site can
+      // list a provider once per auth method (e.g. an OpenAI API-key card and a
+      // separate ChatGPT subscription card). Rows with no recorded auth type
+      // (older messages) are counted as API key, matching how the model table
+      // renders a null auth_type.
+      const authKey = entry.authType ?? 'api_key';
+      let auth = prov.authTotals.get(authKey);
+      if (!auth) {
+        auth = { total: 0, modelCount: 0 };
+        prov.authTotals.set(authKey, auth);
+      }
+      auth.total += entry.total;
+      if (entry.total > 0) auth.modelCount += 1;
     }
 
     return Array.from(providerMap.entries())
@@ -269,6 +305,13 @@ export class PublicStatsService {
         provider,
         total_tokens: data.total,
         models: data.models.sort((a, b) => b.total_tokens - a.total_tokens),
+        auth_types: Array.from(data.authTotals.entries())
+          .map(([auth_type, totals]) => ({
+            auth_type,
+            total_tokens: totals.total,
+            model_count: totals.modelCount,
+          }))
+          .sort((a, b) => b.total_tokens - a.total_tokens),
       }));
   }
 

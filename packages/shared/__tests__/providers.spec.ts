@@ -60,6 +60,58 @@ describe('SHARED_PROVIDER_BY_ID_OR_ALIAS', () => {
     );
   });
 
+  it('resolves NVIDIA NIM aliases to the canonical provider entry', () => {
+    for (const name of ['nvidia', 'nvidia-nim', 'nvidia nim', 'nim']) {
+      expect(SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalizeProviderName(name))?.id).toBe('nvidia');
+    }
+  });
+
+  it('resolves Fireworks AI aliases to the canonical provider entry', () => {
+    for (const name of ['fireworks', 'fireworks-ai', 'fireworks ai']) {
+      expect(SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalizeProviderName(name))?.id).toBe('fireworks');
+    }
+  });
+
+  it('resolves Command Code aliases to the canonical provider entry', () => {
+    for (const name of ['commandcode', 'command-code', 'Command Code', 'cmd']) {
+      const normalized = normalizeProviderName(name);
+      const entry =
+        SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalized) ??
+        SHARED_PROVIDER_BY_ID_OR_ALIAS.get(name.toLowerCase());
+      expect(entry?.id).toBe('commandcode');
+    }
+  });
+
+  it('resolves BytePlus ModelArk aliases to the canonical provider entry', () => {
+    for (const name of ['byteplus', 'byteplus-plan', 'BytePlus Plan', 'ModelArk']) {
+      const normalized = normalizeProviderName(name);
+      const entry =
+        SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalized) ??
+        SHARED_PROVIDER_BY_ID_OR_ALIAS.get(name.toLowerCase());
+      expect(entry?.id).toBe('byteplus');
+    }
+  });
+
+  it('resolves AWS Bedrock aliases to the canonical provider entry', () => {
+    for (const name of ['bedrock', 'aws-bedrock', 'Amazon Bedrock']) {
+      const normalized = normalizeProviderName(name);
+      const entry =
+        SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalized) ??
+        SHARED_PROVIDER_BY_ID_OR_ALIAS.get(name.toLowerCase());
+      expect(entry?.id).toBe('bedrock');
+    }
+  });
+
+  it('resolves Xiaomi MiMo aliases to the canonical provider entry', () => {
+    for (const name of ['xiaomi', 'mimo', 'xiaomi-mimo', 'Xiaomi MiMo']) {
+      const normalized = normalizeProviderName(name);
+      const entry =
+        SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalized) ??
+        SHARED_PROVIDER_BY_ID_OR_ALIAS.get(name.toLowerCase());
+      expect(entry?.id).toBe('xiaomi');
+    }
+  });
+
   it('returns undefined for unknown names', () => {
     expect(SHARED_PROVIDER_BY_ID_OR_ALIAS.get('unknownprovider')).toBeUndefined();
   });
@@ -81,6 +133,52 @@ describe('SHARED_PROVIDER_BY_ID', () => {
     const groq = SHARED_PROVIDER_BY_ID.get('groq');
     expect(groq).toBeDefined();
     expect(groq!.openRouterPrefixes).toEqual([]);
+  });
+
+  it('nvidia has no openRouter prefixes (native NIM /models is authoritative)', () => {
+    const nvidia = SHARED_PROVIDER_BY_ID.get('nvidia');
+    expect(nvidia).toBeDefined();
+    expect(nvidia!.openRouterPrefixes).toEqual([]);
+  });
+
+  it('fireworks has no openRouter prefixes (native serverless /models is authoritative)', () => {
+    const fireworks = SHARED_PROVIDER_BY_ID.get('fireworks');
+    expect(fireworks).toBeDefined();
+    expect(fireworks!.openRouterPrefixes).toEqual([]);
+  });
+
+  it('commandcode has no openRouter prefixes (native Provider API /models is authoritative)', () => {
+    const commandcode = SHARED_PROVIDER_BY_ID.get('commandcode');
+    expect(commandcode).toBeDefined();
+    expect(commandcode!.displayName).toBe('Command Code');
+    expect(commandcode!.openRouterPrefixes).toEqual([]);
+    expect(commandcode!.keyPrefix).toBe('user_');
+  });
+
+  it('byteplus has no OpenRouter prefixes (native Coding Plan /models is authoritative)', () => {
+    const byteplus = SHARED_PROVIDER_BY_ID.get('byteplus');
+    expect(byteplus).toBeDefined();
+    expect(byteplus!.displayName).toBe('BytePlus');
+    expect(byteplus!.openRouterPrefixes).toEqual([]);
+    expect(byteplus!.keyPlaceholder).toBe('ModelArk Coding Plan API key');
+  });
+
+  it('bedrock has no OpenRouter prefixes and accepts raw AWS bearer token metadata', () => {
+    const bedrock = SHARED_PROVIDER_BY_ID.get('bedrock');
+    expect(bedrock).toBeDefined();
+    expect(bedrock!.displayName).toBe('AWS Bedrock');
+    expect(bedrock!.openRouterPrefixes).toEqual([]);
+    expect(bedrock!.keyPrefix).toBe('');
+    expect(bedrock!.keyPlaceholder).toBe('ABSK...');
+  });
+
+  it('xiaomi exposes the MiMo API-key provider metadata', () => {
+    const xiaomi = SHARED_PROVIDER_BY_ID.get('xiaomi');
+    expect(xiaomi).toBeDefined();
+    expect(xiaomi!.displayName).toBe('Xiaomi MiMo');
+    expect(xiaomi!.openRouterPrefixes).toEqual(['xiaomi']);
+    expect(xiaomi!.keyPrefix).toBe('sk-');
+    expect(xiaomi!.minKeyLength).toBe(10);
   });
 });
 

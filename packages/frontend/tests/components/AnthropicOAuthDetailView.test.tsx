@@ -7,6 +7,7 @@ const mockSubmitAnthropicOAuth = vi.fn();
 const mockRevokeAnthropicOAuth = vi.fn();
 const mockGetAnthropicOAuthPending = vi.fn();
 const mockDisconnectProvider = vi.fn();
+const mockRenameProviderKey = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 
@@ -16,6 +17,7 @@ vi.mock('../../src/services/api.js', () => ({
   revokeAnthropicOAuth: (...args: unknown[]) => mockRevokeAnthropicOAuth(...args),
   getAnthropicOAuthPending: (...args: unknown[]) => mockGetAnthropicOAuthPending(...args),
   disconnectProvider: (...args: unknown[]) => mockDisconnectProvider(...args),
+  renameProviderKey: (...args: unknown[]) => mockRenameProviderKey(...args),
 }));
 
 vi.mock('../../src/services/toast-store.js', () => ({
@@ -27,6 +29,7 @@ vi.mock('../../src/services/toast-store.js', () => ({
 
 import AnthropicOAuthDetailView from '../../src/components/AnthropicOAuthDetailView';
 import type { ProviderDef } from '../../src/services/providers.js';
+import type { RoutingProvider } from '../../src/services/api.js';
 
 const provDef: ProviderDef = {
   id: 'anthropic',
@@ -128,13 +131,13 @@ describe('AnthropicOAuthDetailView', () => {
     await waitFor(() => {
       expect(mockSubmitAnthropicOAuth).toHaveBeenCalledWith(
         'test-agent',
-        'auth-code-123',
+        OAUTH_PAYLOAD,
         'state-xyz',
       );
     });
     expect(mockToastSuccess).toHaveBeenCalledWith('Anthropic subscription connected');
     expect(onUpdate).toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('rejects input that does not look like an authorization code', () => {
@@ -161,16 +164,14 @@ describe('AnthropicOAuthDetailView', () => {
     await waitFor(() => {
       expect(mockSubmitAnthropicOAuth).toHaveBeenCalledWith(
         'test-agent',
-        'fresh-code',
+        'fresh-code#persisted-state',
         'persisted-state',
       );
     });
   });
 
-  it('hydrates pending state at submit time when the local signal was lost', async () => {
-    mockGetAnthropicOAuthPending
-      .mockResolvedValueOnce({ state: null }) // onMount call
-      .mockResolvedValueOnce({ state: 'late-state' }); // submit call
+  it('uses the pasted state when the local signal was lost', async () => {
+    mockGetAnthropicOAuthPending.mockResolvedValue({ state: null });
     mockSubmitAnthropicOAuth.mockResolvedValue({ ok: true });
 
     renderView();
@@ -181,12 +182,17 @@ describe('AnthropicOAuthDetailView', () => {
     fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
-      expect(mockSubmitAnthropicOAuth).toHaveBeenCalledWith('test-agent', 'code', 'late-state');
+      expect(mockSubmitAnthropicOAuth).toHaveBeenCalledWith(
+        'test-agent',
+        'code#whatever',
+        'whatever',
+      );
     });
   });
 
-  it('asks the user to sign in first when no pending state is available', async () => {
+  it('submits the full pasted payload even when no pending state hydrates locally', async () => {
     mockGetAnthropicOAuthPending.mockResolvedValue({ state: null });
+    mockSubmitAnthropicOAuth.mockResolvedValue({ ok: true });
 
     renderView();
     await waitFor(() => expect(mockGetAnthropicOAuthPending).toHaveBeenCalled());
@@ -196,8 +202,21 @@ describe('AnthropicOAuthDetailView', () => {
     fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Click "Sign in with Claude" first/)).toBeDefined();
+      expect(mockSubmitAnthropicOAuth).toHaveBeenCalledWith(
+        'test-agent',
+        'orphan-code#orphan-state',
+        'orphan-state',
+      );
     });
+  });
+
+  it('rejects payloads missing the state suffix', () => {
+    renderView();
+    const codeInput = screen.getByLabelText('Anthropic authorization code');
+    fireEvent.input(codeInput, { target: { value: 'auth-code#' } });
+    fireEvent.click(screen.getByText('Connect'));
+
+    expect(screen.getByText(/doesn't look like an authorization code/)).toBeDefined();
     expect(mockSubmitAnthropicOAuth).not.toHaveBeenCalled();
   });
 
@@ -215,7 +234,29 @@ describe('AnthropicOAuthDetailView', () => {
     fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Failed to exchange code/)).toBeDefined();
+      expect(screen.getByText('boom')).toBeDefined();
+    });
+  });
+
+  it('shows the generic exchange error when the failure is not an Error object', async () => {
+    mockStartAnthropicOAuth.mockResolvedValue({ url: 'https://x', state: 's1' });
+    mockSubmitAnthropicOAuth.mockRejectedValue('boom');
+    vi.spyOn(window, 'open').mockReturnValue({ closed: false } as unknown as Window);
+
+    renderView();
+    fireEvent.click(screen.getByText('Sign in with Claude'));
+    await waitFor(() => expect(mockStartAnthropicOAuth).toHaveBeenCalled());
+
+    const codeInput = screen.getByLabelText('Anthropic authorization code');
+    fireEvent.input(codeInput, { target: { value: 'code#s1' } });
+    fireEvent.click(screen.getByText('Connect'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Failed to exchange code. The code may have expired — sign in again to retry.',
+        ),
+      ).toBeDefined();
     });
   });
 
@@ -232,10 +273,9 @@ describe('AnthropicOAuthDetailView', () => {
     expect(mockGetAnthropicOAuthPending).not.toHaveBeenCalled();
   });
 
-  it('falls back gracefully when the late-arriving pending lookup throws', async () => {
-    mockGetAnthropicOAuthPending
-      .mockResolvedValueOnce({ state: null }) // onMount
-      .mockRejectedValueOnce(new Error('network')); // submit-time
+  it('does not need a submit-time pending lookup when the pasted payload contains state', async () => {
+    mockGetAnthropicOAuthPending.mockResolvedValue({ state: null });
+    mockSubmitAnthropicOAuth.mockResolvedValue({ ok: true });
 
     renderView();
     await waitFor(() => expect(mockGetAnthropicOAuthPending).toHaveBeenCalledTimes(1));
@@ -245,8 +285,13 @@ describe('AnthropicOAuthDetailView', () => {
     fireEvent.click(screen.getByText('Connect'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Click "Sign in with Claude" first/)).toBeDefined();
+      expect(mockSubmitAnthropicOAuth).toHaveBeenCalledWith(
+        'test-agent',
+        'code#whatever',
+        'whatever',
+      );
     });
+    expect(mockGetAnthropicOAuthPending).toHaveBeenCalledTimes(1);
   });
 
   it('submits on Enter inside the paste input', async () => {
@@ -271,8 +316,8 @@ describe('AnthropicOAuthDetailView', () => {
   });
 
   it('surfaces server-side notifications when disconnect returns them', async () => {
-    mockRevokeAnthropicOAuth.mockResolvedValue({ ok: true });
-    mockDisconnectProvider.mockResolvedValue({
+    mockRevokeAnthropicOAuth.mockResolvedValue({
+      ok: true,
       notifications: ['Subscription is shared with another agent'],
     });
 
@@ -285,26 +330,25 @@ describe('AnthropicOAuthDetailView', () => {
     expect(onBack).toHaveBeenCalled();
   });
 
-  it('continues with disconnect when revoke fails (best-effort cleanup)', async () => {
+  it('does not call generic disconnect when revoke request fails', async () => {
     mockRevokeAnthropicOAuth.mockRejectedValue(new Error('revoke failed'));
-    mockDisconnectProvider.mockResolvedValue({ ok: true });
 
     const { onBack, onUpdate } = renderView(true);
     fireEvent.click(screen.getByText('Disconnect'));
 
-    await waitFor(() => expect(mockDisconnectProvider).toHaveBeenCalled());
-    expect(onBack).toHaveBeenCalled();
-    expect(onUpdate).toHaveBeenCalled();
+    await waitFor(() => expect(mockRevokeAnthropicOAuth).toHaveBeenCalledWith('test-agent'));
+    expect(mockDisconnectProvider).not.toHaveBeenCalled();
+    expect(onBack).not.toHaveBeenCalled();
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 
-  it('does not throw when disconnect itself fails', async () => {
-    mockRevokeAnthropicOAuth.mockResolvedValue({ ok: true });
-    mockDisconnectProvider.mockRejectedValue(new Error('network'));
+  it('does not navigate back when revoke request fails', async () => {
+    mockRevokeAnthropicOAuth.mockRejectedValue(new Error('network'));
 
     const { onBack } = renderView(true);
     fireEvent.click(screen.getByText('Disconnect'));
 
-    await waitFor(() => expect(mockDisconnectProvider).toHaveBeenCalled());
+    await waitFor(() => expect(mockRevokeAnthropicOAuth).toHaveBeenCalledWith('test-agent'));
     expect(onBack).not.toHaveBeenCalled();
   });
 
@@ -314,5 +358,235 @@ describe('AnthropicOAuthDetailView', () => {
     fireEvent.click(screen.getByText('Sign in with Claude'));
     await waitFor(() => expect(mockStartAnthropicOAuth).toHaveBeenCalled());
     expect(screen.getByText('Sign in with Claude')).toBeDefined();
+  });
+});
+
+function makeKey(overrides: Partial<RoutingProvider> = {}): RoutingProvider {
+  return {
+    id: 'key-1',
+    provider: 'anthropic',
+    auth_type: 'subscription',
+    is_active: true,
+    has_api_key: true,
+    key_prefix: null,
+    label: 'Account 1',
+    priority: 1,
+    region: null,
+    connected_at: '2025-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function renderMultiKeyView(keys: RoutingProvider[]) {
+  const [busy, setBusy] = createSignal(false);
+  const onBack = vi.fn();
+  const onUpdate = vi.fn();
+  const onClose = vi.fn();
+  const result = render(() => (
+    <AnthropicOAuthDetailView
+      provDef={provDef}
+      provId="anthropic"
+      agentName="test-agent"
+      connected={() => true}
+      selectedAuthType={() => 'subscription'}
+      busy={busy}
+      setBusy={setBusy}
+      onBack={onBack}
+      onUpdate={onUpdate}
+      onClose={onClose}
+      activeKeys={() => keys}
+    />
+  ));
+  return { ...result, onBack, onUpdate, onClose };
+}
+
+describe('AnthropicOAuthDetailView — multi-key', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetAnthropicOAuthPending.mockResolvedValue({ state: null });
+  });
+
+  it('renders the multi-key list when activeKeys has 2+ items', () => {
+    const keys = [makeKey({ id: 'k1', label: 'Work' }), makeKey({ id: 'k2', label: 'Personal' })];
+    renderMultiKeyView(keys);
+    expect(screen.getByText('Accounts')).toBeDefined();
+    expect(screen.getByText('Work')).toBeDefined();
+    expect(screen.getByText('Personal')).toBeDefined();
+  });
+
+  it('rename flow: clicking Rename shows input and saving calls renameProviderKey', async () => {
+    mockRenameProviderKey.mockResolvedValue({ id: 'k1', label: 'New', priority: 1 });
+    const keys = [makeKey({ id: 'k1', label: 'Old' }), makeKey({ id: 'k2', label: 'Other' })];
+    const { onUpdate } = renderMultiKeyView(keys);
+
+    const renameButtons = screen.getAllByText('Rename');
+    fireEvent.click(renameButtons[0]);
+
+    const input = screen.getByLabelText('Rename Old');
+    fireEvent.input(input, { target: { value: 'New' } });
+    fireEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => {
+      expect(mockRenameProviderKey).toHaveBeenCalledWith(
+        'test-agent',
+        'anthropic',
+        'Old',
+        'New',
+        'subscription',
+      );
+    });
+    expect(mockToastSuccess).toHaveBeenCalledWith('Renamed to "New"');
+    expect(onUpdate).toHaveBeenCalled();
+  });
+
+  it('delete individual key calls revokeAnthropicOAuth with label', async () => {
+    mockRevokeAnthropicOAuth.mockResolvedValue({ ok: true, notifications: [] });
+    const keys = [
+      makeKey({ id: 'k1', label: 'Primary' }),
+      makeKey({ id: 'k2', label: 'Secondary' }),
+    ];
+    const { onUpdate } = renderMultiKeyView(keys);
+
+    fireEvent.click(screen.getByLabelText('Delete account Primary'));
+
+    await waitFor(() => {
+      expect(mockRevokeAnthropicOAuth).toHaveBeenCalledWith('test-agent', 'Primary');
+    });
+    expect(mockDisconnectProvider).not.toHaveBeenCalled();
+    expect(onUpdate).toHaveBeenCalled();
+  });
+
+  it('shows "Disconnect all" button in multi-key mode', () => {
+    const keys = [makeKey({ id: 'k1', label: 'A' }), makeKey({ id: 'k2', label: 'B' })];
+    renderMultiKeyView(keys);
+    expect(screen.getByText('Disconnect all')).toBeDefined();
+  });
+
+  it('handleDeleteKey surfaces notifications from revokeAnthropicOAuth', async () => {
+    mockRevokeAnthropicOAuth.mockResolvedValue({
+      ok: true,
+      notifications: ['Key still in use by another agent'],
+    });
+    const keys = [
+      makeKey({ id: 'k1', label: 'Primary' }),
+      makeKey({ id: 'k2', label: 'Secondary' }),
+    ];
+    renderMultiKeyView(keys);
+
+    fireEvent.click(screen.getByLabelText('Delete account Primary'));
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith('Key still in use by another agent');
+    });
+  });
+
+  it('handleDeleteKey catch branch when revokeAnthropicOAuth fails', async () => {
+    mockRevokeAnthropicOAuth.mockRejectedValue(new Error('network'));
+    const keys = [
+      makeKey({ id: 'k1', label: 'Primary' }),
+      makeKey({ id: 'k2', label: 'Secondary' }),
+    ];
+    const { onUpdate } = renderMultiKeyView(keys);
+
+    fireEvent.click(screen.getByLabelText('Delete account Primary'));
+
+    await waitFor(() => {
+      expect(mockRevokeAnthropicOAuth).toHaveBeenCalledWith('test-agent', 'Primary');
+    });
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('commitRename catch branch when renameProviderKey fails', async () => {
+    mockRenameProviderKey.mockRejectedValue(new Error('network'));
+    const keys = [makeKey({ id: 'k1', label: 'Old' }), makeKey({ id: 'k2', label: 'Other' })];
+    const { onUpdate } = renderMultiKeyView(keys);
+
+    const renameButtons = screen.getAllByText('Rename');
+    fireEvent.click(renameButtons[0]);
+
+    const input = screen.getByLabelText('Rename Old');
+    fireEvent.input(input, { target: { value: 'New' } });
+    fireEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => {
+      expect(mockRenameProviderKey).toHaveBeenCalled();
+    });
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('commitRename cancels if the label did not change', () => {
+    const keys = [makeKey({ id: 'k1', label: 'Same' }), makeKey({ id: 'k2', label: 'Other' })];
+    renderMultiKeyView(keys);
+
+    const renameButtons = screen.getAllByText('Rename');
+    fireEvent.click(renameButtons[0]);
+    fireEvent.click(screen.getByText('Save'));
+
+    expect(mockRenameProviderKey).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Rename Same')).toBeNull();
+  });
+});
+
+function renderViewWithAddKeyOpen() {
+  const [busy, setBusy] = createSignal(false);
+  const [addKeyOpen, setAddKeyOpen] = createSignal(true);
+  const onBack = vi.fn();
+  const onUpdate = vi.fn();
+  const onClose = vi.fn();
+  const keys = [makeKey()];
+  const result = render(() => (
+    <AnthropicOAuthDetailView
+      provDef={provDef}
+      provId="anthropic"
+      agentName="test-agent"
+      connected={() => true}
+      selectedAuthType={() => 'subscription'}
+      busy={busy}
+      setBusy={setBusy}
+      onBack={onBack}
+      onUpdate={onUpdate}
+      onClose={onClose}
+      addKeyOpen={addKeyOpen}
+      setAddKeyOpen={setAddKeyOpen}
+      activeKeys={() => keys}
+    />
+  ));
+  return { ...result, onBack, onUpdate, onClose, setAddKeyOpen };
+}
+
+describe('AnthropicOAuthDetailView — addKeyOpen effect', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetAnthropicOAuthPending.mockResolvedValue({ state: null });
+  });
+
+  it('auto-launches handleSignIn when addKeyOpen is true and connected', async () => {
+    mockStartAnthropicOAuth.mockResolvedValue({ url: 'https://x', state: 'abc' });
+    vi.spyOn(window, 'open').mockReturnValue({ closed: false } as unknown as Window);
+
+    renderViewWithAddKeyOpen();
+
+    await waitFor(() => {
+      expect(mockStartAnthropicOAuth).toHaveBeenCalledWith('test-agent');
+    });
+    expect(screen.getByLabelText('Anthropic authorization code')).toBeDefined();
+  });
+
+  it('cancels a connected add-account Claude OAuth flow', async () => {
+    mockStartAnthropicOAuth.mockResolvedValue({ url: 'https://x', state: 'abc' });
+    vi.spyOn(window, 'open').mockReturnValue({ closed: false } as unknown as Window);
+
+    renderViewWithAddKeyOpen();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Anthropic authorization code')).toBeDefined();
+    });
+    fireEvent.input(screen.getByLabelText('Anthropic authorization code'), {
+      target: { value: 'code#abc' },
+    });
+    fireEvent.click(screen.getByText('Cancel'));
+
+    expect(screen.queryByLabelText('Anthropic authorization code')).toBeNull();
+    expect(screen.getByText('Disconnect')).toBeDefined();
   });
 });

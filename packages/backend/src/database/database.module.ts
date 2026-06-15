@@ -19,6 +19,11 @@ import { CustomProvider } from '../entities/custom-provider.entity';
 import { SpecificityAssignment } from '../entities/specificity-assignment.entity';
 import { HeaderTier } from '../entities/header-tier.entity';
 import { InstallMetadata } from '../entities/install-metadata.entity';
+import { MessageRecording } from '../entities/message-recording.entity';
+import { AgentModelParams } from '../entities/agent-model-params.entity';
+import { PlaygroundRun } from '../entities/playground-run.entity';
+import { PlaygroundColumn } from '../entities/playground-column.entity';
+import { ReasoningContentCacheEntry } from '../entities/reasoning-content-cache-entry.entity';
 import { DatabaseSeederService } from './database-seeder.service';
 import { ModelPricesModule } from '../model-prices/model-prices.module';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
@@ -92,6 +97,21 @@ import { AddParamDefaultsColumns1785000000000 } from './migrations/1785000000000
 import { AddProviderKeyLabelAndPriority1785000000000 } from './migrations/1785000000000-AddProviderKeyLabelAndPriority';
 import { AddProviderKeyLabelToAgentMessages1785100000000 } from './migrations/1785100000000-AddProviderKeyLabelToAgentMessages';
 import { AddRequestParamsColumn1786000000000 } from './migrations/1786000000000-AddRequestParamsColumn';
+import { AddAgentRecordMessages1786100000000 } from './migrations/1786100000000-AddAgentRecordMessages';
+import { AddMessageRecordings1786200000000 } from './migrations/1786200000000-AddMessageRecordings';
+import { DefaultRecordMessagesTrue1786300000000 } from './migrations/1786300000000-DefaultRecordMessagesTrue';
+import { AddAgentModelParams1787000000000 } from './migrations/1787000000000-AddAgentModelParams';
+import { AddBenchmarkHistory1788000000000 } from './migrations/1788000000000-AddBenchmarkHistory';
+import { RenameBenchmarkToPlayground1789000000000 } from './migrations/1789000000000-RenameBenchmarkToPlayground';
+import { AddOAuthPendingFlows1789100000000 } from './migrations/1789100000000-AddOAuthPendingFlows';
+import { ScopeAgentModelParams1789200000000 } from './migrations/1789200000000-ScopeAgentModelParams';
+import { EnableRecordMessagesForAll1789300000000 } from './migrations/1789300000000-EnableRecordMessagesForAll';
+import { AddRoutingOutputControls1789300000000 } from './migrations/1789300000000-AddRoutingOutputControls';
+import { AddAgentApiKeyPrefixActiveIndex1790000000000 } from './migrations/1790000000000-AddAgentApiKeyPrefixActiveIndex';
+import { AddReasoningContentCache1790100000000 } from './migrations/1790100000000-AddReasoningContentCache';
+import { AddDedupCompositeIndex1790200000000 } from './migrations/1790200000000-AddDedupCompositeIndex';
+import { AddErrorsPartialIndex1790300000000 } from './migrations/1790300000000-AddErrorsPartialIndex';
+import { DropRedundantAgentApiKeyPrefixIndex1790400000000 } from './migrations/1790400000000-DropRedundantAgentApiKeyPrefixIndex';
 
 const entities = [
   AgentMessage,
@@ -111,6 +131,11 @@ const entities = [
   SpecificityAssignment,
   HeaderTier,
   InstallMetadata,
+  MessageRecording,
+  AgentModelParams,
+  PlaygroundRun,
+  PlaygroundColumn,
+  ReasoningContentCacheEntry,
 ];
 
 const migrations = [
@@ -185,6 +210,21 @@ const migrations = [
   AddProviderKeyLabelAndPriority1785000000000,
   AddProviderKeyLabelToAgentMessages1785100000000,
   AddRequestParamsColumn1786000000000,
+  AddAgentRecordMessages1786100000000,
+  AddMessageRecordings1786200000000,
+  DefaultRecordMessagesTrue1786300000000,
+  AddAgentModelParams1787000000000,
+  AddBenchmarkHistory1788000000000,
+  RenameBenchmarkToPlayground1789000000000,
+  AddOAuthPendingFlows1789100000000,
+  ScopeAgentModelParams1789200000000,
+  EnableRecordMessagesForAll1789300000000,
+  AddRoutingOutputControls1789300000000,
+  AddAgentApiKeyPrefixActiveIndex1790000000000,
+  AddReasoningContentCache1790100000000,
+  AddDedupCompositeIndex1790200000000,
+  AddErrorsPartialIndex1790300000000,
+  DropRedundantAgentApiKeyPrefixIndex1790400000000,
 ];
 
 @Module({
@@ -208,7 +248,10 @@ const migrations = [
         migrations,
         logging: false,
         extra: {
-          max: config.get<number>('app.dbPoolMax') ?? 50,
+          // app.config.ts always resolves dbPoolMax (default 20), so there is no
+          // undefined case to fall back from — keep that file the single source
+          // of truth for the pool size.
+          max: config.get<number>('app.dbPoolMax'),
           idleTimeoutMillis: 30000,
           // statement_timeout / idle_in_transaction_session_timeout were tried
           // here (#1745) and via the `options` connection string (#1749), but
@@ -230,6 +273,9 @@ const migrations = [
       CustomProvider,
       SpecificityAssignment,
       HeaderTier,
+      MessageRecording,
+      AgentModelParams,
+      ReasoningContentCacheEntry,
     ]),
     ModelPricesModule,
   ],

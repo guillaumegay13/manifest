@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { ProviderService } from '../routing-core/provider.service';
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
+import { scrubSecrets } from '../../common/utils/secret-scrub';
+import { coordinateOAuthRefresh, oauthRefreshKey } from './core';
 import { OAuthTokenBlob } from './openai-oauth.types';
 import {
   MinimaxRegion,
@@ -18,6 +20,16 @@ import {
   toPollIntervalMs,
   isOAuthTokenBlob,
 } from './minimax-oauth-helpers';
+
+/** Parse a stored MiniMax credential into a validated OAuth blob, or null. */
+function parseMinimaxBlob(raw: string): OAuthTokenBlob | null {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return isOAuthTokenBlob(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 export type { MinimaxRegion };
 
@@ -204,12 +216,15 @@ export class MinimaxOauthService {
       e: toAbsoluteExpiryTimestamp(payload.expired_in),
       u: resourceUrl,
     };
+    const label = await this.providerService.nextOAuthLabel(pending.agentId, 'minimax');
     const { provider: savedProvider } = await this.providerService.upsertProvider(
       pending.agentId,
       pending.userId,
       'minimax',
       JSON.stringify(blob),
       'subscription',
+      undefined,
+      label,
     );
     try {
       await this.discoveryService.discoverModels(savedProvider);
@@ -237,7 +252,7 @@ export class MinimaxOauthService {
     });
     if (!response.ok) {
       const text = await response.text();
-      this.logger.error(`MiniMax token refresh failed: ${text}`);
+      this.logger.error(`MiniMax token refresh failed: ${scrubSecrets(text)}`);
       throw new Error('Token refresh failed');
     }
     const payload = (await response.json()) as MinimaxTokenResponse;
@@ -260,6 +275,7 @@ export class MinimaxOauthService {
     rawValue: string,
     agentId: string,
     userId: string,
+    keyLabel?: string,
   ): Promise<OAuthTokenBlob | null> {
     let blob: OAuthTokenBlob;
     try {
@@ -272,16 +288,27 @@ export class MinimaxOauthService {
     if (!blob.t || !blob.r || !blob.e) return null;
     if (Date.now() < blob.e - 60_000) return blob;
     try {
-      const refreshed = await this.refreshAccessToken(blob.r, blob.u);
-      await this.providerService.upsertProvider(
-        agentId,
-        userId,
-        'minimax',
-        JSON.stringify(refreshed),
-        'subscription',
-      );
-      this.logger.log(`MiniMax OAuth token refreshed for agent=${agentId}`);
-      return refreshed;
+      return await coordinateOAuthRefresh<OAuthTokenBlob>({
+        key: oauthRefreshKey('minimax', userId, agentId, keyLabel),
+        logger: this.logger,
+        callerBlob: blob,
+        readFreshRaw: () =>
+          this.providerService.getFreshSubscriptionCredential(agentId, 'minimax', keyLabel),
+        parse: parseMinimaxBlob,
+        refresh: (current) => this.refreshAccessToken(current.r, current.u),
+        persist: (refreshed) =>
+          this.providerService
+            .upsertProvider(
+              agentId,
+              userId,
+              'minimax',
+              JSON.stringify(refreshed),
+              'subscription',
+              undefined,
+              keyLabel,
+            )
+            .then(() => undefined),
+      });
     } catch (err) {
       this.logger.error(`Failed to refresh MiniMax token: ${err}`);
       return blob;

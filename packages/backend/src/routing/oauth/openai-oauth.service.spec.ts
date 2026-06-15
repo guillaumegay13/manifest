@@ -25,17 +25,22 @@ function createConfig(nodeEnv = 'production'): ConfigService {
   } as unknown as ConfigService;
 }
 
-function createProviderService(): {
-  svc: ProviderService;
-  upsertProvider: jest.Mock;
-  recalculateTiers: jest.Mock;
-} {
+function createProviderService() {
   const upsertProvider = jest.fn().mockResolvedValue({ provider: { id: 'p1' } });
   const recalculateTiers = jest.fn().mockResolvedValue(undefined);
+  const nextOAuthLabel = jest.fn().mockResolvedValue(undefined);
+  const getFreshSubscriptionCredential = jest.fn().mockResolvedValue(null);
   return {
-    svc: { upsertProvider, recalculateTiers } as unknown as ProviderService,
+    svc: {
+      upsertProvider,
+      recalculateTiers,
+      nextOAuthLabel,
+      getFreshSubscriptionCredential,
+    } as unknown as ProviderService,
     upsertProvider,
     recalculateTiers,
+    nextOAuthLabel,
+    getFreshSubscriptionCredential,
   };
 }
 
@@ -144,6 +149,8 @@ describe('OpenaiOauthService', () => {
         'openai',
         expect.stringContaining('"t":"access-1"'),
         'subscription',
+        undefined,
+        undefined,
       );
       expect(discovery.discoverModels).toHaveBeenCalled();
       expect(providerService.recalculateTiers).toHaveBeenCalledWith('agent-1');
@@ -167,6 +174,40 @@ describe('OpenaiOauthService', () => {
       const state = new URL(url).searchParams.get('state')!;
       await expect(svc.exchangeCode(state, 'c')).resolves.toBeUndefined();
       expect(providerService.upsertProvider).toHaveBeenCalled();
+    });
+  });
+
+  describe('callback handler', () => {
+    it('shuts down the callback server after a callback exchange failure', async () => {
+      fetchMock.mockResolvedValue(mockResponse(400, {}, 'invalid_grant'));
+      const url = await svc.generateAuthorizationUrl('a', 'u', 'http://localhost:3001');
+      const state = new URL(url).searchParams.get('state')!;
+      const close = jest.fn();
+      const serviceInternals = svc as unknown as {
+        callbackServer: { close: () => void } | null;
+        serverReady: Promise<void> | null;
+      };
+      serviceInternals.callbackServer = { close };
+      serviceInternals.serverReady = Promise.resolve();
+      const req = { url: `/auth/callback?state=${state}&code=bad` };
+      let resolveResponse!: () => void;
+      const responseDone = new Promise<void>((resolve) => {
+        resolveResponse = resolve;
+      });
+      const res = { writeHead: jest.fn(), end: jest.fn(resolveResponse) };
+
+      (
+        svc as unknown as {
+          handleCallbackRequest: (request: typeof req, response: typeof res) => void;
+        }
+      ).handleCallbackRequest(req, res);
+      await responseDone;
+
+      expect(close).toHaveBeenCalled();
+      expect(serviceInternals.callbackServer).toBeNull();
+      expect(serviceInternals.serverReady).toBeNull();
+      expect(svc.getPendingCount()).toBe(0);
+      expect(res.end).toHaveBeenCalled();
     });
   });
 
@@ -214,7 +255,7 @@ describe('OpenaiOauthService', () => {
       fetchMock.mockResolvedValue(
         mockResponse(200, { access_token: 'new', refresh_token: 'rf2', expires_in: 3600 }),
       );
-      const token = await svc.unwrapToken(JSON.stringify(blob), 'agent-1', 'user-1');
+      const token = await svc.unwrapToken(JSON.stringify(blob), 'agent-1', 'user-1', 'Work');
       expect(token).toBe('new');
       expect(providerService.upsertProvider).toHaveBeenCalledWith(
         'agent-1',
@@ -222,6 +263,8 @@ describe('OpenaiOauthService', () => {
         'openai',
         expect.stringContaining('"t":"new"'),
         'subscription',
+        undefined,
+        'Work',
       );
     });
 
@@ -229,6 +272,21 @@ describe('OpenaiOauthService', () => {
       const blob = { t: 'old', r: 'rf', e: Date.now() + 1000 };
       fetchMock.mockRejectedValue(new Error('network'));
       expect(await svc.unwrapToken(JSON.stringify(blob), 'a', 'u')).toBeNull();
+    });
+
+    // Regression: a still-valid access token must be returned even when the
+    // OAuth response omitted a refresh token. The earlier check
+    // `!blob.t || !blob.r || !blob.e` short-circuited usable tokens to null.
+    it('returns the access token for a valid blob with no refresh token', async () => {
+      const blob = { t: 'still-good', r: '', e: Date.now() + 10 * 60 * 1000 };
+      expect(await svc.unwrapToken(JSON.stringify(blob), 'a', 'u')).toBe('still-good');
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('returns null for an expired blob with no refresh token (cannot refresh)', async () => {
+      const blob = { t: 'old', r: '', e: Date.now() + 1000 };
+      expect(await svc.unwrapToken(JSON.stringify(blob), 'a', 'u')).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 
