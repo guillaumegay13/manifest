@@ -198,7 +198,7 @@ describe('ProviderService — coverage completion', () => {
     const row = provRow({
       provider: 'openrouter',
       cached_models: [{ id: 'Foo-Model' }] as unknown as TenantProvider['cached_models'],
-      priority: 1,
+      priority: 0,
     });
     expect(
       priv().routeBelongsToProviderRows({ authType: 'api_key', model: 'foo-model' }, [row]),
