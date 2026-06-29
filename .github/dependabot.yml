@@ -26,8 +26,14 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     groups:
+      modelparams-catalog:
+        applies-to: version-updates
+        patterns:
+          - "modelparams"
       patch-and-minor:
         applies-to: version-updates
+        exclude-patterns:
+          - "modelparams"
         update-types:
           - patch
           - minor
