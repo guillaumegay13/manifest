@@ -326,6 +326,19 @@ describe('getSubscriptionKnownModels', () => {
     expect(models).toContain('copilot/gpt-5.4');
   });
 
+  it('returns known models for OpenAI subscription', () => {
+    const models = getSubscriptionKnownModels('openai');
+    expect(models).toEqual(
+      expect.arrayContaining([
+        'gpt-5.4-image-2',
+        'gpt-5.4-nano',
+        'gpt-5.2-chat',
+        'gpt-5.2-pro',
+        'gpt-5.1-codex-mini',
+      ]),
+    );
+  });
+
   it('returns known models for BytePlus ModelArk Coding Plan', () => {
     const models = getSubscriptionKnownModels('byteplus');
     expect(models).toEqual(
@@ -378,6 +391,7 @@ describe('getSubscriptionKnownModels', () => {
 
   it('returns known models for zai', () => {
     const models = getSubscriptionKnownModels('zai');
+    expect(models).toContain('glm-5.2');
     expect(models).toContain('glm-5.1');
     expect(models).toContain('glm-5');
     expect(models).toContain('glm-4.7');
