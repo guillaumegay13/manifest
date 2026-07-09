@@ -1,22 +1,41 @@
-import { createResource, createSignal, onMount, Show, type Component } from 'solid-js';
+import {
+  createEffect,
+  createResource,
+  createSignal,
+  onMount,
+  Show,
+  type Component,
+} from 'solid-js';
 import { useNavigate, useSearchParams } from '@solidjs/router';
 import { Title, Meta } from '@solidjs/meta';
 import { authClient } from '../services/auth-client.js';
-import { getBillingStatus } from '../services/api/billing.js';
+import { getBillingStatus, updateBillingEmailPreferences } from '../services/api/billing.js';
 import { toast } from '../services/toast-store.js';
+import {
+  FREE_REQUEST_LIMIT_LABEL,
+  formatBillingPriceWithInterval,
+} from '../services/billing-display.js';
 
 const Account: Component = () => {
   const navigate = useNavigate();
   const session = authClient.useSession();
   const [copied, setCopied] = createSignal(false);
   const [theme, setTheme] = createSignal<'light' | 'dark' | 'system'>('system');
-  const [billing] = createResource(getBillingStatus);
+  const [billing, { refetch: refetchBilling }] = createResource(() => getBillingStatus());
   const [searchParams, setSearchParams] = useSearchParams();
   const [billingBusy, setBillingBusy] = createSignal(false);
+  const [emailPrefsBusy, setEmailPrefsBusy] = createSignal(false);
+  const [usageAlertsEnabled, setUsageAlertsEnabled] = createSignal(true);
 
   const userName = () => session()?.data?.user?.name ?? '';
   const userEmail = () => session()?.data?.user?.email ?? '';
   const userId = () => session()?.data?.user?.id ?? '';
+  const proPriceWithInterval = () => formatBillingPriceWithInterval(billing()?.priceMonthly);
+
+  createEffect(() => {
+    const prefs = billing()?.emailPreferences;
+    if (prefs) setUsageAlertsEnabled(prefs.usageAlerts);
+  });
 
   onMount(() => {
     const stored = localStorage.getItem('theme');
@@ -36,11 +55,13 @@ const Account: Component = () => {
     setBillingBusy(true);
     try {
       const origin = window.location.origin;
-      await authClient.subscription.upgrade({
+      const res = await authClient.subscription.upgrade({
         plan: 'pro',
         successUrl: `${origin}/account?upgraded=1`,
         cancelUrl: `${origin}/account`,
       });
+      const error = (res as { error?: unknown } | undefined)?.error;
+      if (error) throw error;
     } catch {
       toast.error('Could not start the upgrade. Please try again.');
     } finally {
@@ -99,6 +120,22 @@ const Account: Component = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleUsageAlertsChange = async (enabled: boolean) => {
+    const previous = usageAlertsEnabled();
+    setUsageAlertsEnabled(enabled);
+    setEmailPrefsBusy(true);
+    try {
+      const saved = await updateBillingEmailPreferences({ usageAlerts: enabled });
+      setUsageAlertsEnabled(saved.usageAlerts);
+      await refetchBilling();
+      toast.success('Email preferences saved');
+    } catch {
+      setUsageAlertsEnabled(previous);
+    } finally {
+      setEmailPrefsBusy(false);
+    }
+  };
+
   return (
     <div class="account-modal">
       <Title>Account Preferences - Manifest</Title>
@@ -146,9 +183,7 @@ const Account: Component = () => {
           <div class="settings-card__row">
             <div class="settings-card__label">
               <span class="settings-card__label-title">Email</span>
-              <span class="settings-card__label-desc">
-                Used for account notifications and limit alerts.
-              </span>
+              <span class="settings-card__label-desc">Used for account notifications.</span>
             </div>
             <div class="settings-card__control">
               <input
@@ -231,10 +266,20 @@ const Account: Component = () => {
                 <span class="billing-stat__label">Current plan</span>
                 <span class="billing-stat__value">
                   {billing()!.plan === 'pro' ? 'Pro' : 'Free'}
-                  {billing()!.plan === 'pro' && billing()!.priceMonthlyUsd != null
-                    ? ` · $${billing()!.priceMonthlyUsd}/mo`
+                  {billing()!.plan === 'pro' && proPriceWithInterval()
+                    ? ` · ${proPriceWithInterval()}`
                     : ''}
                 </span>
+                <Show when={billing()!.cancelAtPeriodEnd && billing()!.subscriptionPeriodEnd}>
+                  <span class="billing-stat__cancel">
+                    You'll keep Pro access until{' '}
+                    {new Date(billing()!.subscriptionPeriodEnd!).toLocaleDateString(undefined, {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </span>
+                </Show>
               </div>
 
               <div class="billing-stat">
@@ -261,19 +306,28 @@ const Account: Component = () => {
             <div class="settings-card__footer billing-footer">
               <span class="billing-footer__note">
                 {billing()!.plan === 'free'
-                  ? 'Free: 10,000 requests/mo · Pro: unlimited requests'
-                  : 'Update your payment method, view invoices, or cancel anytime.'}
+                  ? `Free: ${FREE_REQUEST_LIMIT_LABEL} requests/mo · Pro: unlimited requests`
+                  : 'Update your payment method and view invoices.'}
               </span>
               <Show
                 when={billing()!.plan === 'free'}
                 fallback={
-                  <button
-                    class="btn btn--outline btn--sm"
-                    disabled={billingBusy()}
-                    onClick={handleManageBilling}
-                  >
-                    {billingBusy() ? <span class="spinner" /> : 'Manage billing'}
-                  </button>
+                  <div class="billing-footer__actions">
+                    <button
+                      class="btn btn--outline btn--sm"
+                      disabled={billingBusy()}
+                      onClick={handleManageBilling}
+                    >
+                      {billingBusy() ? <span class="spinner" /> : 'Manage subscription'}
+                    </button>
+                    <button
+                      class="btn btn--outline btn--sm"
+                      disabled={billingBusy()}
+                      onClick={handleManageBilling}
+                    >
+                      {billingBusy() ? <span class="spinner" /> : 'View invoices'}
+                    </button>
+                  </div>
                 }
               >
                 <button
@@ -282,9 +336,47 @@ const Account: Component = () => {
                   onClick={handleUpgrade}
                 >
                   Upgrade to Pro
-                  {billing()!.priceMonthlyUsd != null ? ` · $${billing()!.priceMonthlyUsd}/mo` : ''}
+                  {proPriceWithInterval() ? ` · ${proPriceWithInterval()}` : ''}
                 </button>
               </Show>
+            </div>
+          </div>
+        </Show>
+
+        {/* Email Preferences */}
+        <Show when={billing()?.enabled}>
+          <h2 class="settings-section__title" id="email-preferences">
+            Email preferences
+          </h2>
+
+          <div class="settings-card">
+            <div class="settings-card__row">
+              <div class="settings-card__label">
+                <span class="settings-card__label-title">Usage alert emails</span>
+                <span class="settings-card__label-desc">
+                  Receive emails at 80% usage and when the monthly request limit is reached.
+                </span>
+              </div>
+              <div class="settings-card__control settings-card__control--end">
+                <label
+                  class="notification-toggle account-email-toggle"
+                  classList={{ 'account-email-toggle--disabled': emailPrefsBusy() }}
+                  title="Usage alert emails"
+                >
+                  <input
+                    type="checkbox"
+                    checked={usageAlertsEnabled()}
+                    disabled={emailPrefsBusy()}
+                    onChange={(e) => void handleUsageAlertsChange(e.currentTarget.checked)}
+                  />
+                  <span class="notification-toggle__slider" aria-hidden="true" />
+                  <span class="sr-only">Receive usage alert emails</span>
+                </label>
+              </div>
+            </div>
+            <div class="settings-card__footer account-email-footer">
+              Plan confirmations, plan changes, and cancellation confirmations remain on as billing
+              lifecycle emails.
             </div>
           </div>
         </Show>

@@ -61,6 +61,7 @@ describe('classifyMessageError', () => {
     ['no_provider', 'config', 'no_provider'],
     ['no_provider_key', 'config', 'no_provider_key'],
     ['limit_exceeded', 'policy', 'limit_exceeded'],
+    ['manifest_rate_limited', 'policy', 'rate_limit'],
     ['friendly_error', 'internal', 'internal'],
   ])('maps the Manifest reason %s to %s/%s', (reason, origin, klass) => {
     expect(classifyMessageError({ status: 'error', routingReason: reason })).toEqual({
@@ -130,6 +131,16 @@ describe('classifyMessageError', () => {
     expect(classifyMessageError({ status: 'fallback_error', errorHttpStatus: 500 })).toEqual({
       error_origin: 'provider',
       error_class: 'server_error',
+      superseded: true,
+    });
+  });
+
+  it('marks an auto_fixed row (healed original) as superseded while classifying its cause', () => {
+    // The failed original of a healed request was recovered by the retry, so it
+    // must not count as a live fault — same as fallback_error.
+    expect(classifyMessageError({ status: 'auto_fixed', errorHttpStatus: 400 })).toEqual({
+      error_origin: 'provider',
+      error_class: 'invalid_request',
       superseded: true,
     });
   });

@@ -3,6 +3,7 @@ import { Show, createEffect, createSignal, onMount, type ParentComponent } from 
 import { authClient } from '../services/auth-client.js';
 import { getAuthDestination } from '../services/auth-redirects.js';
 import { checkNeedsSetup } from '../services/setup-status.js';
+import { hasPlanBeenChosen } from '../services/plan-selection.js';
 
 const GuestGuard: ParentComponent = (props) => {
   const session = authClient.useSession();
@@ -22,7 +23,14 @@ const GuestGuard: ParentComponent = (props) => {
 
   createEffect(() => {
     const s = session();
+    const step = Array.isArray(searchParams.step)
+      ? searchParams.step[0]
+      : searchParams.step;
     if (!s.isPending && s.data) {
+      if (step === 'plan' && !hasPlanBeenChosen(s.data.user?.id ?? '')) {
+        if (setupChecked()) setReady(true);
+        return;
+      }
       navigate(getAuthDestination(searchParams), { replace: true });
     }
     if (setupChecked() && !s.isPending && !s.data) {

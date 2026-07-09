@@ -78,6 +78,7 @@ const STATUS_LABELS: Record<string, string> = {
   // column stays the simple Success/Failed it was before.
   rate_limited: 'Failed',
   fallback_error: 'Handled',
+  auto_fixed: 'Auto-fixed',
 };
 
 export function formatStatus(status: string): string {
@@ -117,7 +118,7 @@ const ERROR_CLASS_LABELS: Record<string, string> = {
   network: 'Network',
   no_provider: 'No provider configured',
   no_provider_key: 'Missing API key',
-  limit_exceeded: 'Spend limit exceeded',
+  limit_exceeded: 'Limit exceeded',
   internal: 'Internal error',
 };
 

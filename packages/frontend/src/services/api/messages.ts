@@ -1,5 +1,12 @@
 import { fetchJson, fetchMutate } from './core.js';
 
+/** A deterministic edit Phoenix applied to heal a request. */
+export interface AutofixOperation {
+  type: string;
+  from?: string;
+  to?: string;
+}
+
 export interface MessageDetailResponse {
   message: {
     id: string;
@@ -12,6 +19,8 @@ export interface MessageDetailResponse {
     error_origin: string | null;
     /** WHAT kind of failure (rate_limit, auth, no_provider_key, timeout, …). Null on success. */
     error_class: string | null;
+    /** HTTP status code of the error response. Null on success. */
+    error_http_status: number | null;
     /** True when this row is a recovered (retried / fell-back-away-from) attempt, not the outcome. */
     superseded: boolean;
     description: string | null;
@@ -56,6 +65,23 @@ export interface MessageDetailResponse {
       appUrl?: string;
       categories?: string[];
     } | null;
+    autofix_applied: boolean;
+    autofix_role: string | null;
+    autofix_operations: AutofixOperation[] | null;
+    /** Phoenix's own identifiers for the heal decision behind this row. */
+    autofix_phoenix: {
+      issueId: string | null;
+      patchId: string | null;
+      healAttemptId: string | null;
+      /** Phoenix's human-readable "why" for the fix (null for pre-explanation rows). */
+      explanation?: {
+        summary: string;
+        operations: Array<{ type: string; detail: string }>;
+        source: string;
+      } | null;
+    } | null;
+    /** The paired row (failed original ↔ successful retry), for the visual link. */
+    autofix_sibling: { id: string; role: string | null; status: string } | null;
   };
 }
 

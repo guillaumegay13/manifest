@@ -142,5 +142,16 @@ export type {
   PlaygroundHistoryRunSummary,
   PlaygroundHistoryRunDetail,
 } from './playground';
-export { PLANS, PLAN_LIMITS, UNLIMITED_PLAN_LIMITS } from './plan-limits';
-export type { Plan, PlanLimits, BillingStatus } from './plan-limits';
+export {
+  PLANS,
+  FREE_PLAN_REQUESTS_PER_MONTH,
+  PLAN_LIMITS,
+  UNLIMITED_PLAN_LIMITS,
+} from './plan-limits';
+export type {
+  BillingEmailPreferences,
+  BillingPrice,
+  BillingStatus,
+  Plan,
+  PlanLimits,
+} from './plan-limits';

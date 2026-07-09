@@ -32,7 +32,15 @@ export function computeTrend(current: number, previous: number): number {
  * "what is an error" — consumed both by the Messages-log error filter and by
  * every "messages" KPI count below, so the two notions can never drift.
  */
-export const ERROR_MESSAGE_STATUSES = ['error', 'fallback_error', 'rate_limited'] as const;
+// `auto_fixed` is the failed-original row of a healed Auto-fix pair; its paired
+// `ok` retry row is the real success, so the original is excluded here to avoid
+// double-counting one logical request.
+export const ERROR_MESSAGE_STATUSES = [
+  'error',
+  'fallback_error',
+  'rate_limited',
+  'auto_fixed',
+] as const;
 
 /**
  * SQL `COUNT(*)` expression that counts only real (non-error) messages.
@@ -279,6 +287,7 @@ export const MESSAGE_ROW_SELECT_ALIASES = [
   'error_message',
   'error_origin',
   'error_class',
+  'error_http_status',
   'auth_type',
   'fallback_from_model',
   'fallback_index',
@@ -288,6 +297,8 @@ export const MESSAGE_ROW_SELECT_ALIASES = [
   'header_tier_color',
   'provider_key_label',
   'custom_provider_name',
+  'autofix_applied',
+  'autofix_role',
 ] as const;
 
 export function selectMessageRowColumns<T extends ObjectLiteral>(
@@ -313,6 +324,7 @@ export function selectMessageRowColumns<T extends ObjectLiteral>(
     .addSelect('at.error_message', 'error_message')
     .addSelect('at.error_origin', 'error_origin')
     .addSelect('at.error_class', 'error_class')
+    .addSelect('at.error_http_status', 'error_http_status')
     .addSelect('at.auth_type', 'auth_type')
     .addSelect('at.fallback_from_model', 'fallback_from_model')
     .addSelect('at.fallback_index', 'fallback_index')
@@ -321,5 +333,7 @@ export function selectMessageRowColumns<T extends ObjectLiteral>(
     .addSelect('at.header_tier_name', 'header_tier_name')
     .addSelect('at.header_tier_color', 'header_tier_color')
     .addSelect('at.provider_key_label', 'provider_key_label')
-    .addSelect('cp.name', 'custom_provider_name');
+    .addSelect('cp.name', 'custom_provider_name')
+    .addSelect('at.autofix_applied', 'autofix_applied')
+    .addSelect('at.autofix_role', 'autofix_role');
 }

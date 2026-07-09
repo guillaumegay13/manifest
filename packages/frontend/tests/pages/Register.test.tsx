@@ -3,7 +3,12 @@ import { render, screen, fireEvent } from '@solidjs/testing-library';
 
 const mockSignUpEmail = vi.fn().mockResolvedValue({});
 const mockSendVerificationEmail = vi.fn().mockResolvedValue({});
+const mockSubscriptionUpgrade = vi.fn().mockResolvedValue({});
+const mockGetBillingStatus = vi.fn().mockResolvedValue({ enabled: false, plan: 'free' });
+const mockNavigate = vi.fn();
+const mockToastError = vi.fn();
 let mockLocationSearch = '';
+let mockSearchParams: Record<string, string | undefined> = {};
 
 vi.mock('@solidjs/router', () => ({
   A: (props: any) => (
@@ -12,7 +17,8 @@ vi.mock('@solidjs/router', () => ({
     </a>
   ),
   useLocation: () => ({ search: mockLocationSearch }),
-  useSearchParams: () => [{}],
+  useNavigate: () => mockNavigate,
+  useSearchParams: () => [mockSearchParams],
 }));
 
 vi.mock('@solidjs/meta', () => ({
@@ -22,13 +28,26 @@ vi.mock('@solidjs/meta', () => ({
 
 vi.mock('../../src/services/auth-client.js', () => ({
   authClient: {
+    useSession: () => () => ({
+      data: { user: { id: 'u1', name: 'Test User', email: 'test@test.com' } },
+      isPending: false,
+    }),
     signUp: { email: (...args: unknown[]) => mockSignUpEmail(...args) },
     sendVerificationEmail: (...args: unknown[]) => mockSendVerificationEmail(...args),
+    subscription: { upgrade: (...args: unknown[]) => mockSubscriptionUpgrade(...args) },
   },
 }));
 
+vi.mock('../../src/services/api/billing.js', () => ({
+  getBillingStatus: (...args: unknown[]) => mockGetBillingStatus(...args),
+}));
+
 vi.mock('../../src/services/toast-store.js', () => ({
-  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
+  toast: {
+    error: (...args: unknown[]) => mockToastError(...args),
+    success: vi.fn(),
+    warning: vi.fn(),
+  },
 }));
 
 vi.mock('../../src/services/setup-status.js', () => ({
@@ -42,7 +61,10 @@ describe('Register', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSignUpEmail.mockResolvedValue({});
+    mockSubscriptionUpgrade.mockResolvedValue({});
+    mockGetBillingStatus.mockResolvedValue({ enabled: false, plan: 'free' });
     mockLocationSearch = '';
+    mockSearchParams = {};
     localStorage.clear();
   });
 
@@ -171,7 +193,7 @@ describe('Register', () => {
     expect(container.querySelector('a[href="/reset-password"]')).not.toBeNull();
   });
 
-  it('redirects to upgrade when signup returns a token', async () => {
+  it('opens the plan step when signup returns a token and billing is enabled', async () => {
     const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
       ...window.location,
       href: '',
@@ -179,6 +201,11 @@ describe('Register', () => {
     const hrefSetter = vi.fn();
     Object.defineProperty(window.location, 'href', { set: hrefSetter, configurable: true });
 
+    mockGetBillingStatus.mockResolvedValue({
+      enabled: true,
+      plan: 'free',
+      priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
+    });
     mockSignUpEmail.mockResolvedValue({
       data: { token: 'tok', user: { id: 'u1' } },
       error: null,
@@ -193,10 +220,91 @@ describe('Register', () => {
     });
     fireEvent.submit(container.querySelector('form')!);
     await vi.waitFor(() => {
-      expect(hrefSetter).toHaveBeenCalledWith('/upgrade');
+      expect(hrefSetter).toHaveBeenCalledWith('/register?step=plan');
     });
 
     locationSpy.mockRestore();
+  });
+
+  it('redirects already-Pro users away from the plan step', async () => {
+    mockSearchParams = { step: 'plan' };
+    mockGetBillingStatus.mockResolvedValue({
+      enabled: true,
+      plan: 'pro',
+      priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
+    });
+
+    render(() => <Register />);
+
+    await vi.waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+    });
+  });
+
+  it('lets users choose the free plan from the plan step', async () => {
+    const replace = vi.fn();
+    const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
+      ...window.location,
+      replace,
+    });
+    mockSearchParams = { step: 'plan' };
+    mockGetBillingStatus.mockResolvedValue({
+      enabled: true,
+      plan: 'free',
+      priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
+    });
+
+    const { container } = render(() => <Register />);
+    await screen.findByText('Choose your plan');
+
+    const freeCard = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.plan-picker__card'),
+    ).find((card) => card.textContent?.includes('Free'));
+    if (!freeCard) throw new Error('Free plan card not found');
+    fireEvent.click(freeCard);
+    fireEvent.click(container.querySelector('.plan-picker__cta')!);
+
+    expect(replace).toHaveBeenCalledWith('/');
+    locationSpy.mockRestore();
+  });
+
+  it('starts Pro checkout from the plan step', async () => {
+    mockSearchParams = { step: 'plan' };
+    mockGetBillingStatus.mockResolvedValue({
+      enabled: true,
+      plan: 'free',
+      priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
+    });
+
+    const { container } = render(() => <Register />);
+    await screen.findByText('Choose your plan');
+    fireEvent.click(container.querySelector('.plan-picker__cta')!);
+
+    await vi.waitFor(() => {
+      expect(mockSubscriptionUpgrade).toHaveBeenCalledWith({
+        plan: 'pro',
+        successUrl: `${window.location.origin}/overview?upgraded=1`,
+        cancelUrl: `${window.location.origin}/register?step=plan`,
+      });
+    });
+  });
+
+  it('shows an error toast when Pro checkout returns an error payload from the plan step', async () => {
+    mockSearchParams = { step: 'plan' };
+    mockSubscriptionUpgrade.mockResolvedValue({ error: { message: 'stripe down' } });
+    mockGetBillingStatus.mockResolvedValue({
+      enabled: true,
+      plan: 'free',
+      priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
+    });
+
+    const { container } = render(() => <Register />);
+    await screen.findByText('Choose your plan');
+    fireEvent.click(container.querySelector('.plan-picker__cta')!);
+
+    await vi.waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith('Could not start the upgrade. Please try again.'),
+    );
   });
 
   it('shows loading state during submission', async () => {

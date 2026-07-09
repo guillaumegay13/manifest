@@ -26,6 +26,14 @@ vi.mock('../../src/services/model-display.js', () => ({
   },
 }));
 
+vi.mock('@solidjs/router', () => ({
+  A: (props: any) => (
+    <a href={props.href} class={props.class} style={props.style}>
+      {props.children}
+    </a>
+  ),
+}));
+
 import MessageDetails from '../../src/components/MessageDetails';
 
 const detailsResponse = {
@@ -97,9 +105,33 @@ describe('MessageDetails', () => {
     mockGetMessageDetails.mockResolvedValue(errorResponse);
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
-      const errorBox = container.querySelector('.msg-detail__error-box');
+      // The redesign renders the error message inside `.msg-detail__error-inline`
+      // (an icon + the message span) within the error/auto-fix row.
+      const errorBox = container.querySelector('.msg-detail__error-inline');
       expect(errorBox).not.toBeNull();
       expect(errorBox!.textContent).toBe('401 Unauthorized: invalid API key');
+    });
+  });
+
+  it('links request-limit 402 errors to the upgrade page', async () => {
+    mockGetMessageDetails.mockResolvedValue({
+      message: {
+        ...detailsResponse.message,
+        status: 'error',
+        error_message: 'Request limit reached',
+        error_http_status: 402,
+        error_origin: 'policy',
+        error_class: 'limit_exceeded',
+        superseded: false,
+      },
+    });
+
+    const { container } = render(() => <MessageDetails messageId="msg-1" />);
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Upgrade to Pro for unlimited requests.');
+      const link = screen.getByText('Upgrade plan').closest('a');
+      expect(link?.getAttribute('href')).toBe('/upgrade?reason=requests');
     });
   });
 
@@ -123,7 +155,10 @@ describe('MessageDetails', () => {
     });
   });
 
-  it('flags a superseded (recovered-by-fallback) attempt', async () => {
+  it('renders a fallback-recovery panel for a fallback_error attempt', async () => {
+    // A fallback_error is the failed original of a chain that recovered on a
+    // fallback. The redesign pairs the error block with a "fallback was
+    // triggered" next-card, and surfaces the provider origin/type.
     mockGetMessageDetails.mockResolvedValue({
       message: {
         ...detailsResponse.message,
@@ -136,8 +171,12 @@ describe('MessageDetails', () => {
     });
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain('Superseded');
+      expect(container.textContent).toContain('Overloaded');
+      expect(container.textContent).toContain('A fallback was triggered after this error.');
     });
+    // The provider fault is surfaced as origin + type in the error meta table.
+    expect(container.textContent).toContain('Provider');
+    expect(container.textContent).toContain('Server error');
   });
 
   it('shows message summary', async () => {
@@ -206,7 +245,9 @@ describe('MessageDetails', () => {
     mockGetMessageDetails.mockResolvedValue(fallbackResponse);
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
-      const banner = container.querySelector('.msg-detail__fallback-banner');
+      // A successful request reached via fallback renders the fallback
+      // trigger card (`.autofix-card--fallback`) with the attempt number.
+      const banner = container.querySelector('.autofix-card--fallback');
       expect(banner).not.toBeNull();
       expect(banner!.textContent).toContain('gemini-2.5-flash-lite');
       expect(banner!.textContent).toContain('#1');
@@ -217,7 +258,7 @@ describe('MessageDetails', () => {
     mockGetMessageDetails.mockResolvedValue(detailsResponse);
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
-      expect(container.querySelector('.msg-detail__fallback-banner')).toBeNull();
+      expect(container.querySelector('.autofix-card--fallback')).toBeNull();
     });
   });
 
@@ -473,7 +514,7 @@ describe('MessageDetails', () => {
     });
   });
 
-  it('omits the attempt # when fallback_index is null but fallback_from_model is set', async () => {
+  it('defaults to Attempt #1 in the fallback banner when fallback_index is null', async () => {
     const fallbackNoIndexResponse = {
       ...detailsResponse,
       message: {
@@ -485,11 +526,12 @@ describe('MessageDetails', () => {
     mockGetMessageDetails.mockResolvedValue(fallbackNoIndexResponse);
     const { container } = render(() => <MessageDetails messageId="msg-1" />);
     await vi.waitFor(() => {
-      const banner = container.querySelector('.msg-detail__fallback-banner');
+      const banner = container.querySelector('.autofix-card--fallback');
       expect(banner).not.toBeNull();
       expect(banner!.textContent).toContain('gemini-2.5-flash-lite');
-      // Without fallback_index, the "(attempt #N)" suffix is hidden.
-      expect(banner!.textContent).not.toContain('attempt #');
+      // With no explicit index the attempt number falls back to #1 rather than
+      // being hidden — `(fallback_index ?? 0) + 1`.
+      expect(banner!.textContent).toContain('Attempt #1');
     });
   });
 
@@ -719,7 +761,7 @@ describe('MessageDetails', () => {
       expect(chevron.classList.contains('msg-detail__chevron--open')).toBe(true);
     });
 
-    it("renders an info tooltip explaining what model parameters are and that the surface will grow", async () => {
+    it('renders an info tooltip explaining what model parameters are and that the surface will grow', async () => {
       const withParams = {
         ...detailsResponse,
         message: {
@@ -732,9 +774,10 @@ describe('MessageDetails', () => {
       await vi.waitFor(() => {
         expect(container.textContent).toContain('Model Parameters');
       });
-      // The tooltip lives next to the toggle button as a sibling — putting
-      // it inside the button would nest interactive elements (invalid HTML).
-      const row = container.querySelector('.msg-detail__section-row');
+      // The tooltip lives next to the toggle button as a sibling in the
+      // panel header — putting it inside the button would nest interactive
+      // elements (invalid HTML).
+      const row = container.querySelector('.toggle-panel__header');
       expect(row).not.toBeNull();
       const tooltip = row!.querySelector('.info-tooltip');
       expect(tooltip).not.toBeNull();

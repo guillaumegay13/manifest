@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
+import { FREE_REQUEST_LIMIT_LABEL } from '../../src/services/billing-display';
+import { FREE_PLAN_REQUESTS_PER_MONTH } from 'manifest-shared';
 
 const searchParamsState: Record<string, string | undefined> = {};
 const setSearchParamsFn = vi.fn((p: Record<string, string | undefined>) => {
@@ -36,8 +38,10 @@ vi.mock('../../src/services/auth-client.js', () => ({
 }));
 
 const mockGetBillingStatus = vi.fn();
+const mockUpdateBillingEmailPreferences = vi.fn();
 vi.mock('../../src/services/api/billing.js', () => ({
   getBillingStatus: (...a: unknown[]) => mockGetBillingStatus(...a),
+  updateBillingEmailPreferences: (...a: unknown[]) => mockUpdateBillingEmailPreferences(...a),
 }));
 
 const mockToastSuccess = vi.fn();
@@ -74,22 +78,35 @@ import Account from '../../src/pages/Account';
 const disabledStatus = {
   enabled: false,
   plan: 'free' as const,
-  priceMonthlyUsd: null,
-  requests: { used: 0, limit: 10_000, periodEnd: null },
+  priceMonthly: { amount: null, currency: null, interval: null },
+  emailPreferences: { usageAlerts: true },
+  requests: { used: 0, limit: FREE_PLAN_REQUESTS_PER_MONTH, periodEnd: null },
+  cancelAtPeriodEnd: false,
+  subscriptionPeriodEnd: null,
 };
 
 const freeStatus = {
   enabled: true,
   plan: 'free' as const,
-  priceMonthlyUsd: 20,
-  requests: { used: 120, limit: 10_000, periodEnd: '2026-08-01T00:00:00.000Z' },
+  priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
+  emailPreferences: { usageAlerts: true },
+  requests: {
+    used: 120,
+    limit: FREE_PLAN_REQUESTS_PER_MONTH,
+    periodEnd: '2026-08-01T00:00:00.000Z',
+  },
+  cancelAtPeriodEnd: false,
+  subscriptionPeriodEnd: null,
 };
 
 const proStatus = {
   enabled: true,
   plan: 'pro' as const,
-  priceMonthlyUsd: 20,
+  priceMonthly: { amount: 20, currency: 'USD', interval: 'month' },
+  emailPreferences: { usageAlerts: true },
   requests: { used: null, limit: null, periodEnd: null },
+  cancelAtPeriodEnd: false,
+  subscriptionPeriodEnd: null,
 };
 
 describe('Account', () => {
@@ -100,6 +117,7 @@ describe('Account', () => {
     localStorage.clear();
     for (const key of Object.keys(searchParamsState)) delete searchParamsState[key];
     mockGetBillingStatus.mockResolvedValue(disabledStatus);
+    mockUpdateBillingEmailPreferences.mockResolvedValue({ usageAlerts: true });
     mockUpgrade.mockResolvedValue(undefined);
     mockBillingPortal.mockResolvedValue({ data: { url: 'https://billing.stripe.com/session' } });
     fakeTab = { location: { href: '' }, opener: {}, close: vi.fn() };
@@ -193,6 +211,7 @@ describe('Account', () => {
       const { container } = render(() => <Account />);
       await waitFor(() => expect(mockGetBillingStatus).toHaveBeenCalled());
       expect(screen.queryByText('Billing')).toBeNull();
+      expect(screen.queryByText('Email preferences')).toBeNull();
       expect(container.querySelector('#billing')).toBeNull();
     });
 
@@ -203,19 +222,59 @@ describe('Account', () => {
       expect(container.querySelector('#billing')).not.toBeNull();
       expect(screen.getByText('Current plan')).toBeDefined();
       expect(screen.getByText('Free')).toBeDefined();
-      expect(screen.getByText('120 / 10,000')).toBeDefined();
+      expect(screen.getByText(`120 / ${FREE_REQUEST_LIMIT_LABEL}`)).toBeDefined();
       expect(screen.getByText(/Resets/)).toBeDefined();
-      expect(screen.getByText('Free: 10,000 requests/mo · Pro: unlimited requests')).toBeDefined();
+      expect(
+        screen.getByText(`Free: ${FREE_REQUEST_LIMIT_LABEL} requests/mo · Pro: unlimited requests`),
+      ).toBeDefined();
+      expect(screen.getByText('Email preferences')).toBeDefined();
+      expect(
+        (screen.getByLabelText('Receive usage alert emails') as HTMLInputElement).checked,
+      ).toBe(true);
     });
 
+    it('saves usage alert email preferences', async () => {
+      mockGetBillingStatus
+        .mockResolvedValueOnce(freeStatus)
+        .mockResolvedValue({ ...freeStatus, emailPreferences: { usageAlerts: false } });
+      mockUpdateBillingEmailPreferences.mockResolvedValue({ usageAlerts: false });
+      render(() => <Account />);
+      const checkbox = (await screen.findByLabelText(
+        'Receive usage alert emails',
+      )) as HTMLInputElement;
+
+      fireEvent.click(checkbox);
+
+      await waitFor(() =>
+        expect(mockUpdateBillingEmailPreferences).toHaveBeenCalledWith({ usageAlerts: false }),
+      );
+      await waitFor(() => expect(mockToastSuccess).toHaveBeenCalledWith('Email preferences saved'));
+      await waitFor(() => expect(checkbox.checked).toBe(false));
+    });
+
+    it('restores the usage alert toggle when saving fails', async () => {
+      mockGetBillingStatus.mockResolvedValue(freeStatus);
+      mockUpdateBillingEmailPreferences.mockRejectedValue(new Error('network'));
+      render(() => <Account />);
+      const checkbox = (await screen.findByLabelText(
+        'Receive usage alert emails',
+      )) as HTMLInputElement;
+
+      fireEvent.click(checkbox);
+
+      await waitFor(() =>
+        expect(mockUpdateBillingEmailPreferences).toHaveBeenCalledWith({ usageAlerts: false }),
+      );
+      await waitFor(() => expect(checkbox.checked).toBe(true));
+    });
     it('falls back to the included label when a limited plan has no usage count yet', async () => {
       mockGetBillingStatus.mockResolvedValue({
         ...freeStatus,
-        requests: { used: null, limit: 10_000, periodEnd: null },
+        requests: { used: null, limit: FREE_PLAN_REQUESTS_PER_MONTH, periodEnd: null },
       });
       render(() => <Account />);
       await screen.findByText('Billing');
-      expect(screen.getByText('10,000')).toBeDefined();
+      expect(screen.getByText(FREE_REQUEST_LIMIT_LABEL)).toBeDefined();
     });
 
     it('calls subscription.upgrade with checkout URLs when Upgrade to Pro is clicked', async () => {
@@ -260,11 +319,25 @@ describe('Account', () => {
       await waitFor(() => expect(button.disabled).toBe(false));
     });
 
+    it('shows an error toast and re-enables the button when the upgrade call returns an error payload', async () => {
+      mockGetBillingStatus.mockResolvedValue(freeStatus);
+      mockUpgrade.mockResolvedValue({ error: { message: 'network' } });
+      render(() => <Account />);
+      const button = (await screen.findByText(/Upgrade to Pro/)) as HTMLButtonElement;
+      fireEvent.click(button);
+      await waitFor(() =>
+        expect(mockToastError).toHaveBeenCalledWith(
+          'Could not start the upgrade. Please try again.',
+        ),
+      );
+      await waitFor(() => expect(button.disabled).toBe(false));
+    });
+
     it('shows an error toast when the billing portal call rejects', async () => {
       mockGetBillingStatus.mockResolvedValue(proStatus);
       mockBillingPortal.mockRejectedValue(new Error('network'));
       render(() => <Account />);
-      const button = (await screen.findByText('Manage billing')) as HTMLButtonElement;
+      const button = (await screen.findByText('Manage subscription')) as HTMLButtonElement;
       fireEvent.click(button);
       await waitFor(() =>
         expect(mockToastError).toHaveBeenCalledWith(
@@ -278,7 +351,7 @@ describe('Account', () => {
       mockGetBillingStatus.mockResolvedValue(proStatus);
       mockBillingPortal.mockResolvedValue({ data: null });
       render(() => <Account />);
-      const button = (await screen.findByText('Manage billing')) as HTMLButtonElement;
+      const button = (await screen.findByText('Manage subscription')) as HTMLButtonElement;
       fireEvent.click(button);
       await waitFor(() =>
         expect(mockToastError).toHaveBeenCalledWith(
@@ -295,7 +368,7 @@ describe('Account', () => {
       // Popup blocker: the synchronous placeholder open returns null.
       (window.open as unknown as ReturnType<typeof vi.fn>).mockReturnValue(null);
       render(() => <Account />);
-      const button = await screen.findByText('Manage billing');
+      const button = await screen.findByText('Manage subscription');
       fireEvent.click(button);
       await waitFor(() =>
         expect(window.open).toHaveBeenCalledWith(
@@ -306,20 +379,25 @@ describe('Account', () => {
       );
     });
 
-    it('hides the upgrade price when priceMonthlyUsd is null', async () => {
-      mockGetBillingStatus.mockResolvedValue({ ...freeStatus, priceMonthlyUsd: null });
+    it('hides the upgrade price when Stripe price is unavailable', async () => {
+      mockGetBillingStatus.mockResolvedValue({
+        ...freeStatus,
+        priceMonthly: { amount: null, currency: null, interval: null },
+      });
       render(() => <Account />);
       const button = await screen.findByText(/Upgrade to Pro/);
       expect(button.textContent).not.toContain('$');
     });
 
-    it('shows Manage billing on the pro plan and opens the billing portal', async () => {
+    it('shows Manage subscription on the pro plan and opens the billing portal', async () => {
       mockGetBillingStatus.mockResolvedValue(proStatus);
       render(() => <Account />);
-      const button = await screen.findByText('Manage billing');
+      const button = await screen.findByText('Manage subscription');
       expect(screen.getByText('Pro · $20/mo')).toBeDefined();
       expect(screen.getByText('Unlimited')).toBeDefined();
-      expect(screen.queryByText(/Free: 10,000 requests/)).toBeNull();
+      expect(
+        screen.queryByText(new RegExp(`Free: ${FREE_REQUEST_LIMIT_LABEL} requests`)),
+      ).toBeNull();
       fireEvent.click(button);
       expect(mockBillingPortal).toHaveBeenCalledWith({
         returnUrl: `${window.location.origin}/account`,
@@ -333,14 +411,27 @@ describe('Account', () => {
       await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
     });
 
+    it('shows the scheduled cancellation access date for Pro users', async () => {
+      mockGetBillingStatus.mockResolvedValue({
+        ...proStatus,
+        cancelAtPeriodEnd: true,
+        subscriptionPeriodEnd: '2026-08-15T00:00:00.000Z',
+      });
+
+      render(() => <Account />);
+
+      await screen.findByText(/You'll keep Pro access until/);
+      expect(screen.getByText(/August 15, 2026/)).toBeDefined();
+    });
+
     it('shows unlimited labels when pro limits are null', async () => {
       mockGetBillingStatus.mockResolvedValue({
         ...proStatus,
-        priceMonthlyUsd: null,
+        priceMonthly: { amount: null, currency: null, interval: null },
         requests: { used: 5000, limit: null, periodEnd: null },
       });
       render(() => <Account />);
-      await screen.findByText('Manage billing');
+      await screen.findByText('Manage subscription');
       expect(screen.getByText('Pro')).toBeDefined();
       expect(screen.getByText('Unlimited')).toBeDefined();
     });
