@@ -2303,7 +2303,8 @@ describe('ModelDiscoveryService', () => {
       expect(ids).toContain('gemini-3.1-pro-preview');
       expect(ids).toContain('gemini-3-flash-preview');
       expect(ids).toContain('gemini-3.1-flash-lite');
-      expect(ids).toContain('gemini-3.1-flash-lite-preview');
+      expect(ids).toContain('gemini-3.5-flash-lite');
+      expect(ids).toContain('gemini-3.6-flash');
       expect(fetcher.fetch).not.toHaveBeenCalled();
     });
   });
@@ -2810,7 +2811,8 @@ describe('ModelDiscoveryService', () => {
       // Gemini only has the verbatim match
       expect(geminiResult.map((m) => m.id)).toContain('gemini-2.5-pro');
       expect(geminiResult.map((m) => m.id)).toContain('gemini-3.1-pro-preview');
-      expect(geminiResult.map((m) => m.id)).toContain('gemini-3.1-flash-lite-preview');
+      expect(geminiResult.map((m) => m.id)).toContain('gemini-3.5-flash-lite');
+      expect(geminiResult.map((m) => m.id)).toContain('gemini-3.6-flash');
     });
   });
 

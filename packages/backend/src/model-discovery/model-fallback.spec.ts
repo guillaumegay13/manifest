@@ -526,7 +526,8 @@ describe('buildSubscriptionFallbackModels', () => {
       expect(geminiResult.map((m) => m.id)).toContain('gemini-2.5-flash-lite');
       expect(geminiResult.map((m) => m.id)).toContain('gemini-3.1-pro-preview');
       expect(geminiResult.map((m) => m.id)).toContain('gemini-3.1-flash-lite');
-      expect(geminiResult.map((m) => m.id)).toContain('gemini-3.1-flash-lite-preview');
+      expect(geminiResult.map((m) => m.id)).toContain('gemini-3.5-flash-lite');
+      expect(geminiResult.map((m) => m.id)).toContain('gemini-3.6-flash');
     });
 
     it('applies maxContextWindow cap from gemini subscription capabilities', () => {
@@ -554,15 +555,16 @@ describe('buildSubscriptionFallbackModels', () => {
     it('returns all gemini knownModels as zero-cost when pricingSync returns nothing', () => {
       const result = buildSubscriptionFallbackModels(makePricingSync(new Map()), 'gemini');
 
-      expect(result).toHaveLength(7);
+      expect(result).toHaveLength(8);
       expect(result.map((m) => m.id).sort()).toEqual([
         'gemini-2.5-flash',
         'gemini-2.5-flash-lite',
         'gemini-2.5-pro',
         'gemini-3-flash-preview',
         'gemini-3.1-flash-lite',
-        'gemini-3.1-flash-lite-preview',
         'gemini-3.1-pro-preview',
+        'gemini-3.5-flash-lite',
+        'gemini-3.6-flash',
       ]);
       for (const m of result) {
         expect(m.inputPricePerToken).toBe(0);
@@ -616,7 +618,7 @@ describe('supplementWithKnownModels', () => {
     expect(opusEntries).toHaveLength(1);
   });
 
-  it('keeps explicit gemini preview known models separate in exact mode', () => {
+  it('keeps exact gemini known models separate in exact mode', () => {
     const raw = [
       {
         id: 'gemini-3.1-flash-lite',
@@ -635,7 +637,9 @@ describe('supplementWithKnownModels', () => {
     const ids = result.map((m) => m.id);
 
     expect(ids).toContain('gemini-3.1-flash-lite');
-    expect(ids).toContain('gemini-3.1-flash-lite-preview');
+    expect(ids).toContain('gemini-3.5-flash-lite');
+    expect(ids).toContain('gemini-3.6-flash');
+    expect(ids).not.toContain('gemini-3.1-flash-lite-preview');
   });
 });
 
