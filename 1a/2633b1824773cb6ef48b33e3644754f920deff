@@ -1,0 +1,21 @@
+packages/backend/src/routing/proxy/__tests__/proxy.controller.spec.ts
+  s_f77dd36f1afce7::t_89b1f418533d56 396-399,417-422
+  s_f77dd36f1afce7::t_7cc46ff726dcf7 395
+  s_f77dd36f1afce7::t_012442ae6a7cad 423
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "1a2633b1824773cb6ef48b33e3644754f920deff",
+  "prompts": {},
+  "sessions": {
+    "s_f77dd36f1afce7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f9377-52ed-7f61-a13b-e3123850b28e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
