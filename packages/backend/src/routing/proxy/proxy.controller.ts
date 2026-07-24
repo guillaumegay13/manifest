@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
@@ -59,11 +60,38 @@ interface OpenAiModelObject {
   object: 'model';
   created: number;
   owned_by: string;
+  cost?: OpenAiModelCost;
+}
+
+interface OpenAiModelCost {
+  /** USD per million input tokens. */
+  input?: number;
+  /** USD per million output tokens. */
+  output?: number;
 }
 
 interface OpenAiModelList {
   object: 'list';
   data: OpenAiModelObject[];
+}
+
+function openAiModelCost(
+  inputPricePerToken: number | null,
+  outputPricePerToken: number | null,
+): OpenAiModelCost | undefined {
+  const input =
+    inputPricePerToken != null && Number.isFinite(inputPricePerToken) && inputPricePerToken >= 0
+      ? inputPricePerToken * 1_000_000
+      : undefined;
+  const output =
+    outputPricePerToken != null && Number.isFinite(outputPricePerToken) && outputPricePerToken >= 0
+      ? outputPricePerToken * 1_000_000
+      : undefined;
+  if (input === undefined && output === undefined) return undefined;
+  return {
+    ...(input !== undefined ? { input } : {}),
+    ...(output !== undefined ? { output } : {}),
+  };
 }
 
 @Controller('v1')
@@ -91,7 +119,9 @@ export class ProxyController {
   @Get('models')
   async models(
     @Req() req: Request & { ingestionContext: IngestionContext },
+    @Query('cost') cost?: string,
   ): Promise<OpenAiModelList> {
+    const includeCost = cost === 'true';
     const models = await this.modelDiscovery.getModelsForAgent(
       req.ingestionContext.tenantId,
       req.ingestionContext.agentId,
@@ -110,12 +140,17 @@ export class ProxyController {
       const id = openAiModelId(model);
       if (seen.has(id)) continue;
       seen.add(id);
-      data.push({
+      const entry: OpenAiModelObject = {
         id,
         object: 'model',
         created: MODEL_CREATED_UNKNOWN,
         owned_by: model.provider,
-      });
+      };
+      if (includeCost) {
+        const modelCost = openAiModelCost(model.inputPricePerToken, model.outputPricePerToken);
+        if (modelCost) entry.cost = modelCost;
+      }
+      data.push(entry);
     }
 
     return {

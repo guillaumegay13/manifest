@@ -262,6 +262,95 @@ describe('ProxyController', () => {
     });
   });
 
+  it('should keep the default /v1/models shape unchanged when model costs are known', async () => {
+    modelDiscovery.getModelsForAgent.mockResolvedValue([
+      makeDiscoveredModel({
+        id: 'gpt-4o',
+        provider: 'openai',
+        inputPricePerToken: 2.5 / 1_000_000,
+        outputPricePerToken: 10 / 1_000_000,
+      }),
+    ]);
+
+    await expect(controller.models(mockRequest({}) as never)).resolves.toEqual({
+      object: 'list',
+      data: [
+        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        { id: 'openai/gpt-4o', object: 'model', created: 0, owned_by: 'openai' },
+      ],
+    });
+  });
+
+  it('should expose costs in USD per million tokens when ?cost=true', async () => {
+    modelDiscovery.getModelsForAgent.mockResolvedValue([
+      makeDiscoveredModel({
+        id: 'gpt-5.4-mini',
+        provider: 'openai',
+        authType: 'subscription',
+        inputPricePerToken: 0.25 / 1_000_000,
+        outputPricePerToken: 2 / 1_000_000,
+      }),
+      makeDiscoveredModel({
+        id: 'free-model',
+        provider: 'openrouter',
+        inputPricePerToken: 0,
+        outputPricePerToken: 0,
+      }),
+    ]);
+
+    await expect(controller.models(mockRequest({}) as never, 'true')).resolves.toEqual({
+      object: 'list',
+      data: [
+        { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+        {
+          id: 'openai/gpt-5.4-mini-subscription',
+          object: 'model',
+          created: 0,
+          owned_by: 'openai',
+          cost: { input: 0.25, output: 2 },
+        },
+        {
+          id: 'openrouter/free-model',
+          object: 'model',
+          created: 0,
+          owned_by: 'openrouter',
+          cost: { input: 0, output: 0 },
+        },
+      ],
+    });
+  });
+
+  it('should omit unknown cost values and ignore values other than ?cost=true', async () => {
+    modelDiscovery.getModelsForAgent.mockResolvedValue([
+      makeDiscoveredModel({
+        id: 'input-only',
+        inputPricePerToken: 1 / 1_000_000,
+        outputPricePerToken: null,
+      }),
+      makeDiscoveredModel({
+        id: 'unknown',
+        inputPricePerToken: Number.NaN,
+        outputPricePerToken: -1,
+      }),
+    ]);
+
+    const withCosts = await controller.models(mockRequest({}) as never, 'true');
+    expect(withCosts.data).toEqual([
+      { id: 'auto', object: 'model', created: 0, owned_by: 'manifest' },
+      {
+        id: 'openai/input-only',
+        object: 'model',
+        created: 0,
+        owned_by: 'openai',
+        cost: { input: 1 },
+      },
+      { id: 'openai/unknown', object: 'model', created: 0, owned_by: 'openai' },
+    ]);
+
+    const withoutCosts = await controller.models(mockRequest({}) as never, '1');
+    expect(withoutCosts.data.every((model) => !('cost' in model))).toBe(true);
+  });
+
   it('should return JSON response for non-streaming OpenAI provider', async () => {
     const responseBody = { choices: [{ message: { content: 'hello' } }] };
     const mockProviderResp = new Response(JSON.stringify(responseBody), {
