@@ -1,0 +1,68 @@
+packages/backend/src/routing/proxy/__tests__/proxy-message-recorder.spec.ts
+  s_59e4a92070941c::t_ffb4942d0de1bd 173-214
+packages/backend/src/routing/proxy/proxy.service.ts
+  s_59e4a92070941c::t_aa44d678117dad 479-483,519-523
+packages/backend/src/database/data-source-definitions.ts
+  s_59e4a92070941c::t_5df46550229ab8 152,304
+packages/backend/src/routing/autofix/observation-payload.ts
+  s_59e4a92070941c::t_1b4104085fac57 2,134-136,138,156-162,172-175,178-181
+  s_59e4a92070941c::t_86c345ba3acb0b 61-75,153,176
+  s_59e4a92070941c::t_bed2ebb2ecd7f2 137,154,177
+  s_59e4a92070941c::t_da484ce7e1f146 155
+.changeset/capture-provider-wire-exchanges.md
+  s_59e4a92070941c::t_f98fc0cf6dd5ee 1-5
+packages/backend/src/routing/proxy/proxy-message-recorder.ts
+  s_59e4a92070941c::t_3437f204db6867 23,99,102,116-117,135-136
+  s_59e4a92070941c::t_3e935b64083bcd 837,922
+  s_59e4a92070941c::t_4916c313894dff 94-98,100-101,103-115,118-134,137-150,343,587-588,658
+packages/backend/src/routing/proxy/__tests__/proxy.controller.spec.ts
+  s_59e4a92070941c::t_ffb4942d0de1bd 1428-1429,1460-1464
+  s_59e4a92070941c::t_b849d329b11bf3 1470-1513
+packages/backend/src/routing/proxy/__tests__/provider-client.spec.ts
+  s_59e4a92070941c::t_ffb4942d0de1bd 1277-1279
+packages/backend/src/routing/autofix/observation-payload.spec.ts
+  s_59e4a92070941c::t_ffb4942d0de1bd 107,151-176
+  s_59e4a92070941c::t_0ea40d6418d2a9 5,102-106
+  s_59e4a92070941c::t_f030145de8c867 108-109
+packages/backend/src/routing/autofix/contract/phoenix-openapi.yaml
+  s_59e4a92070941c::t_1d07b45a779ba4 346-371
+packages/backend/test/provider-wire-capture.e2e-spec.ts
+  s_59e4a92070941c::t_37f060258a8069 1-143
+packages/backend/src/entities/agent-message.entity.ts
+  s_59e4a92070941c::t_03374f86d37b89 184-195
+packages/backend/src/routing/proxy/proxy-types.ts
+  s_59e4a92070941c::t_03374f86d37b89 32-45,61-62
+packages/backend/src/routing/proxy/proxy.controller.ts
+  s_59e4a92070941c::t_1b4104085fac57 362-367,374-378,380
+  s_59e4a92070941c::t_bed2ebb2ecd7f2 379
+packages/backend/src/database/migrations/1801300000000-AddProviderWireExchange.ts
+  s_59e4a92070941c::t_03374f86d37b89 1-25
+packages/backend/src/routing/proxy/proxy-fallback.service.ts
+  s_59e4a92070941c::t_03374f86d37b89 774
+  s_59e4a92070941c::t_daa1b604499f6b 450-456,768-773
+packages/backend/src/routing/autofix/phoenix.types.ts
+  s_59e4a92070941c::t_1b4104085fac57 1,25-38,65
+packages/backend/src/routing/proxy/provider-client.ts
+  s_59e4a92070941c::t_03374f86d37b89 27-32,46-49,85-94,270,363-364
+packages/backend/src/routing/autofix/autofix.service.ts
+  s_59e4a92070941c::t_2917e053ced308 14,90-96
+  s_59e4a92070941c::t_86c345ba3acb0b 15,388
+  s_59e4a92070941c::t_1b4104085fac57 383-387,389-397
+  s_59e4a92070941c::t_29172cc7395532 97-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "024abfdbcdf821bf9b8f86ec7bb5c44dc2b7fca9",
+  "prompts": {},
+  "sessions": {
+    "s_59e4a92070941c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f940a-f9c7-74a0-8908-791721c17e9b",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
