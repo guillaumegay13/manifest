@@ -56,6 +56,7 @@ function mockRecorder() {
     recordFallbackSuccess: jest.fn().mockResolvedValue(undefined),
     recordSuccessMessage: jest.fn().mockResolvedValue(undefined),
     recordAutofixOriginals: jest.fn().mockResolvedValue(undefined),
+    recordManifestBlockedRequest: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -2194,6 +2195,60 @@ describe('proxy-response-handler', () => {
         'standard',
         healedAutofix,
         expect.objectContaining({ provider: 'openai', reason: 'auto', traceId: 'trace-1' }),
+      );
+      expect(recorder.recordManifestBlockedRequest).not.toHaveBeenCalled();
+    });
+
+    it('routes a healed Manifest-blocked original (manifestOrigin) through the Manifest-blocked writer', () => {
+      // An M302 heal: the pre-heal failure never reached a provider, so its
+      // original row must be a Manifest row (provider NULL, error_code stamped),
+      // not a provider-attributed auto_fixed row under the healed model.
+      const recorder = mockRecorder();
+      const meta = makeMeta();
+      const manifestAutofix: AutofixRecord = {
+        ...healedAutofix,
+        manifestOrigin: {
+          code: 'M302',
+          message: '[🦚 Manifest M302] Model "ghost" is not available for this agent.',
+          model: 'ghost',
+        },
+      };
+
+      recordSuccess(
+        testCtx,
+        meta,
+        { prompt_tokens: 100, completion_tokens: 50 },
+        undefined,
+        recorder as any,
+        'trace-1',
+        'session-1',
+        undefined,
+        null,
+        undefined,
+        manifestAutofix,
+      );
+
+      expect(recorder.recordManifestBlockedRequest).toHaveBeenCalledWith(
+        testCtx,
+        expect.objectContaining({
+          errorMessage: '[🦚 Manifest M302] Model "ghost" is not available for this agent.',
+          errorCode: 'M302',
+          reason: 'model_not_available',
+          model: 'ghost',
+          traceId: 'trace-1',
+          sessionKey: 'session-1',
+          autofix: manifestAutofix,
+        }),
+      );
+      expect(recorder.recordAutofixOriginals).not.toHaveBeenCalled();
+      // The retry row still records as the standard success message.
+      expect(recorder.recordSuccessMessage).toHaveBeenCalledWith(
+        testCtx,
+        'gpt-4o',
+        'standard',
+        'auto',
+        expect.anything(),
+        expect.objectContaining({ autofix: manifestAutofix }),
       );
     });
 
