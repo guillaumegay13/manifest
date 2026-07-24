@@ -393,6 +393,11 @@ describe('ProxyController', () => {
         outputPricePerToken: null,
       }),
       makeDiscoveredModel({
+        id: 'output-only',
+        inputPricePerToken: null,
+        outputPricePerToken: 3 / 1_000_000,
+      }),
+      makeDiscoveredModel({
         id: 'unknown',
         inputPricePerToken: Number.NaN,
         outputPricePerToken: -1,
@@ -408,6 +413,13 @@ describe('ProxyController', () => {
         created: 0,
         owned_by: 'openai',
         cost: { input: 1 },
+      },
+      {
+        id: 'openai/output-only',
+        object: 'model',
+        created: 0,
+        owned_by: 'openai',
+        cost: { output: 3 },
       },
       { id: 'openai/unknown', object: 'model', created: 0, owned_by: 'openai' },
     ]);
