@@ -69,11 +69,38 @@ interface OpenAiModelObject {
   created: number;
   owned_by: string;
   capabilities?: OpenAiModelCapabilities;
+  cost?: OpenAiModelCost;
+}
+
+interface OpenAiModelCost {
+  /** USD per million input tokens. */
+  input?: number;
+  /** USD per million output tokens. */
+  output?: number;
 }
 
 interface OpenAiModelList {
   object: 'list';
   data: OpenAiModelObject[];
+}
+
+function openAiModelCost(
+  inputPricePerToken: number | null,
+  outputPricePerToken: number | null,
+): OpenAiModelCost | undefined {
+  const input =
+    inputPricePerToken != null && Number.isFinite(inputPricePerToken) && inputPricePerToken >= 0
+      ? inputPricePerToken * 1_000_000
+      : undefined;
+  const output =
+    outputPricePerToken != null && Number.isFinite(outputPricePerToken) && outputPricePerToken >= 0
+      ? outputPricePerToken * 1_000_000
+      : undefined;
+  if (input === undefined && output === undefined) return undefined;
+  return {
+    ...(input !== undefined ? { input } : {}),
+    ...(output !== undefined ? { output } : {}),
+  };
 }
 
 @Controller('v1')
@@ -104,13 +131,15 @@ export class ProxyController {
   async models(
     @Req() req: Request & { ingestionContext: IngestionContext },
     @Query('capabilities') capabilities?: string,
+    @Query('cost') cost?: string,
   ): Promise<OpenAiModelList> {
     const includeCapabilities = capabilities === 'true';
+    const includeCost = cost === 'true';
     const models = await this.modelDiscovery.getModelsForAgent(
       req.ingestionContext.tenantId,
       req.ingestionContext.agentId,
     );
-    // The synthetic `auto` route never carries capabilities — it resolves to a
+    // The synthetic `auto` route never carries metadata — it resolves to a
     // different concrete model per request, so any claim would be wrong.
     const data: OpenAiModelObject[] = [
       {
@@ -142,6 +171,10 @@ export class ProxyController {
         );
         const modelCapabilities = openAiModelCapabilities({ ...model, ...resolved });
         if (modelCapabilities) entry.capabilities = modelCapabilities;
+      }
+      if (includeCost) {
+        const modelCost = openAiModelCost(model.inputPricePerToken, model.outputPricePerToken);
+        if (modelCost) entry.cost = modelCost;
       }
       data.push(entry);
     }
