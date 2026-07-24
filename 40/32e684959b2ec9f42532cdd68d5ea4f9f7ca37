@@ -1,0 +1,40 @@
+packages/shared/__tests__/chat-message.spec.ts
+  s_1bd539ae3d5eca::t_2f61e07440a585 23,44-48,97-123,125,138-140,160-172,225-227,233-234,238-261
+  s_1bd539ae3d5eca::t_5474d9384728b5 2,6-7,11-22,24-43,83-96,124,126-137,141-159,173-195,213-224,228-232,262-333,349-370
+  s_1bd539ae3d5eca::t_c3343b500b7885 235-237
+packages/backend/src/routing/proxy/request-recording.service.spec.ts
+  s_1bd539ae3d5eca::t_ee3d361b2d30bc 40-55
+  s_1bd539ae3d5eca::t_4e3efb5f2441a9 72-79
+packages/frontend/src/components/RequestMessages.tsx
+  s_1bd539ae3d5eca::t_2f61e07440a585 49,67-68
+packages/frontend/tests/components/RequestMessages.test.tsx
+  s_1bd539ae3d5eca::t_4e3efb5f2441a9 57,64,74,80-82
+  s_1bd539ae3d5eca::t_0efde23705827e 83
+  s_1bd539ae3d5eca::t_020c88ffceba4d 49-56,58-63,65-73,75-79,84-98
+packages/frontend/tests/pages/SettingsRecordingSection.test.tsx
+  s_1bd539ae3d5eca::t_020c88ffceba4d 39-52
+packages/backend/src/routing/proxy/__tests__/proxy.controller.spec.ts
+  s_1bd539ae3d5eca::t_ee3d361b2d30bc 504-535
+packages/frontend/tests/components/RequestDrawer.test.tsx
+  s_1bd539ae3d5eca::t_020c88ffceba4d 217-219
+packages/backend/src/routing/proxy/request-recording-capture.spec.ts
+  s_1bd539ae3d5eca::t_ee3d361b2d30bc 24-27
+packages/shared/src/chat-message.ts
+  s_1bd539ae3d5eca::t_2f61e07440a585 81-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "4032e684959b2ec9f42532cdd68d5ea4f9f7ca37",
+  "prompts": {},
+  "sessions": {
+    "s_1bd539ae3d5eca": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8e36-94e5-7372-be8f-3a390f0d4d92",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
