@@ -1,0 +1,61 @@
+packages/backend/src/routing/proxy/proxy.service.ts
+  s_15a5569de639d0::t_766d039fdb33b0 276-278,280-288
+  s_15a5569de639d0::t_e8ea9d9e77ffde 192-204
+  s_15a5569de639d0::t_ebc43a34faca9e 32
+  s_15a5569de639d0::t_78fb6c25864e41 1110-1121,1123-1210
+  s_15a5569de639d0::t_ed97f6991c49f0 310-311
+  s_15a5569de639d0::t_060f3fd52dd123 154-162,171-179,190
+  s_15a5569de639d0::t_f0f9aa87853a90 606,626-627
+  s_15a5569de639d0::t_22d6cf79f885e2 637
+  s_59e4a92070941c::t_d7e25f566edf37 191
+packages/backend/src/routing/proxy/__tests__/proxy-response-handler.spec.ts
+  s_15a5569de639d0::t_1e8a2a3b61bad6 2199-2252
+  s_15a5569de639d0::t_d6f4988a448cef 59
+CLAUDE.md
+  s_15a5569de639d0::t_233bab89c74860 566-567
+packages/backend/src/routing/proxy/proxy-message-recorder.ts
+  s_15a5569de639d0::t_c648485a862352 125-131
+  s_15a5569de639d0::t_b61428c94f2594 375,388-390,395-397
+packages/backend/src/routing/proxy/__tests__/proxy.service.spec.ts
+  s_15a5569de639d0::t_bf39343e18e6e2 912-1042
+.changeset/heal-unavailable-model.md
+  s_15a5569de639d0::t_536cf6b3ab026f 1-5
+packages/backend/src/routing/proxy/proxy.controller.ts
+  s_15a5569de639d0::t_6a41801ed38b96 335-343
+  s_15a5569de639d0::t_a41e2aba8060cc 389,403-404
+  s_15a5569de639d0::t_30dd1f2ad06f30 29
+packages/backend/src/routing/autofix/autofix.types.ts
+  s_15a5569de639d0::t_a988ef2b87711f 55-68
+  s_15a5569de639d0::t_48a51ca39bb3ad 7
+packages/backend/src/routing/proxy/proxy-response-handler.ts
+  s_15a5569de639d0::t_ed046126dddd90 45
+  s_15a5569de639d0::t_96f61d3a399a71 699,701-731
+packages/backend/src/routing/proxy/__tests__/proxy-message-recorder.spec.ts
+  s_15a5569de639d0::t_14704c07fd428f 495-562
+packages/backend/src/routing/proxy/__tests__/proxy.controller.spec.ts
+  s_15a5569de639d0::t_e6868d5e418afe 1587-1642
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "b0d63d52b7306a918b9723abb8d029266f738ec5",
+  "prompts": {},
+  "sessions": {
+    "s_15a5569de639d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9d2cc0c6-e504-49a2-bada-d491ff905bdd",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    },
+    "s_59e4a92070941c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f940a-f9c7-74a0-8908-791721c17e9b",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
