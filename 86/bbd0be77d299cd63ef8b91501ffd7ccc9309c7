@@ -1,0 +1,133 @@
+packages/backend/src/routing/proxy/request-recording.service.spec.ts
+  s_1bd539ae3d5eca::t_fbab32dc5529aa 7,42,47
+  s_1bd539ae3d5eca::t_6e0866c07d06b8 25-39
+  s_1bd539ae3d5eca::t_374083e551febb 1-6,8-24,40-41,43-46,48-56
+packages/frontend/src/components/RequestDrawer.tsx
+  s_1bd539ae3d5eca::t_878f42f0e29a0b 17,26,210,377-402,424-428
+packages/backend/src/database/database.module.ts
+  s_1bd539ae3d5eca::t_6c014a894ef54c 13,82
+  s_1bd539ae3d5eca::t_e069b235a687f4 27,95
+packages/backend/src/analytics/analytics.module.ts
+  s_1bd539ae3d5eca::t_082e1d370bd65e 5,51
+packages/frontend/tests/pages/SettingsRecordingSection.test.tsx
+  s_1bd539ae3d5eca::t_e7e516baf63a1f 1-21,24-32,34-36,38-39
+  s_1bd539ae3d5eca::t_1293c127e8f559 22-23,33,37
+packages/backend/src/routing/tier.controller.spec.ts
+  s_1bd539ae3d5eca::t_010403aee65a79 9,19,30,56,62,210-227
+  s_1bd539ae3d5eca::t_1ec3bc5330c2ea 228
+packages/frontend/src/styles/request-drawer.css
+  s_1bd539ae3d5eca::t_345ae158df2c8f 268-501
+packages/frontend/src/pages/Settings.tsx
+  s_1bd539ae3d5eca::t_e7e516baf63a1f 10,233-234
+  s_1bd539ae3d5eca::t_81bf55244e7c6e 235
+packages/backend/src/database/request-recording-retention.service.ts
+  s_1bd539ae3d5eca::t_e069b235a687f4 1-9,11-12,17,20-24,68-89,92-110,112,117-123
+  s_1bd539ae3d5eca::t_8b85161e800492 91,111,113-116
+  s_1bd539ae3d5eca::t_df8223d1b1fe90 90
+  s_1bd539ae3d5eca::t_ecbdbddba64103 10,13-16,18-19,25-67
+packages/backend/src/routing/proxy/__tests__/proxy.controller.spec.ts
+  s_1bd539ae3d5eca::t_eb317d448e34e3 151-152,193-197,232-233,464-497
+  s_1bd539ae3d5eca::t_1bfbb15c2d9559 498-501
+  s_1bd539ae3d5eca::t_51ef981b69a220 502-503
+packages/backend/src/database/migrations/1801300000000-AddRequestRecordings.ts
+  s_1bd539ae3d5eca::t_e069b235a687f4 24-26
+  s_1bd539ae3d5eca::t_6c014a894ef54c 1-23,27-33
+packages/backend/src/common/services/agent-recording-cache.service.ts
+  s_1bd539ae3d5eca::t_010403aee65a79 1-33
+packages/backend/src/entities/request-recording.entity.ts
+  s_1bd539ae3d5eca::t_e069b235a687f4 1,17
+  s_1bd539ae3d5eca::t_6c014a894ef54c 2-16,18-39
+packages/backend/src/routing/proxy/request-recording-capture.ts
+  s_1bd539ae3d5eca::t_374083e551febb 1-27
+packages/backend/src/routing/dto/routing.dto.ts
+  s_1bd539ae3d5eca::t_010403aee65a79 238-243
+packages/backend/src/routing/tier.controller.ts
+  s_1bd539ae3d5eca::t_010403aee65a79 25,29,39,201-222
+  s_1bd539ae3d5eca::t_2a05734533a501 223
+packages/backend/src/routing/proxy/proxy.module.ts
+  s_1bd539ae3d5eca::t_374083e551febb 6,32,36-41,69
+packages/backend/src/routing/proxy/proxy.controller.ts
+  s_1bd539ae3d5eca::t_92c6b8f1fc5e4a 13,61-66,108-111,207,227-238,296-298,300,386,388,420,434,438-439,486,488,541,646,652-654,661,665-666,682,687-700
+  s_1bd539ae3d5eca::t_1bfbb15c2d9559 662-664
+packages/frontend/tests/components/RequestMessages.test.tsx
+  s_1bd539ae3d5eca::t_d5a0a3de623fd5 1-32,35-40,43-44,47-50,52-53
+  s_1bd539ae3d5eca::t_1293c127e8f559 33-34,41-42,45-46,51
+packages/frontend/tests/components/RequestDrawer.test.tsx
+  s_1bd539ae3d5eca::t_e4f3ffe73ca247 219-243
+packages/backend/src/routing/proxy/request-recording-capture.spec.ts
+  s_1bd539ae3d5eca::t_374083e551febb 1-24
+packages/backend/src/common/services/agent-recording-cache.service.spec.ts
+  s_1bd539ae3d5eca::t_010403aee65a79 1-39
+packages/frontend/src/services/api/messages.ts
+  s_1bd539ae3d5eca::t_082e1d370bd65e 25-35
+packages/shared/src/chat-message.ts
+  s_1bd539ae3d5eca::t_1bfbb15c2d9559 165-173
+  s_1bd539ae3d5eca::t_0732221dcbc39c 1-164,174-298
+packages/backend/src/common/common.module.ts
+  s_1bd539ae3d5eca::t_010403aee65a79 10,21,29
+packages/frontend/src/components/RequestMessages.tsx
+  s_1bd539ae3d5eca::t_c8229eff34d907 106-107,116-117,126-127,132-134
+  s_1bd539ae3d5eca::t_d5a0a3de623fd5 1-105,108-115,118-125,128-131,135-197
+packages/frontend/tests/services/api/routing-extra.test.ts
+  s_1bd539ae3d5eca::t_872a511bcfa975 144-165
+packages/backend/src/config/app.config.spec.ts
+  s_1bd539ae3d5eca::t_e069b235a687f4 100-111,113-120
+  s_1bd539ae3d5eca::t_6e0866c07d06b8 112
+packages/backend/src/entities/agent.entity.ts
+  s_1bd539ae3d5eca::t_6c014a894ef54c 40-44
+packages/frontend/src/pages/SettingsRecordingSection.tsx
+  s_1bd539ae3d5eca::t_e7e516baf63a1f 1-59
+packages/backend/.env.example
+  s_1bd539ae3d5eca::t_6e0866c07d06b8 27-29
+packages/backend/src/config/app.config.ts
+  s_1bd539ae3d5eca::t_e069b235a687f4 11-16,60-65
+packages/backend/src/database/migrations/1801300000000-AddRequestRecordings.spec.ts
+  s_1bd539ae3d5eca::t_1293c127e8f559 5-6,13,27
+  s_1bd539ae3d5eca::t_6c014a894ef54c 1-4,7-12,14-15,22-26,29-30
+  s_1bd539ae3d5eca::t_1bfbb15c2d9559 16-18,28
+  s_1bd539ae3d5eca::t_e069b235a687f4 19-21
+packages/backend/src/database/data-source-definitions.ts
+  s_1bd539ae3d5eca::t_6c014a894ef54c 8,35,158,306
+packages/backend/src/routing/proxy/request-recording.service.ts
+  s_1bd539ae3d5eca::t_374083e551febb 1-39,44-53
+  s_1bd539ae3d5eca::t_fbab32dc5529aa 40-43
+packages/frontend/tests/pages/Settings.test.tsx
+  s_1bd539ae3d5eca::t_5652016b089dd6 26-27,37-38
+packages/shared/__tests__/chat-message.spec.ts
+  s_1bd539ae3d5eca::t_0732221dcbc39c 1-14,18-74
+  s_1bd539ae3d5eca::t_1bfbb15c2d9559 15-17
+packages/backend/src/analytics/services/message-details.service.spec.ts
+  s_1bd539ae3d5eca::t_937114d073871e 198,201-202,354-362,366,392-399
+packages/frontend/src/services/api/routing.ts
+  s_1bd539ae3d5eca::t_e7e516baf63a1f 201-218
+packages/backend/src/database/request-recording-retention.service.spec.ts
+  s_1bd539ae3d5eca::t_8b85161e800492 27,31-32,34-37,53
+  s_1bd539ae3d5eca::t_df8223d1b1fe90 48-51,79
+  s_1bd539ae3d5eca::t_e069b235a687f4 1-17,19-22,25-26,28-30,33,38-47,52,54-78,80-90
+  s_1bd539ae3d5eca::t_6e0866c07d06b8 18,23-24
+packages/shared/src/index.ts
+  s_1bd539ae3d5eca::t_0732221dcbc39c 173-180
+  s_1bd539ae3d5eca::t_1bfbb15c2d9559 181
+packages/backend/src/routing/proxy/proxy-response-handler.ts
+  s_1bd539ae3d5eca::t_2cc4438e1a9001 52,223,252,291,297-299,317,381,397-399,513,520-526,689,770
+packages/backend/src/analytics/services/message-details.service.ts
+  s_1bd539ae3d5eca::t_082e1d370bd65e 9-12,15-21,110-112,159-163,190-198
+.changeset/record-request-payloads.md
+  s_1bd539ae3d5eca::t_6e0866c07d06b8 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "86bbd0be77d299cd63ef8b91501ffd7ccc9309c7",
+  "prompts": {},
+  "sessions": {
+    "s_1bd539ae3d5eca": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f8e36-94e5-7372-be8f-3a390f0d4d92",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}

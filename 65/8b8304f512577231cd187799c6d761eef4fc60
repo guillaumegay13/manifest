@@ -1,0 +1,23 @@
+packages/backend/src/routing/proxy/proxy.controller.ts
+  s_f77dd36f1afce7::t_7347e45bafda08 5,63-70,78-96,122,124,143,148-153
+.changeset/models-cost-projection.md
+  s_f77dd36f1afce7::t_7347e45bafda08 1-5
+packages/backend/src/routing/proxy/__tests__/proxy.controller.spec.ts
+  s_f77dd36f1afce7::t_7347e45bafda08 265-353
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "658b8304f512577231cd187799c6d761eef4fc60",
+  "prompts": {},
+  "sessions": {
+    "s_f77dd36f1afce7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f9377-52ed-7f61-a13b-e3123850b28e",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
