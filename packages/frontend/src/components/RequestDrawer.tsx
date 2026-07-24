@@ -314,13 +314,10 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
 
               {/* ── Body: sidebar + content ── */}
               <div class="drawer__split">
-                {/* Attempts sidebar */}
-                <div class="drawer__sidebar">
-                  <div class="drawer__sidebar-title">Attempts</div>
-                  <Show
-                    when={attempts().length > 0}
-                    fallback={<div class="drawer__empty">No provider attempts</div>}
-                  >
+                {/* Attempts sidebar — hidden when no attempts */}
+                <Show when={attempts().length > 0}>
+                  <div class="drawer__sidebar">
+                    <div class="drawer__sidebar-title">Attempts</div>
                     <For each={attempts()}>
                       {(att, idx) => (
                         <button
@@ -355,7 +352,7 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                               </svg>
                             )}
                           </span>
-                          <span class="attempt-item__model">{att.model}</span>
+                          <span class="attempt-item__model">{att.model ?? 'No provider'}</span>
                           <span
                             class={`attempt-code ${isSuccessStatus(att.status) ? 'attempt-code--ok' : 'attempt-code--error'}`}
                           >
@@ -364,8 +361,8 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                         </button>
                       )}
                     </For>
-                  </Show>
-                </div>
+                  </div>
+                </Show>
 
                 {/* Attempt content */}
                 <div class="drawer__content">
@@ -418,7 +415,7 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                                 <span class="drawer-kv__key">Provider</span>
                                 <span style="display: inline-flex; align-items: center; gap: 6px;">
                                   {providerIcon(att().provider, 14)}
-                                  {att().provider}
+                                  {att().provider ?? '-'}
                                 </span>
                               </div>
                               <Show when={att().auth_type}>
@@ -429,7 +426,7 @@ const RequestDrawer: Component<RequestDrawerProps> = (props) => {
                               </Show>
                               <div class="drawer-kv">
                                 <span class="drawer-kv__key">Model</span>
-                                <span>{att().model}</span>
+                                <span>{att().model ?? '-'}</span>
                               </div>
                               <Show when={att().model_id && att().model_id !== att().model}>
                                 <div class="drawer-kv">
