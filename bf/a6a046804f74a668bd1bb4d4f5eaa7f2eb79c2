@@ -1,0 +1,56 @@
+packages/backend/src/routing/proxy/proxy-types.ts
+  s_59e4a92070941c::t_03374f86d37b89 32-39
+packages/backend/src/routing/autofix/contract/phoenix-openapi.yaml
+  s_59e4a92070941c::t_1d07b45a779ba4 346-371
+packages/backend/src/routing/autofix/__tests__/autofix.service.spec.ts
+  s_59e4a92070941c::t_1f64ad7fd1e1f5 567-592
+  s_59e4a92070941c::t_c694c1e344743b 529-566
+packages/backend/src/routing/autofix/phoenix.types.ts
+  s_59e4a92070941c::t_1b4104085fac57 1,25-38,65
+packages/backend/src/routing/proxy/__tests__/proxy.controller.spec.ts
+  s_59e4a92070941c::t_b849d329b11bf3 1470-1513
+  s_59e4a92070941c::t_ffb4942d0de1bd 1428-1429,1460-1464
+packages/backend/src/routing/proxy/proxy.controller.ts
+  s_59e4a92070941c::t_1b4104085fac57 362-367,374-378,380
+  s_59e4a92070941c::t_bed2ebb2ecd7f2 379
+packages/backend/src/routing/proxy/provider-client.ts
+  s_59e4a92070941c::t_03374f86d37b89 27-32,46-49,85-94,270,363-364
+packages/backend/src/routing/autofix/observation-payload.spec.ts
+  s_59e4a92070941c::t_c694c1e344743b 108-113,155,179-197,199,201-212
+  s_59e4a92070941c::t_ffb4942d0de1bd 107,157-178,198,200
+  s_59e4a92070941c::t_dc0a09675b7abc 156
+  s_59e4a92070941c::t_0ea40d6418d2a9 5,102-106
+packages/backend/src/routing/autofix/autofix.service.ts
+  s_59e4a92070941c::t_2917e053ced308 14,90-96
+  s_59e4a92070941c::t_86c345ba3acb0b 15,388
+  s_59e4a92070941c::t_1b4104085fac57 383-387,389-397
+  s_59e4a92070941c::t_29172cc7395532 97-98
+packages/backend/src/routing/autofix/observation-payload.ts
+  s_59e4a92070941c::t_da484ce7e1f146 155
+  s_59e4a92070941c::t_86c345ba3acb0b 61-75,153,176
+  s_59e4a92070941c::t_1b4104085fac57 2,134-136,138,156-162,172-175,178-181
+  s_59e4a92070941c::t_bed2ebb2ecd7f2 137,154,177
+packages/backend/src/routing/proxy/__tests__/provider-client.spec.ts
+  s_59e4a92070941c::t_ffb4942d0de1bd 1277-1279
+packages/backend/src/routing/proxy/proxy.service.ts
+  s_59e4a92070941c::t_aa44d678117dad 479-483,519-523
+.changeset/capture-provider-wire-exchanges.md
+  s_59e4a92070941c::t_280b2a235d2df0 5
+  s_59e4a92070941c::t_f98fc0cf6dd5ee 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "bfa6a046804f74a668bd1bb4d4f5eaa7f2eb79c2",
+  "prompts": {},
+  "sessions": {
+    "s_59e4a92070941c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f940a-f9c7-74a0-8908-791721c17e9b",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": null
+    }
+  }
+}
