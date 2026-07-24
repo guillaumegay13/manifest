@@ -1584,6 +1584,62 @@ describe('ProxyController', () => {
         }),
       );
     });
+
+    it('threads the Auto-fix audit of a failed M302 heal onto the stub row', async () => {
+      const autofix = {
+        groupId: 'g-302',
+        outcome: 'unfixable',
+        original_http_status: 404,
+        chain: [],
+        manifestOrigin: { code: 'M302', message: 'unavailable', model: 'ghost' },
+      };
+      proxyService.proxyRequest.mockResolvedValue({
+        forward: {
+          response: new Response(
+            JSON.stringify({
+              choices: [{ message: { role: 'assistant', content: 'unavailable' } }],
+              usage: { prompt_tokens: 0, completion_tokens: 0 },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+          isGoogle: false,
+          isAnthropic: false,
+          isChatGpt: false,
+        },
+        meta: {
+          tier: 'default',
+          model: 'manifest',
+          provider: 'manifest',
+          confidence: 0,
+          reason: 'model_not_available',
+          manifest_error_code: 'M302',
+          manifest_error_message: '[🦚 Manifest M302] Model "ghost" is not available.',
+        },
+        failedFallbacks: [],
+        autofix,
+      });
+      const manifestSpy = jest.spyOn(recorder, 'recordManifestBlockedRequest');
+
+      const req = mockRequest({ messages: [{ role: 'user', content: 'hi' }], model: 'ghost' });
+      const { res } = mockResponse();
+
+      await controller.chatCompletions(req as never, res as never);
+      await flushRecorderMicrotasks();
+
+      expect(manifestSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ errorCode: 'M302', autofix }),
+      );
+      expect(mockMessageRepo.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'error',
+          error_code: 'M302',
+          autofix_applied: true,
+          autofix_group_id: 'g-302',
+          autofix_role: 'original',
+        }),
+      );
+    });
   });
 
   describe('provider error recording', () => {

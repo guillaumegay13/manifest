@@ -42,6 +42,7 @@ import {
   type ExtractedThinkingBlocks,
 } from './anthropic-adapter';
 import { getOpenAiReasoningStreamFormat, supportsReasoningContent } from './reasoning-format';
+import { MANIFEST_CODE_TO_REASON } from '../../common/errors/manifest-error';
 import type { CallerAttribution } from './caller-classifier';
 import {
   unwrapCodeAssistResponse,
@@ -695,22 +696,39 @@ export function recordSuccess(
   // failure with the Auto-fix audit — so recording a standalone `auto_fixed` row
   // now would double-count it under the wrong model.
   if (autofix && autofix.outcome === 'healed' && !meta.fallbackFromModel) {
+    const origin = autofix.manifestOrigin;
     recordSafely(
-      recorder.recordAutofixOriginals(ctx, meta.model, meta.tier, autofix, {
-        provider: meta.provider,
-        reason: meta.reason,
-        authType: meta.auth_type,
-        traceId,
-        callerAttribution,
-        requestHeaders,
-        requestParams: meta.request_params,
-        specificityCategory: meta.specificity_category,
-        providerKeyLabel: meta.provider_key_label,
-        tenantProviderId: meta.tenantProviderId,
-        headerTierId: meta.header_tier_id,
-        headerTierName: meta.header_tier_name,
-        headerTierColor: meta.header_tier_color,
-      }),
+      origin
+        ? // The pre-heal failure was Manifest-blocked (no provider was ever
+          // contacted), so the original row goes through the sole writer of
+          // Manifest rows — provider/tier NULL, `error_code` stamped — rather
+          // than a provider-attributed `auto_fixed` row under the healed model.
+          recorder.recordManifestBlockedRequest(ctx, {
+            errorMessage: origin.message,
+            errorCode: origin.code,
+            reason: MANIFEST_CODE_TO_REASON[origin.code],
+            model: origin.model,
+            traceId,
+            sessionKey,
+            callerAttribution,
+            requestHeaders,
+            autofix,
+          })
+        : recorder.recordAutofixOriginals(ctx, meta.model, meta.tier, autofix, {
+            provider: meta.provider,
+            reason: meta.reason,
+            authType: meta.auth_type,
+            traceId,
+            callerAttribution,
+            requestHeaders,
+            requestParams: meta.request_params,
+            specificityCategory: meta.specificity_category,
+            providerKeyLabel: meta.provider_key_label,
+            tenantProviderId: meta.tenantProviderId,
+            headerTierId: meta.header_tier_id,
+            headerTierName: meta.header_tier_name,
+            headerTierColor: meta.header_tier_color,
+          }),
       'autofix originals',
     );
   }

@@ -4,6 +4,7 @@ import type {
   PhoenixOperation,
   PhoenixProviderError,
 } from './phoenix.types';
+import type { RecordableManifestCode } from '../../common/errors/manifest-error';
 
 /**
  * How an Auto-fix attempt ended:
@@ -51,4 +52,18 @@ export interface AutofixRecord {
   outcome: AutofixOutcome;
   original_http_status: number;
   chain: AutofixChainEntry[];
+  /**
+   * Present when the healed failure was Manifest-blocked rather than a provider
+   * response (e.g. an M302 unknown model — no provider was ever contacted). The
+   * recorder then writes the original row through the Manifest-blocked path
+   * (provider/tier NULL, `error_code` stamped) instead of a provider-attributed
+   * `auto_fixed` row.
+   */
+  manifestOrigin?: {
+    code: RecordableManifestCode;
+    /** The rendered `[🦚 Manifest M###] …` text the caller would have seen. */
+    message: string;
+    /** The model the caller requested (kept as the row's `model` column). */
+    model: string;
+  };
 }

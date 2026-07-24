@@ -492,6 +492,74 @@ describe('ProxyMessageRecorder', () => {
       });
     });
 
+    it('writes the auto_fixed original of a healed Manifest-blocked request, backdated under the retry', async () => {
+      const before = Date.now();
+      await recorder.recordManifestBlockedRequest(ctx, {
+        errorMessage: '[🦚 Manifest M302] Model "ghost" is not available for this agent.',
+        errorCode: 'M302',
+        reason: 'model_not_available',
+        model: 'ghost',
+        autofix: {
+          groupId: 'g-heal',
+          outcome: 'healed',
+          original_http_status: 404,
+          chain: [
+            {
+              attempt: 0,
+              origin: 'original',
+              request: {},
+              http_status: 404,
+              error: { message: 'nope' },
+              issue_id: 'iss-1',
+              patch_id: 'p-1',
+              heal_attempt_id: 'ha-1',
+              operations: [{ type: 'rename_param' }],
+            },
+          ],
+        },
+      });
+
+      const row = insertMock.mock.calls[0][0];
+      expect(row).toMatchObject({
+        status: 'auto_fixed',
+        error_code: 'M302',
+        error_origin: 'request',
+        error_class: 'not_found',
+        superseded: true,
+        // Still a Manifest row: no provider was contacted for the original.
+        provider: null,
+        routing_tier: null,
+        autofix_applied: true,
+        autofix_group_id: 'g-heal',
+        autofix_role: 'original',
+        autofix_operations: [{ type: 'rename_param' }],
+      });
+      expect(row.autofix_phoenix).toMatchObject({ issueId: 'iss-1', healAttemptId: 'ha-1' });
+      // Backdated ~1s (like recordAutofixOriginals) so the retry sorts above.
+      expect(new Date(row.timestamp).getTime()).toBeLessThanOrEqual(before - 900);
+    });
+
+    it('keeps the error row and stamps the audit when a heal did not clear the block', async () => {
+      const before = Date.now();
+      await recorder.recordManifestBlockedRequest(ctx, {
+        errorMessage: '[🦚 Manifest M302] Model "ghost" is not available for this agent.',
+        errorCode: 'M302',
+        reason: 'model_not_available',
+        autofix: { groupId: 'g-miss', outcome: 'unfixable', original_http_status: 404, chain: [] },
+      });
+
+      const row = insertMock.mock.calls[0][0];
+      expect(row).toMatchObject({
+        status: 'error',
+        error_code: 'M302',
+        superseded: false,
+        autofix_applied: true,
+        autofix_group_id: 'g-miss',
+        autofix_role: 'original',
+      });
+      expect(new Date(row.timestamp).getTime()).toBeGreaterThanOrEqual(before - 100);
+    });
+
     it('records an expired key as a setup error against its agent', async () => {
       await recorder.recordManifestBlockedRequest(ctx, {
         httpStatus: 401,

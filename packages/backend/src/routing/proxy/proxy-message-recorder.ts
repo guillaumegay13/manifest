@@ -122,6 +122,13 @@ export interface ManifestBlockedRequestOpts {
   sessionKey?: string;
   callerAttribution?: CallerAttribution | null;
   requestHeaders?: Record<string, string> | null;
+  /**
+   * Auto-fix audit when this Manifest-blocked failure was handed to the healing
+   * service (e.g. an M302 unknown model). A healed outcome turns the row into
+   * the `auto_fixed` original of the linked pair; any other outcome keeps the
+   * error row and just stamps the attempt's Phoenix ids.
+   */
+  autofix?: AutofixRecord;
 }
 
 export interface FallbackSuccessOpts extends HeaderTierRef {
@@ -365,6 +372,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       sessionKey,
       callerAttribution,
       requestHeaders,
+      autofix,
     } = opts;
 
     // Cooldown per reason, not per tenant: a per-IP limit firing must not
@@ -377,12 +385,16 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       model ?? null,
     );
 
+    // A healed original is backdated (like recordAutofixOriginals) so the
+    // successful retry row sorts directly above it.
+    const healed = autofix?.outcome === 'healed';
     await this.messageRepo.insert(
       buildMessageRow(ctx, {
         trace_id: traceId ?? null,
         session_key: sessionKey ?? null,
-        timestamp: new Date().toISOString(),
-        status: httpStatus === 429 ? 'rate_limited' : 'error',
+        timestamp: new Date(Date.now() - (healed ? 1000 : 0)).toISOString(),
+        status: httpStatus === 429 ? 'rate_limited' : healed ? 'auto_fixed' : 'error',
+        ...autofixColumns(autofix, 'original'),
         error_message: scrubSecrets(errorMessage).slice(0, 2000),
         error_code: errorCode ?? null,
         error_http_status: httpStatus ?? null,

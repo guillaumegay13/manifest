@@ -26,6 +26,7 @@ import { ReasoningContentCache } from './reasoning-content-cache';
 import { ModelDiscoveryService } from '../../model-discovery/model-discovery.service';
 import { classifyCaller } from './caller-classifier';
 import { ObservationReporter } from '../autofix/observation-reporter';
+import type { AutofixRecord } from '../autofix/autofix.types';
 import { sanitizeRequestHeaders } from './request-headers';
 import {
   buildMetaHeaders,
@@ -331,7 +332,15 @@ export class ProxyController {
       // proxy as an HTTP 200 assistant message, so it lands here — but it is a
       // Manifest failure, not a completion. Record it as one.
       if (meta.manifest_error_code) {
-        this.recordManifestStub(req, meta, traceId, sessionKey, callerAttribution, requestHeaders);
+        this.recordManifestStub(
+          req,
+          meta,
+          traceId,
+          sessionKey,
+          callerAttribution,
+          requestHeaders,
+          autofix,
+        );
       } else {
         recordSuccess(
           req.ingestionContext,
@@ -377,6 +386,7 @@ export class ProxyController {
     sessionKey: string | undefined,
     callerAttribution: ReturnType<typeof classifyCaller>,
     requestHeaders: ReturnType<typeof sanitizeRequestHeaders>,
+    autofix?: AutofixRecord,
   ): void {
     const code = meta.manifest_error_code;
     if (!code || !isRecordableManifestCode(code)) return;
@@ -390,6 +400,8 @@ export class ProxyController {
         sessionKey,
         callerAttribution,
         requestHeaders,
+        // A failed heal attempt still stamps its Phoenix audit on the M row.
+        autofix,
       })
       .catch((e) => this.logger.warn(`Failed to record Manifest stub: ${e}`));
   }
