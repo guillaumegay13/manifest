@@ -209,11 +209,13 @@ describe('RequestDrawer', () => {
       <RequestDrawer messageId="zero-attempt" onClose={vi.fn()} />
     ));
 
-    await waitFor(() => expect(screen.getByText('No provider attempts')).toBeDefined());
+    await waitFor(() =>
+      expect(
+        screen.getByText('Manifest rejected this request before contacting a provider.'),
+      ).toBeDefined(),
+    );
     expect(container.querySelector('.attempt-item')).toBeNull();
-    expect(
-      screen.getByText('Manifest rejected this request before contacting a provider.'),
-    ).toBeDefined();
+    expect(container.querySelector('.drawer__sidebar')).toBeNull();
   });
 
   it('shows loading state while an open request is unresolved and stays closed for null', () => {
