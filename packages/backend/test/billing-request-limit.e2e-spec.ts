@@ -3,11 +3,12 @@ import { DataSource } from 'typeorm';
 import request from 'supertest';
 import { createTestApp, TEST_OTLP_KEY, TEST_USER_ID } from './helpers';
 import { PlanService } from '../src/billing/plan.service';
+import { REQUEST_USAGE_CUTOVER_STATE } from '../src/billing/request-quota-window';
 
 // Enforces the monthly routed-request cap on the /v1/* proxy. Billing env must
 // be set BEFORE the app is created so isBillingEnabled() resolves true. We drive
 // the block with PLAN_LIMIT_FREE_REQUESTS=0 so the gate trips on the first
-// request — no need to seed thousands of agent_messages rows or stub a provider
+// request — no need to seed thousands of request rows or stub a provider
 // (the gate runs before any upstream call). Env is restored in afterAll so it
 // can't leak into sibling e2e files sharing the --runInBand worker.
 let app: INestApplication;
@@ -28,7 +29,7 @@ async function waitForManifestBlockCount(tenantId: string, minimum: number): Pro
   do {
     const rows = await ds.query(
       `SELECT COUNT(*)::int AS n
-         FROM agent_messages
+         FROM requests
         WHERE tenant_id = $1
           AND error_origin = 'policy'
           AND error_class = 'plan_request_limit_exceeded'
@@ -66,6 +67,12 @@ beforeAll(async () => {
     "periodEnd" timestamptz,
     "cancelAtPeriodEnd" boolean DEFAULT false
   )`);
+  await ds.query(
+    `INSERT INTO "backfill_state" ("name", "completed_at")
+     VALUES ($1, clock_timestamp() AT TIME ZONE 'UTC')
+     ON CONFLICT ("name") DO NOTHING`,
+    [REQUEST_USAGE_CUTOVER_STATE],
+  );
 });
 
 afterAll(async () => {
@@ -100,15 +107,17 @@ describe('request limit gate (/v1 proxy)', () => {
     const tenantId = tenantRows[0].id;
     const monthStartMs = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1);
     const planService = app.get(PlanService);
-    planService.invalidateRequestCountCache(tenantId);
     const billableBefore = await planService.countRequestsSince(tenantId, monthStartMs);
-    const before = await ds.query(
+    const before = await ds.query(`SELECT COUNT(*)::int AS n FROM requests WHERE tenant_id = $1`, [
+      tenantId,
+    ]);
+    const attemptsBefore = await ds.query(
       `SELECT COUNT(*)::int AS n FROM agent_messages WHERE tenant_id = $1`,
       [tenantId],
     );
     const manifestBlocksBefore = await ds.query(
       `SELECT COUNT(*)::int AS n
-         FROM agent_messages
+         FROM requests
         WHERE tenant_id = $1
           AND error_origin = 'policy'
           AND error_class = 'plan_request_limit_exceeded'
@@ -125,13 +134,16 @@ describe('request limit gate (/v1 proxy)', () => {
       tenantId,
       manifestBlocksBefore[0].n + 1,
     );
-    const after = await ds.query(
+    const after = await ds.query(`SELECT COUNT(*)::int AS n FROM requests WHERE tenant_id = $1`, [
+      tenantId,
+    ]);
+    const attemptsAfter = await ds.query(
       `SELECT COUNT(*)::int AS n FROM agent_messages WHERE tenant_id = $1`,
       [tenantId],
     );
     const latestBlock = await ds.query(
-      `SELECT status, error_origin, error_class, error_http_status, routing_reason
-         FROM agent_messages
+      `SELECT status, error_origin, error_class, error_http_status, error_code
+         FROM requests
         WHERE tenant_id = $1
           AND error_origin = 'policy'
           AND error_class = 'plan_request_limit_exceeded'
@@ -140,18 +152,18 @@ describe('request limit gate (/v1 proxy)', () => {
         LIMIT 1`,
       [tenantId],
     );
-    planService.invalidateRequestCountCache(tenantId);
     const billableAfter = await planService.countRequestsSince(tenantId, monthStartMs);
 
     expect(after[0].n).toBe(before[0].n + 1);
+    expect(attemptsAfter[0].n).toBe(attemptsBefore[0].n);
     expect(manifestBlocksAfter).toBe(manifestBlocksBefore[0].n + 1);
     expect(latestBlock[0]).toEqual(
       expect.objectContaining({
-        status: 'error',
+        status: 'failed',
         error_origin: 'policy',
         error_class: 'plan_request_limit_exceeded',
         error_http_status: 402,
-        routing_reason: 'plan_request_limit_exceeded',
+        error_code: 'M204',
       }),
     );
     expect(billableAfter).toBe(billableBefore);

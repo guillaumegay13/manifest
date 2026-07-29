@@ -1,4 +1,5 @@
 import { ProviderClient } from '../provider-client';
+import { ManifestError } from '../../../common/errors/manifest-error';
 import { buildCustomEndpoint } from '../provider-endpoints';
 import { ThinkingBlockCache, type ThinkingBlockRouteContext } from '../thinking-block-cache';
 import type { ProviderModelRegistryService } from '../../../model-discovery/provider-model-registry.service';
@@ -7,11 +8,18 @@ const mockFetch = jest.fn();
 (globalThis as unknown as { fetch: typeof fetch }).fetch = mockFetch;
 
 describe('ProviderClient', () => {
+  const previousMode = process.env['MANIFEST_MODE'];
   let client: ProviderClient;
 
   beforeEach(() => {
+    process.env['MANIFEST_MODE'] = 'selfhosted';
     client = new ProviderClient();
     mockFetch.mockReset();
+  });
+
+  afterAll(() => {
+    if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
+    else process.env['MANIFEST_MODE'] = previousMode;
   });
 
   const body = {
@@ -20,6 +28,25 @@ describe('ProviderClient', () => {
   };
 
   describe('OpenAI-compatible providers', () => {
+    it('refuses to dial a built-in local provider from cloud', async () => {
+      process.env['MANIFEST_MODE'] = 'cloud';
+
+      const request = client.forward({
+        provider: 'ollama',
+        apiKey: '',
+        model: 'qwen2.5:0.5b',
+        body,
+        stream: false,
+      });
+
+      await expect(request).rejects.toMatchObject({ code: 'M303' });
+      await expect(request).rejects.toBeInstanceOf(ManifestError);
+      await expect(request).rejects.toThrow(
+        'Built-in local providers are only available in self-hosted Manifest',
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it('builds correct URL and headers for openai', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
 
@@ -47,6 +74,31 @@ describe('ProviderClient', () => {
       expect(sentBody.stream).toBe(false);
       expect(sentBody.temperature).toBe(0.7);
       expect(result.isAnthropic).toBe(false);
+    });
+
+    it('captures the wire body and retries a healed body without rebuilding it', async () => {
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+
+      const first = await client.forward({
+        provider: 'openai',
+        apiKey: 'sk-test',
+        model: 'gpt-4o',
+        body,
+        stream: false,
+      });
+      const healedBody = {
+        model: 'gpt-4o',
+        messages: body.messages,
+        healed_provider_extension: true,
+      };
+      const retry = await first.retryWireBody!(healedBody);
+
+      expect(first.wireApiMode).toBe('chat_completions');
+      expect(first.wireRequestBody).toEqual(JSON.parse(mockFetch.mock.calls[0][1].body));
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(mockFetch.mock.calls[1][1].body)).toEqual(healedBody);
+      expect(retry.wireRequestBody).toBe(healedBody);
+      expect(retry.retryWireBody).toBe(first.retryWireBody);
     });
 
     it('preserves image parts for OpenAI-compatible providers', async () => {
@@ -446,7 +498,10 @@ describe('ProviderClient', () => {
           reasoning: { effort: 'low' },
           stream: false,
         },
-        chatBody: { messages: [{ role: 'user', content: 'Hello' }], stream: false },
+        resolveChatBody: async () => ({
+          messages: [{ role: 'user', content: 'Hello' }],
+          stream: false,
+        }),
         stream: false,
         apiMode: 'responses',
       });
@@ -504,6 +559,28 @@ describe('ProviderClient', () => {
       expect(sentBody.model).toBe('openrouter/auto');
     });
 
+    it('preserves the Gemini vendor prefix for Gemini Free LiteLLM requests', async () => {
+      process.env['CREDITS_BASE_URL'] = 'https://credits.test';
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+
+      await client.forward({
+        provider: 'gemini-free',
+        apiKey: 'sk-virtual',
+        model: 'gemini/gemini-2.5-flash',
+        body,
+        stream: false,
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://credits.test/v1/chat/completions',
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer sk-virtual' }),
+        }),
+      );
+      const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(sentBody.model).toBe('gemini/gemini-2.5-flash');
+    });
+
     it('builds Nous Portal requests without stripping vendor-prefixed model IDs', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
 
@@ -547,13 +624,16 @@ describe('ProviderClient', () => {
 
     it('routes public Responses API requests for OpenAI to /v1/responses', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+      const resolveChatBody = jest
+        .fn()
+        .mockResolvedValue({ messages: [{ role: 'user', content: 'Hello' }], stream: false });
 
       const result = await client.forward({
         provider: 'openai',
         apiKey: 'sk-test',
         model: 'gpt-4o',
         body: { input: 'Hello', stream: false },
-        chatBody: { messages: [{ role: 'user', content: 'Hello' }], stream: false },
+        resolveChatBody,
         stream: false,
         apiMode: 'responses',
       });
@@ -573,6 +653,28 @@ describe('ProviderClient', () => {
       expect(sentBody.instructions).toBeUndefined();
       expect(result.isResponses).toBe(true);
       expect(result.isChatGpt).toBe(false);
+      expect(resolveChatBody).not.toHaveBeenCalled();
+    });
+
+    it('resolves a Responses conversion once for a Chat Completions endpoint', async () => {
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+      const resolveChatBody = jest
+        .fn()
+        .mockResolvedValue({ messages: [{ role: 'user', content: 'Hello' }], stream: false });
+
+      await client.forward({
+        provider: 'openrouter',
+        apiKey: 'sk-or-test',
+        model: 'openai/gpt-4o',
+        body: { input: 'Hello', stream: false },
+        resolveChatBody,
+        stream: false,
+        apiMode: 'responses',
+      });
+
+      const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(sentBody.messages).toEqual([{ role: 'user', content: 'Hello' }]);
+      expect(resolveChatBody).toHaveBeenCalledTimes(1);
     });
 
     it('adds default instructions for subscription Responses requests', async () => {
@@ -583,7 +685,10 @@ describe('ProviderClient', () => {
         apiKey: 'oauth-token',
         model: 'gpt-5.4',
         body: { input: 'Hello', stream: false },
-        chatBody: { messages: [{ role: 'user', content: 'Hello' }], stream: false },
+        resolveChatBody: async () => ({
+          messages: [{ role: 'user', content: 'Hello' }],
+          stream: false,
+        }),
         stream: false,
         authType: 'subscription',
         apiMode: 'responses',
@@ -599,12 +704,19 @@ describe('ProviderClient', () => {
       expect(sentBody.stream).toBe(true);
     });
 
-    it('uses translated chatBody, not the raw Anthropic Messages body, when forwarding /v1/messages to a chatgpt-format endpoint', async () => {
+    it('resolves Anthropic Messages conversion for a Responses endpoint', async () => {
       // Regression: previously the chatgpt branch passed `body` directly into
       // toResponsesRequest, so a /v1/messages request hitting an
       // openai-responses endpoint would forward Anthropic-shaped tools and
       // drop the top-level system prompt.
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+      const resolveChatBody = jest.fn().mockResolvedValue({
+        messages: [
+          { role: 'system', content: 'be brief' },
+          { role: 'user', content: 'hi' },
+        ],
+        model: 'o1-pro',
+      });
 
       await client.forward({
         provider: 'openai',
@@ -617,22 +729,17 @@ describe('ProviderClient', () => {
           system: 'be brief',
           messages: [{ role: 'user', content: 'hi' }],
         },
-        chatBody: {
-          messages: [
-            { role: 'system', content: 'be brief' },
-            { role: 'user', content: 'hi' },
-          ],
-          model: 'o1-pro',
-        },
+        resolveChatBody,
         stream: false,
         apiMode: 'messages',
       });
 
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       // toResponsesRequest pulls instructions out of chat-completions system
-      // messages — proves we forwarded chatBody, not the raw Anthropic body.
+      // messages, proving the lazy conversion, not the raw Anthropic body, was forwarded.
       expect(sentBody.instructions).toBe('be brief');
       expect(sentBody.system).toBeUndefined();
+      expect(resolveChatBody).toHaveBeenCalledTimes(1);
     });
 
     it('forwards Anthropic-Messages inbound to an Anthropic upstream without OpenAI translation (issue #1886)', async () => {
@@ -649,8 +756,8 @@ describe('ProviderClient', () => {
         ],
         top_k: 40,
       };
-      // chatBody is what the routing layer would have produced — we pass it
-      // in to prove the wire path ignores it and reads the raw body instead.
+      // This is what the routing layer would derive. Pass it as a resolver to
+      // prove the native wire path never asks for it.
       const lossyChatBody = {
         messages: [
           { role: 'system', content: 'Be concise.' },
@@ -662,13 +769,14 @@ describe('ProviderClient', () => {
         ],
         max_tokens: 1024,
       };
+      const resolveChatBody = jest.fn().mockResolvedValue(lossyChatBody);
 
-      await client.forward({
+      const result = await client.forward({
         provider: 'anthropic',
         apiKey: 'sk-ant-test',
         model: 'claude-sonnet-4-5-20250929',
         body: anthropicBody,
-        chatBody: lossyChatBody,
+        resolveChatBody,
         stream: false,
         apiMode: 'messages',
       });
@@ -692,6 +800,9 @@ describe('ProviderClient', () => {
       ]);
       // Inbound body untouched (no surprise mutations).
       expect((anthropicBody.tools[1] as Record<string, unknown>).cache_control).toBeUndefined();
+      expect(result.wireApiMode).toBe('messages');
+      expect(result.wireRequestBody).toEqual(sent);
+      expect(resolveChatBody).not.toHaveBeenCalled();
     });
 
     it('still uses toAnthropicRequest for chat_completions inbound forwarded to an Anthropic upstream', async () => {
@@ -746,7 +857,7 @@ describe('ProviderClient', () => {
             },
           },
         },
-        chatBody: {
+        resolveChatBody: async () => ({
           messages: [{ role: 'user', content: 'Return JSON.' }],
           response_format: {
             type: 'json_schema',
@@ -757,7 +868,7 @@ describe('ProviderClient', () => {
               strict: true,
             },
           },
-        },
+        }),
         stream: false,
         apiMode: 'responses',
       });
@@ -788,10 +899,10 @@ describe('ProviderClient', () => {
           input: 'Return JSON.',
           text: { format: { type: 'json_object' } },
         },
-        chatBody: {
+        resolveChatBody: async () => ({
           messages: [{ role: 'user', content: 'Return JSON.' }],
           response_format: { type: 'json_object' },
-        },
+        }),
         stream: false,
         apiMode: 'responses',
       });
@@ -819,10 +930,10 @@ describe('ProviderClient', () => {
           input: 'Return text.',
           text: { format: { type: 'text' } },
         },
-        chatBody: {
+        resolveChatBody: async () => ({
           messages: [{ role: 'user', content: 'Return text.' }],
           response_format: { type: 'text' },
-        },
+        }),
         stream: false,
         apiMode: 'responses',
       });
@@ -852,7 +963,7 @@ describe('ProviderClient', () => {
           ],
           stream: false,
         },
-        chatBody: {
+        resolveChatBody: async () => ({
           messages: [
             {
               role: 'user',
@@ -863,7 +974,7 @@ describe('ProviderClient', () => {
             },
           ],
           stream: false,
-        },
+        }),
         stream: false,
         apiMode: 'responses',
       });
@@ -939,7 +1050,10 @@ describe('ProviderClient', () => {
         apiKey: 'sk-test',
         model: 'deepseek-chat',
         body: { input: 'Hello', stream: false },
-        chatBody: { messages: [{ role: 'user', content: 'Hello' }], stream: false },
+        resolveChatBody: async () => ({
+          messages: [{ role: 'user', content: 'Hello' }],
+          stream: false,
+        }),
         stream: false,
         apiMode: 'responses',
       });
@@ -1219,6 +1333,10 @@ describe('ProviderClient', () => {
       expect(init.headers['x-goog-api-key']).toBe('AIza-test');
       expect(result.isGoogle).toBe(true);
       expect(result.isAnthropic).toBe(false);
+      expect(result.wireApiMode).toBeUndefined();
+      expect(result.wireFormat).toBe('google_generate_content');
+      expect(result.wireRequestUrl).toBe(url);
+      expect(result.wireRequestBody).toEqual(JSON.parse(mockFetch.mock.calls[0][1].body));
     });
 
     it('adds alt=sse for streaming', async () => {
@@ -1252,6 +1370,27 @@ describe('ProviderClient', () => {
       // Should not have OpenAI-style fields
       expect(sentBody.model).toBeUndefined();
       expect(sentBody.stream).toBeUndefined();
+    });
+
+    it('resolves a Responses conversion once for a Gemini endpoint', async () => {
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+      const resolveChatBody = jest
+        .fn()
+        .mockResolvedValue({ messages: [{ role: 'user', content: 'Hello' }] });
+
+      await client.forward({
+        provider: 'google',
+        apiKey: 'AIza-test',
+        model: 'gemini-2.0-flash',
+        body: { input: 'Hello' },
+        resolveChatBody,
+        apiMode: 'responses',
+        stream: false,
+      });
+
+      const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(sentBody.contents).toEqual([{ role: 'user', parts: [{ text: 'Hello' }] }]);
+      expect(resolveChatBody).toHaveBeenCalledTimes(1);
     });
 
     it('maps image parts onto the Google request body', async () => {
@@ -1368,6 +1507,48 @@ describe('ProviderClient', () => {
       expect(result.isChatGpt).toBe(false);
       const url = mockFetch.mock.calls[0][0] as string;
       expect(url).toContain('api.openai.com');
+    });
+
+    it('rejects an HTTP 200 Codex stream that completes without output', async () => {
+      mockFetch.mockResolvedValue(
+        new Response('event: response.completed\ndata: {"response":{"output":[]}}\n\n', {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        }),
+      );
+
+      const result = await client.forward({
+        provider: 'openai',
+        apiKey: 'oauth-token',
+        model: 'gpt-5',
+        body,
+        stream: true,
+        authType: 'subscription',
+      });
+
+      expect(result.response.status).toBe(502);
+      await expect(result.response.json()).resolves.toMatchObject({
+        error: { code: 'empty_response' },
+      });
+    });
+
+    it('does not apply Codex stream qualification to API-key Responses requests', async () => {
+      const upstream = new Response('{"output":[]}', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+      mockFetch.mockResolvedValue(upstream);
+
+      const result = await client.forward({
+        provider: 'openai',
+        apiKey: 'sk-test',
+        model: 'gpt-5.3-codex',
+        body,
+        stream: false,
+      });
+
+      expect(result.response).toBe(upstream);
+      expect(result.response.status).toBe(200);
     });
   });
 
@@ -1712,7 +1893,10 @@ describe('ProviderClient', () => {
         apiKey: 'tid=abc',
         model: 'gpt-5.4',
         body: { input: 'Hello', stream: false },
-        chatBody: { messages: [{ role: 'user', content: 'Hello' }], stream: false },
+        resolveChatBody: async () => ({
+          messages: [{ role: 'user', content: 'Hello' }],
+          stream: false,
+        }),
         stream: false,
         apiMode: 'responses',
       });
@@ -1733,7 +1917,10 @@ describe('ProviderClient', () => {
         apiKey: 'tid=abc',
         model: 'claude-sonnet-4.6',
         body: { input: 'Hello', stream: false },
-        chatBody: { messages: [{ role: 'user', content: 'Hello' }], stream: false },
+        resolveChatBody: async () => ({
+          messages: [{ role: 'user', content: 'Hello' }],
+          stream: false,
+        }),
         stream: false,
         apiMode: 'responses',
       });
@@ -2016,7 +2203,10 @@ describe('ProviderClient', () => {
           input: [{ role: 'user', content: 'Hello' }],
           stream: false,
         },
-        chatBody: { messages: [{ role: 'user', content: 'Hello' }], stream: false },
+        resolveChatBody: async () => ({
+          messages: [{ role: 'user', content: 'Hello' }],
+          stream: false,
+        }),
         stream: false,
         authType: 'subscription',
         apiMode: 'responses',
@@ -2150,6 +2340,39 @@ describe('ProviderClient', () => {
       expect(result.isAnthropic).toBe(false);
       expect(result.isChatGpt).toBe(false);
       expect(result.response.headers.get('Content-Type')).toBe('text/event-stream');
+    });
+
+    it('converts Responses input once before forwarding to Kiro', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.close();
+            },
+          }),
+          { status: 200 },
+        ),
+      );
+      const resolveChatBody = jest
+        .fn()
+        .mockResolvedValue({ messages: [{ role: 'user', content: 'Hello from Responses' }] });
+
+      await client.forward({
+        provider: 'kiro',
+        apiKey: 'ksk_test',
+        model: 'kiro/auto',
+        body: { input: 'Hello from Responses' },
+        resolveChatBody,
+        stream: true,
+        authType: 'subscription',
+        apiMode: 'responses',
+      });
+
+      const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(sentBody.conversationState.currentMessage.userInputMessage.content).toBe(
+        'Hello from Responses',
+      );
+      expect(resolveChatBody).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -3238,6 +3461,21 @@ describe('ProviderClient', () => {
       expect(sentBody.model).toBe('nvidia/nemotron-3-super-120b-a12b');
     });
 
+    it('preserves Hugging Face model names and routing suffixes', async () => {
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+
+      await client.forward({
+        provider: 'huggingface',
+        apiKey: 'hf_test',
+        model: 'openai/gpt-oss-120b:cheapest',
+        body,
+        stream: false,
+      });
+
+      const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(sentBody.model).toBe('openai/gpt-oss-120b:cheapest');
+    });
+
     it('preserves Fireworks account model names', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
 
@@ -3381,6 +3619,30 @@ describe('ProviderClient', () => {
       const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(sentBody.store).toBeUndefined();
       expect(sentBody.service_tier).toBeUndefined();
+    });
+
+    it('preserves DeepSeek reasoning_effort in the provider-facing request', async () => {
+      mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+
+      const result = await client.forward({
+        provider: 'deepseek',
+        apiKey: 'sk-ds',
+        model: 'deepseek-v4-pro',
+        body: {
+          messages: [{ role: 'user', content: 'Solve this carefully.' }],
+          thinking: { type: 'enabled' },
+          reasoning_effort: 'max',
+        },
+        stream: false,
+      });
+
+      const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(sentBody).toMatchObject({
+        model: 'deepseek-v4-pro',
+        thinking: { type: 'enabled' },
+        reasoning_effort: 'max',
+      });
+      expect(result.wireRequestBody).toEqual(sentBody);
     });
 
     it('caps DeepSeek max_tokens at the provider limit', async () => {
@@ -3912,6 +4174,7 @@ describe('ProviderClient', () => {
       ['moonshot', 'kimi-k2-0905-preview'],
       ['kilo', 'kilo-auto/free'],
       ['minimax', 'MiniMax-M2'],
+      ['huggingface', 'openai/gpt-oss-120b'],
       ['nvidia', 'nvidia/nemotron-3-super-120b-a12b'],
       ['qwen', 'qwen-max'],
       ['xiaomi', 'mimo-v2.5-pro'],

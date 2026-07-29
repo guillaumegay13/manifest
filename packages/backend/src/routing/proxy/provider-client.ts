@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { OPENAI_RESPONSES_ONLY_RE, stripVendorPrefix } from '../../common/constants/openai-models';
 import { XAI_RESPONSES_ONLY_RE } from '../../common/constants/xai-models';
 import { PROVIDER_ENDPOINTS, ProviderEndpoint, resolveEndpointKey } from './provider-endpoints';
@@ -24,15 +24,41 @@ import {
   createAnthropicTransformer,
   createReasoningContentStreamTransformer as reasoningContentStreamTransformer,
 } from './provider-client-converters';
-import { ForwardOptions } from './proxy-types';
+import {
+  ForwardOptions,
+  ProxyApiMode,
+  ProviderWireFormat,
+  type ProviderAttemptRef,
+} from './proxy-types';
 import { CodexSessionAffinity } from './codex-session-affinity';
 import { toNativeResponsesRequest } from './responses-adapter';
 import { forwardKiroChat } from './kiro-adapter';
 import { OpencodeGoCatalogService } from '../../model-discovery/opencode-go-catalog.service';
 import { ProviderModelRegistryService } from '../../model-discovery/provider-model-registry.service';
+import { qualifyChatGptResponse } from './chatgpt-response-qualifier';
+import { isProviderAvailableForDeployment } from '../../common/utils/provider-availability';
+import { ManifestError } from '../../common/errors/manifest-error';
+import { MANAGED_FREE_PROVIDER_BY_ID } from '../../common/constants/managed-free-providers';
 
 export interface ForwardResult {
   response: Response;
+  /** Exact JSON body sent to the resolved provider transport. */
+  wireRequestBody?: Record<string, unknown>;
+  /** Exact URL used by the resolved provider transport. */
+  wireRequestUrl?: string;
+  /** Provider-native protocol emitted at the transport boundary. */
+  wireFormat?: ProviderWireFormat;
+  /** Provider-facing API shape of {@link wireRequestBody}. */
+  wireApiMode?: ProxyApiMode;
+  /** Re-send a healed wire body through the already-resolved transport. */
+  retryWireBody?: (
+    body: Record<string, unknown>,
+    attempt?: ProviderAttemptRef,
+  ) => Promise<ForwardResult>;
+  /** False only when Manifest produced a response without invoking provider transport. */
+  providerCallStarted?: boolean;
+  /** Persisted provider-call identity, when request tracking is available. */
+  attempt?: ProviderAttemptRef;
   /** True when we converted from Google format (needs SSE transform). */
   isGoogle: boolean;
   /** True when we converted from Anthropic format (needs SSE transform). */
@@ -52,6 +78,29 @@ export interface ForwardResult {
   /** Internal: original Responses text.format metadata for synthesized Responses bodies. */
   responsesTextFormat?: Record<string, unknown>;
 }
+
+function wireApiMode(endpoint: ProviderEndpoint): ProxyApiMode | undefined {
+  if (endpoint.format === 'openai') return 'chat_completions';
+  if (endpoint.format === 'anthropic') return 'messages';
+  if (endpoint.format === 'chatgpt') return 'responses';
+  return undefined;
+}
+
+function wireFormat(endpoint: ProviderEndpoint): ProviderWireFormat | undefined {
+  if (endpoint.format === 'openai') return 'openai_chat_completions';
+  if (endpoint.format === 'anthropic') return 'anthropic_messages';
+  if (endpoint.format === 'chatgpt') return 'openai_responses';
+  if (endpoint.format === 'google') {
+    return endpoint.codeAssistEnvelope ? 'google_code_assist' : 'google_generate_content';
+  }
+  return undefined;
+}
+
+const INPUT_WIRE_FORMATS: Record<ProxyApiMode, ProviderWireFormat> = {
+  chat_completions: 'openai_chat_completions',
+  messages: 'anthropic_messages',
+  responses: 'openai_responses',
+};
 
 interface BuiltProviderRequest {
   url: string;
@@ -156,12 +205,12 @@ function openRouterCacheMode(model: string): 'anthropic' | 'message' | null {
  * Models synced from OpenRouter use vendor prefixes, but native APIs expect bare names.
  */
 function stripModelPrefix(model: string, endpointKey: string): string {
-  // OpenRouter accepts and expects vendor prefixes
-  if (endpointKey === 'openrouter') return model;
+  // OpenRouter and managed free providers expect vendor prefixes.
+  if (endpointKey === 'openrouter' || MANAGED_FREE_PROVIDER_BY_ID.has(endpointKey)) return model;
   if (endpointKey === 'commandcode' || endpointKey === 'commandcode-anthropic') {
     return model.startsWith('commandcode/') ? model.slice('commandcode/'.length) : model;
   }
-  // Custom providers, Fireworks, Groq, Kilo, Nous, NVIDIA NIM, Ollama, Pioneer, and ClinePass: model IDs from these APIs contain
+  // Custom providers, Fireworks, Groq, Hugging Face, Kilo, Nous, NVIDIA NIM, Ollama, Pioneer, and ClinePass: model IDs from these APIs contain
   // legitimate slash segments (e.g. "accounts/fireworks/models/deepseek-v3p1",
   // "MiniMaxAI/MiniMax-2.7", "meta-llama/llama-guard-4-12b", "anthropic/claude-sonnet-4.5",
   // "cline-pass/deepseek-v4-flash"). Stripping would mangle the name the upstream API expects.
@@ -169,6 +218,7 @@ function stripModelPrefix(model: string, endpointKey: string): string {
     endpointKey === 'custom' ||
     endpointKey === 'fireworks' ||
     endpointKey === 'groq' ||
+    endpointKey === 'huggingface' ||
     endpointKey === 'kilo' ||
     endpointKey === 'nous' ||
     endpointKey === 'nvidia' ||
@@ -210,6 +260,10 @@ export class ProviderClient {
       authType,
     } = opts;
 
+    if (!customEndpoint && !isProviderAvailableForDeployment(provider)) {
+      throw new ManifestError('M303', HttpStatus.BAD_REQUEST);
+    }
+
     const { endpoint, endpointKey } = await this.resolveEndpoint(
       customEndpoint,
       provider,
@@ -223,11 +277,21 @@ export class ProviderClient {
     const isChatGpt = endpoint.format === 'chatgpt' && !isResponses;
     const isCodeAssist = !!endpoint.codeAssistEnvelope;
     const textFormat = responsesTextFormat(body, opts.apiMode);
+    const resolvedWireApiMode = wireApiMode(endpoint);
+    const resolvedWireFormat = wireFormat(endpoint);
+    const needsChatBody =
+      opts.apiMode !== undefined &&
+      opts.apiMode !== 'chat_completions' &&
+      INPUT_WIRE_FORMATS[opts.apiMode] !== resolvedWireFormat;
+    const chatBody = needsChatBody ? await opts.resolveChatBody?.() : undefined;
 
     const bareModel = stripModelPrefix(model, endpointKey);
     if (endpoint.format === 'kiro') {
-      const requestSource =
-        opts.apiMode && opts.apiMode !== 'chat_completions' ? (opts.chatBody ?? body) : body;
+      const requestSource = chatBody ?? body;
+      opts.attempt?.startRecording?.({
+        requestBody: requestSource,
+        wireFormat: 'kiro_chat',
+      });
       const response = await forwardKiroChat({
         apiKey,
         model: bareModel,
@@ -242,6 +306,9 @@ export class ProviderClient {
         isGoogle: false,
         isAnthropic: false,
         isChatGpt: false,
+        wireRequestBody: requestSource,
+        wireFormat: 'kiro_chat',
+        wireApiMode: opts.apiMode,
         responsesTextFormat: textFormat,
       };
     }
@@ -254,7 +321,7 @@ export class ProviderClient {
       apiKey,
       authType,
       body,
-      chatBody: opts.chatBody,
+      chatBody,
       apiMode: opts.apiMode,
       stream,
       signatureLookup: opts.signatureLookup,
@@ -276,32 +343,60 @@ export class ProviderClient {
     const finalHeaders =
       affinity || extraHeaders ? { ...headers, ...extraHeaders, ...affinity?.headers } : headers;
 
-    this.logger.debug(`Forwarding to ${endpointKey}: ${url.replace(/key=[^&]+/, 'key=***')}`);
-
-    // SSRF defense in depth for user-supplied endpoint URLs (custom providers,
-    // subscription resource URLs). validatePublicUrl was called when the URL
-    // was stored, but DNS for the hostname may have rebound to a private or
-    // cloud-metadata address since then. Re-resolve and re-check now.
-    if (endpoint.requiresSsrfRevalidation) {
-      try {
-        await validatePublicUrl(url, { allowPrivate: isSelfHosted() });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        throw new Error(`Refusing to forward to disallowed URL: ${message}`);
+    const retryWireBody = async (
+      wireRequestBody: Record<string, unknown>,
+      attempt: ProviderAttemptRef | undefined = opts.attempt,
+    ): Promise<ForwardResult> => {
+      if (resolvedWireFormat) {
+        attempt?.startRecording?.({
+          requestBody: wireRequestBody,
+          wireFormat: resolvedWireFormat,
+        });
       }
-    }
+      this.logger.debug(`Forwarding to ${endpointKey}: ${url.replace(/key=[^&]+/, 'key=***')}`);
 
-    const result = await this.executeFetch(url, finalHeaders, requestBody, signal, stream, {
-      isGoogle,
-      isAnthropic,
-      isChatGpt,
-      isResponses,
-      isCodeAssist,
-      structuredOutputToolName,
-      responsesTextFormat: textFormat,
-    });
-    if (affinity) this.codexAffinity.capture(affinity.storeKey, result.response);
-    return result;
+      // SSRF defense in depth for user-supplied endpoint URLs (custom providers,
+      // subscription resource URLs). Re-check every actual forward, including
+      // an immediate Auto-fix retry, because DNS may have rebound in between.
+      if (endpoint.requiresSsrfRevalidation) {
+        try {
+          await validatePublicUrl(url, { allowPrivate: isSelfHosted() });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          throw new Error(`Refusing to forward to disallowed URL: ${message}`);
+        }
+      }
+
+      const result = await this.executeFetch(url, finalHeaders, wireRequestBody, signal, stream, {
+        isGoogle,
+        isAnthropic,
+        isChatGpt,
+        isResponses,
+        isCodeAssist,
+        structuredOutputToolName,
+        responsesTextFormat: textFormat,
+      });
+      const qualifiedResult =
+        endpointKey === 'openai-subscription'
+          ? {
+              ...result,
+              response: await qualifyChatGptResponse(result.response, {
+                downstreamFormat: isResponses ? 'responses' : 'chat-completions',
+              }),
+            }
+          : result;
+      if (affinity) this.codexAffinity.capture(affinity.storeKey, qualifiedResult.response);
+      return {
+        ...qualifiedResult,
+        wireRequestBody,
+        wireRequestUrl: url,
+        wireFormat: resolvedWireFormat,
+        wireApiMode: resolvedWireApiMode,
+        retryWireBody,
+      };
+    };
+
+    return retryWireBody(requestBody);
   }
 
   private async resolveEndpoint(
@@ -460,12 +555,9 @@ export class ProviderClient {
     sessionKey?: string;
   }): BuiltProviderRequest {
     const { endpoint, endpointKey, bareModel, apiKey, authType, body, chatBody, stream } = ctx;
-    // For non-chat_completions inbound modes ('responses', 'messages'), the
-    // routing layer pre-translated the request into chat_completions form
-    // (`chatBody`). Provider adapters all consume chat_completions, so prefer
-    // `chatBody` when present.
-    const requestSource =
-      ctx.apiMode && ctx.apiMode !== 'chat_completions' ? (chatBody ?? body) : body;
+    // Native matching targets read `body` directly. Cross-protocol targets
+    // receive the lazily resolved Chat Completions view as `chatBody`.
+    const requestSource = chatBody ?? body;
 
     if (endpoint.format === 'google') {
       // Google accepts the API key via header (set by buildHeaders below) so
@@ -504,9 +596,8 @@ export class ProviderClient {
       // (`POST /v1/messages`) and the resolved upstream is also Anthropic,
       // skip the OpenAI translation round-trip and apply only the additive
       // mutations cache_control + subscription identity + max_tokens
-      // default + thinking-block replay. `chatBody` is still used for the
-      // routing/scoring layer earlier in the pipeline; only the wire body
-      // bypasses translation. This closes the lossy-roundtrip class of
+      // default + thinking-block replay. The wire body bypasses translation.
+      // This closes the lossy-roundtrip class of
       // bugs that previously dropped Anthropic-native fields (server tool
       // `type` tags, cache_control placement, etc.) — see #1886.
       const requestBody =
@@ -647,7 +738,11 @@ export class ProviderClient {
     let timeoutController: AbortController | undefined;
     if (stream) {
       timeoutController = new AbortController();
-      timeout = setTimeout(() => timeoutController?.abort(), PROVIDER_TIMEOUT_MS);
+      timeout = setTimeout(() => {
+        const timeoutError = new Error('Upstream provider request timed out');
+        timeoutError.name = 'TimeoutError';
+        timeoutController?.abort(timeoutError);
+      }, PROVIDER_TIMEOUT_MS);
       fetchSignal = signal
         ? AbortSignal.any([timeoutController.signal, signal])
         : timeoutController.signal;
@@ -668,8 +763,14 @@ export class ProviderClient {
         redirect: 'error',
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      throw new Error(message.replace(/key=[^&\s]+/gi, 'key=***'));
+      const errorLike =
+        err !== null && typeof err === 'object'
+          ? (err as { message?: unknown; name?: unknown })
+          : undefined;
+      const message = typeof errorLike?.message === 'string' ? errorLike.message : String(err);
+      const sanitizedError = new Error(message.replace(/key=[^&\s]+/gi, 'key=***'));
+      if (typeof errorLike?.name === 'string') sanitizedError.name = errorLike.name;
+      throw sanitizedError;
     } finally {
       if (timeout) clearTimeout(timeout);
     }
