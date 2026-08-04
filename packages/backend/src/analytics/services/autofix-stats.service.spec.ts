@@ -65,6 +65,7 @@ describe('AutofixStatsService', () => {
       messageRepo as never,
       autofix as never,
       requestVolume as never,
+      { get: jest.fn().mockResolvedValue({ autofix: null, recording: null }) } as never,
     );
   });
 

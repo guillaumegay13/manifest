@@ -42,6 +42,23 @@ export class Tenant {
   @Column('jsonb', { nullable: true })
   billing_email_preferences!: Partial<BillingEmailPreferences> | null;
 
+  /**
+   * Workspace default for Auto-fix, set in Account Preferences. NULL means "no
+   * workspace choice", so agents fall through to the deployment default
+   * (`AUTOFIX_DEFAULT_ENABLED`, else ON in cloud / OFF in self-hosted). An
+   * agent's own `autofix_enabled` always outranks this.
+   */
+  @Column('boolean', { nullable: true })
+  autofix_default_enabled!: boolean | null;
+
+  /**
+   * Workspace default for request recording, set in Account Preferences. NULL
+   * means "no workspace choice" and recording falls back to ON. An agent's own
+   * `record_messages` always outranks this.
+   */
+  @Column('boolean', { nullable: true })
+  recording_default_enabled!: boolean | null;
+
   @OneToMany(() => Agent, (a) => a.tenant, { cascade: true })
   agents!: Agent[];
 

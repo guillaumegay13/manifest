@@ -11,6 +11,7 @@ import { Title, Meta } from '@solidjs/meta';
 import { authClient } from '../services/auth-client.js';
 import { getBillingStatus, updateBillingEmailPreferences } from '../services/api/billing.js';
 import { toast } from '../services/toast-store.js';
+import AccountAgentDefaultsSection from './AccountAgentDefaultsSection.jsx';
 import {
   FREE_REQUEST_LIMIT_LABEL,
   formatBillingPriceWithInterval,
@@ -376,6 +377,8 @@ const Account: Component = () => {
         </div>
 
         {/* Billing */}
+        <AccountAgentDefaultsSection />
+
         <Show when={billing()?.enabled}>
           <h2 class="settings-section__title" id="billing">
             Billing

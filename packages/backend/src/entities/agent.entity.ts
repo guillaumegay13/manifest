@@ -37,10 +37,13 @@ export class Agent {
   @Column('boolean', { nullable: true })
   autofix_enabled!: boolean | null;
 
-  // Enabled for newly created agents. Existing agents keep their persisted
-  // choice because the migration changes only the column default.
-  @Column('boolean', { default: true })
-  record_messages!: boolean;
+  // Nullable: NULL means "no explicit choice — inherit the workspace default"
+  // (tenants.recording_default_enabled, else ON), resolved in
+  // AgentRecordingCacheService / TierController. Agents that predate the
+  // workspace default all carry an explicit value and so ignore it — see
+  // AddWorkspaceAgentDefaults1801800000000 for why they are not collapsed.
+  @Column('boolean', { nullable: true })
+  record_messages!: boolean | null;
 
   // Reserved Playground agent (the per-tenant "Playground" agent). Hidden
   // from the agent list / switcher / counts and not user-creatable/renamable.

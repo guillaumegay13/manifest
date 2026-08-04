@@ -51,14 +51,23 @@ function makeAgentRepo(findOneImpl?: () => unknown): {
   return { repo: { findOne } as unknown as Repository<Agent>, findOne };
 }
 
+function makeWorkspaceDefaults(autofix: boolean | null = null) {
+  return {
+    get: jest.fn().mockResolvedValue({ autofix, recording: null }),
+    invalidate: jest.fn(),
+  };
+}
+
 function makeService(opts: {
   client?: HealingClient;
   repo?: Repository<Agent>;
   config?: ConfigService;
+  workspaceDefaults?: ReturnType<typeof makeWorkspaceDefaults>;
 }): AutofixService {
   return new AutofixService(
     opts.client ?? (makeHealingClient() as unknown as HealingClient),
     opts.repo ?? makeAgentRepo().repo,
+    (opts.workspaceDefaults ?? makeWorkspaceDefaults()) as never,
     opts.config ?? makeConfig(),
   );
 }
@@ -191,6 +200,105 @@ describe('AutofixService', () => {
       const result = await service.maybeHeal(makeParams({}));
 
       expect(result).toBeNull();
+      expect(client.heal).not.toHaveBeenCalled();
+    });
+
+    it('AUTOFIX_DEFAULT_ENABLED=true overrides the self-hosted OFF default', () => {
+      process.env.MANIFEST_MODE = 'selfhosted';
+      const service = makeService({ config: makeConfig({ AUTOFIX_DEFAULT_ENABLED: 'true' }) });
+      expect(service.resolveEnabled(null)).toBe(true);
+    });
+
+    it('AUTOFIX_DEFAULT_ENABLED=false overrides the cloud ON default', () => {
+      process.env.MANIFEST_MODE = 'cloud';
+      const service = makeService({ config: makeConfig({ AUTOFIX_DEFAULT_ENABLED: 'false' }) });
+      expect(service.resolveEnabled(null)).toBe(false);
+    });
+
+    it('AUTOFIX_DEFAULT_ENABLED is case- and whitespace-insensitive', () => {
+      process.env.MANIFEST_MODE = 'selfhosted';
+      const service = makeService({ config: makeConfig({ AUTOFIX_DEFAULT_ENABLED: '  TRUE ' }) });
+      expect(service.resolveEnabled(null)).toBe(true);
+    });
+
+    it('a junk AUTOFIX_DEFAULT_ENABLED falls back to the mode default, not off', () => {
+      process.env.MANIFEST_MODE = 'cloud';
+      const service = makeService({ config: makeConfig({ AUTOFIX_DEFAULT_ENABLED: 'yes' }) });
+      expect(service.resolveEnabled(null)).toBe(true);
+    });
+
+    it('an explicit agent flag still beats AUTOFIX_DEFAULT_ENABLED', () => {
+      process.env.MANIFEST_MODE = 'selfhosted';
+      const service = makeService({ config: makeConfig({ AUTOFIX_DEFAULT_ENABLED: 'true' }) });
+      expect(service.resolveEnabled(false)).toBe(false);
+    });
+  });
+
+  describe('resolveEnabled (workspace default)', () => {
+    let savedMode: string | undefined;
+    beforeEach(() => {
+      savedMode = process.env.MANIFEST_MODE;
+      process.env.MANIFEST_MODE = 'selfhosted';
+    });
+    afterEach(() => {
+      if (savedMode === undefined) delete process.env.MANIFEST_MODE;
+      else process.env.MANIFEST_MODE = savedMode;
+    });
+
+    it('a NULL agent flag inherits the workspace default over the mode default', () => {
+      const service = makeService({});
+      expect(service.resolveEnabled(null, true)).toBe(true);
+    });
+
+    it('an explicit agent flag outranks the workspace default', () => {
+      const service = makeService({});
+      expect(service.resolveEnabled(false, true)).toBe(false);
+      expect(service.resolveEnabled(true, false)).toBe(true);
+    });
+
+    it('a NULL workspace default falls through to the mode default', () => {
+      const service = makeService({});
+      expect(service.resolveEnabled(null, null)).toBe(false);
+    });
+
+    it('resolveEnabledForTenant reads the workspace default only when needed', async () => {
+      const workspaceDefaults = makeWorkspaceDefaults(true);
+      const service = makeService({ workspaceDefaults });
+
+      await expect(service.resolveEnabledForTenant('t1', null)).resolves.toBe(true);
+      expect(workspaceDefaults.get).toHaveBeenCalledWith('t1');
+
+      workspaceDefaults.get.mockClear();
+      await expect(service.resolveEnabledForTenant('t1', false)).resolves.toBe(false);
+      expect(workspaceDefaults.get).not.toHaveBeenCalled();
+    });
+
+    it('heals an unset agent in self-hosted when the workspace default is ON', async () => {
+      const client = makeHealingClient();
+      client.heal.mockResolvedValue(patchedHeal());
+      const reforward = jest.fn().mockResolvedValue(makeForward('{"ok":true}', 200));
+      const { repo } = makeAgentRepo(() => ({ autofix_enabled: null }));
+      const service = makeService({
+        client: client as unknown as HealingClient,
+        repo,
+        workspaceDefaults: makeWorkspaceDefaults(true),
+      });
+
+      const result = await service.maybeHeal(makeParams({ reforward }));
+
+      expect(result!.record.outcome).toBe('healed');
+    });
+
+    it('never lets a workspace default switch on an unknown agent', async () => {
+      const client = makeHealingClient();
+      const { repo } = makeAgentRepo(() => null);
+      const service = makeService({
+        client: client as unknown as HealingClient,
+        repo,
+        workspaceDefaults: makeWorkspaceDefaults(true),
+      });
+
+      await expect(service.maybeHeal(makeParams({}))).resolves.toBeNull();
       expect(client.heal).not.toHaveBeenCalled();
     });
   });

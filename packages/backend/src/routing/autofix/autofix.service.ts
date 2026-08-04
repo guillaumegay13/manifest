@@ -11,6 +11,7 @@ import {
 } from 'manifest-shared';
 import { Agent } from '../../entities/agent.entity';
 import { isSelfHosted } from '../../common/utils/detect-self-hosted';
+import { WorkspaceDefaultsService } from '../../common/services/workspace-defaults.service';
 import type { ForwardResult } from '../proxy/provider-client';
 import type { ProxyApiMode } from '../proxy/proxy-types';
 import {
@@ -51,6 +52,17 @@ export interface AutofixAttempt {
 
 interface AgentAutofixConfig {
   enabled: boolean;
+  harness: AgentPlatform;
+}
+
+/**
+ * What the per-agent cache stores. Deliberately the *stored* flag rather than
+ * the resolved `enabled`: the workspace default is cached separately, so
+ * changing it must not be held hostage by up to 5,000 per-agent entries.
+ */
+interface CachedAutofixConfig {
+  /** NULL = no explicit agent choice; inherit the workspace/deployment default. */
+  storedEnabled: boolean | null;
   harness: AgentPlatform;
 }
 
@@ -127,7 +139,7 @@ export class AutofixService {
   private readonly repairableStatuses: Set<number>;
   private readonly configCache = new Map<
     string,
-    { value: AgentAutofixConfig; expiresAt: number }
+    { value: CachedAutofixConfig; expiresAt: number }
   >();
   // Circuit-breaker state (process-local). `breakerOpenUntil` is an epoch-ms
   // deadline; while it is in the future, heal calls are skipped.
@@ -137,10 +149,19 @@ export class AutofixService {
   constructor(
     @Inject(HEALING_CLIENT) private readonly client: HealingClient,
     @InjectRepository(Agent) private readonly agentRepo: Repository<Agent>,
+    private readonly workspaceDefaults: WorkspaceDefaultsService,
     config: ConfigService,
   ) {
     this.globalEnabled = config.get<string>('AUTOFIX_GLOBAL_ENABLED') !== 'false';
-    this.defaultAgentEnabled = !isSelfHosted();
+    // `AUTOFIX_DEFAULT_ENABLED` lets an operator pin the deployment default
+    // without touching any agent — the config-as-code counterpart to the
+    // Account Preferences toggle, for installs deployed from a compose file
+    // whose operator never opens the dashboard. Only an exact 'true'/'false'
+    // counts; anything else (including a typo) falls back to the mode default
+    // rather than silently reading as off.
+    const rawDefault = config.get<string>('AUTOFIX_DEFAULT_ENABLED')?.trim().toLowerCase();
+    this.defaultAgentEnabled =
+      rawDefault === 'true' ? true : rawDefault === 'false' ? false : !isSelfHosted();
     this.repairableStatuses = parseStatuses(config.get<string>('AUTOFIX_REPAIRABLE_STATUSES'));
     // Boot-time snapshot of the resolved configuration. Logged once so an operator can
     // confirm what the process actually loaded — e.g. whether the global kill
@@ -155,12 +176,24 @@ export class AutofixService {
   }
 
   /**
-   * Resolve an agent's stored Auto-fix flag to an effective on/off value. A
-   * NULL/undefined flag means "no explicit choice" and inherits the
-   * deployment-mode default: ON in cloud, OFF in self-hosted.
+   * Resolve an agent's stored Auto-fix flag to an effective on/off value,
+   * newest-choice-wins: the agent's own flag, else the workspace default set in
+   * Account Preferences, else the deployment default (`AUTOFIX_DEFAULT_ENABLED`,
+   * else ON in cloud / OFF in self-hosted). A NULL/undefined at any level means
+   * "no explicit choice" and falls through to the next.
    */
-  resolveEnabled(stored: boolean | null | undefined): boolean {
-    return stored ?? this.defaultAgentEnabled;
+  resolveEnabled(stored: boolean | null | undefined, workspaceDefault?: boolean | null): boolean {
+    return stored ?? workspaceDefault ?? this.defaultAgentEnabled;
+  }
+
+  /** `resolveEnabled` for callers that have a tenant but not its default yet. */
+  async resolveEnabledForTenant(
+    tenantId: string | null | undefined,
+    stored: boolean | null | undefined,
+  ): Promise<boolean> {
+    if (typeof stored === 'boolean') return stored;
+    const defaults = await this.workspaceDefaults.get(tenantId);
+    return this.resolveEnabled(stored, defaults.autofix);
   }
 
   /** Whether a status is one Auto-fix will try to heal. */
@@ -507,7 +540,15 @@ export class AutofixService {
     const key = `${tenantId}:${agentId}`;
     const now = Date.now();
     const cached = this.configCache.get(key);
-    if (cached && cached.expiresAt > now) return cached.value;
+    // The cache holds the *stored* flag, not the resolved answer, so flipping
+    // the workspace default takes effect as soon as the (separately cached)
+    // workspace entry turns over instead of waiting out every agent entry.
+    if (cached && cached.expiresAt > now) {
+      return {
+        enabled: await this.resolveEnabledForTenant(tenantId, cached.value.storedEnabled),
+        harness: cached.value.harness,
+      };
+    }
 
     const agent = await this.agentRepo.findOne({
       where: { id: agentId, tenant_id: tenantId },
@@ -519,10 +560,11 @@ export class AutofixService {
       // The always-present `id` keeps the row materialized so the NULL flag is read.
       select: ['id', 'autofix_enabled', 'agent_platform'],
     });
-    // Unknown agent → off. Known agent → its explicit flag, or the mode default
-    // when unset (NULL).
-    const value: AgentAutofixConfig = {
-      enabled: agent ? this.resolveEnabled(agent.autofix_enabled) : false,
+    // An unknown agent is pinned off (`storedEnabled: false`) rather than left
+    // to inherit — there is no workspace choice that should switch Auto-fix on
+    // for an agent that does not exist.
+    const value: CachedAutofixConfig = {
+      storedEnabled: agent ? (agent.autofix_enabled ?? null) : false,
       harness: coerceAgentPlatform(agent?.agent_platform),
     };
 
@@ -530,7 +572,10 @@ export class AutofixService {
     // DB read per failed request. Bounded + short TTL, invalidated on config change.
     if (this.configCache.size >= CONFIG_CACHE_MAX) this.configCache.clear();
     this.configCache.set(key, { value, expiresAt: now + CONFIG_CACHE_TTL_MS });
-    return value;
+    return {
+      enabled: await this.resolveEnabledForTenant(tenantId, value.storedEnabled),
+      harness: value.harness,
+    };
   }
 
   /** Fire-and-forget the learning signal so it never delays the client. */

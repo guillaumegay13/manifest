@@ -12,6 +12,7 @@ import { HeaderTiersModule } from './header-tiers/header-tiers.module';
 import { AutofixModule } from './autofix/autofix.module';
 import { ProviderController } from './provider.controller';
 import { TierController } from './tier.controller';
+import { WorkspaceDefaultsController } from './workspace-defaults.controller';
 import { ModelController } from './model.controller';
 import { CopilotController } from './oauth/copilot/copilot.controller';
 import { SpecificityController } from './specificity.controller';
@@ -58,6 +59,7 @@ import { HeaderTier } from '../entities/header-tier.entity';
   controllers: [
     ProviderController,
     TierController,
+    WorkspaceDefaultsController,
     ModelController,
     CopilotController,
     SpecificityController,

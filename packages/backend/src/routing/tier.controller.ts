@@ -26,7 +26,11 @@ import {
 } from './dto/routing.dto';
 import { Agent } from '../entities/agent.entity';
 import { AutofixService } from './autofix/autofix.service';
-import { AgentRecordingCacheService } from '../common/services/agent-recording-cache.service';
+import {
+  AgentRecordingCacheService,
+  RECORDING_FALLBACK_ENABLED,
+} from '../common/services/agent-recording-cache.service';
+import { WorkspaceDefaultsService } from '../common/services/workspace-defaults.service';
 
 @Controller('api/v1/routing')
 export class TierController {
@@ -37,6 +41,7 @@ export class TierController {
     private readonly agentRepo: Repository<Agent>,
     private readonly autofixService: AutofixService,
     private readonly recordingCache: AgentRecordingCacheService,
+    private readonly workspaceDefaults: WorkspaceDefaultsService,
   ) {}
 
   @Get(':agentName/tiers')
@@ -162,7 +167,12 @@ export class TierController {
   @Get(':agentName/autofix')
   async getAutofix(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
-    return { enabled: this.autofixService.resolveEnabled(agent.autofix_enabled) };
+    return {
+      enabled: await this.autofixService.resolveEnabledForTenant(
+        ctx.tenantId,
+        agent.autofix_enabled,
+      ),
+    };
   }
 
   @Patch(':agentName/autofix')
@@ -184,14 +194,14 @@ export class TierController {
     return {
       enabled: applied
         ? (body.enabled as boolean)
-        : this.autofixService.resolveEnabled(agent.autofix_enabled),
+        : await this.autofixService.resolveEnabledForTenant(ctx.tenantId, agent.autofix_enabled),
     };
   }
 
   @Get(':agentName/recording')
   async getRecording(@TenantCtx() ctx: TenantContext, @Param('agentName') agentName: string) {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
-    return { enabled: agent.record_messages === true };
+    return { enabled: await this.resolveRecording(ctx.tenantId, agent.record_messages) };
   }
 
   @Patch(':agentName/recording')
@@ -202,13 +212,26 @@ export class TierController {
   ) {
     const agent = await this.resolveAgentService.resolve(ctx.tenantId, agentName);
     if (typeof body.enabled !== 'boolean') {
-      return { enabled: agent.record_messages === true };
+      return { enabled: await this.resolveRecording(ctx.tenantId, agent.record_messages) };
     }
 
     await this.agentRepo.update(agent.id, { record_messages: body.enabled });
     this.resolveAgentService.invalidate(agent.tenant_id, agentName);
     this.recordingCache.invalidate(agent.id);
     return { enabled: body.enabled };
+  }
+
+  /**
+   * Effective recording state: the agent's own choice, else the workspace
+   * default from Account Preferences, else on.
+   */
+  private async resolveRecording(
+    tenantId: string | null,
+    stored: boolean | null | undefined,
+  ): Promise<boolean> {
+    if (typeof stored === 'boolean') return stored;
+    const defaults = await this.workspaceDefaults.get(tenantId);
+    return defaults.recording ?? RECORDING_FALLBACK_ENABLED;
   }
 
   private validateTier(tier: string): void {

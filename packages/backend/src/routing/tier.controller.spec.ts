@@ -7,6 +7,7 @@ import { Agent } from '../entities/agent.entity';
 import { AutofixService } from './autofix/autofix.service';
 import type { TenantContext } from '../common/decorators/tenant-context.decorator';
 import { AgentRecordingCacheService } from '../common/services/agent-recording-cache.service';
+import { WorkspaceDefaultsService } from '../common/services/workspace-defaults.service';
 
 describe('TierController', () => {
   const ctx: TenantContext = { tenantId: 'tenant-1', userId: 'user-1' };
@@ -24,9 +25,11 @@ describe('TierController', () => {
   let autofixService: {
     invalidateConfig: jest.Mock;
     resolveEnabled: jest.Mock;
+    resolveEnabledForTenant: jest.Mock;
   };
   let controller: TierController;
   let recordingCache: { invalidate: jest.Mock };
+  let workspaceDefaults: { get: jest.Mock; invalidate: jest.Mock };
 
   beforeEach(() => {
     tierService = {
@@ -49,14 +52,22 @@ describe('TierController', () => {
       invalidateConfig: jest.fn(),
       // Mirror the real resolver: explicit flag wins, NULL inherits a default.
       resolveEnabled: jest.fn((stored: boolean | null) => stored ?? false),
+      resolveEnabledForTenant: jest.fn(
+        async (_tenantId: string, stored: boolean | null) => stored ?? false,
+      ),
     };
     recordingCache = { invalidate: jest.fn() };
+    workspaceDefaults = {
+      get: jest.fn().mockResolvedValue({ autofix: null, recording: null }),
+      invalidate: jest.fn(),
+    };
     controller = new TierController(
       tierService as unknown as TierService,
       resolveAgentService as unknown as ResolveAgentService,
       agentRepo as unknown as Repository<Agent>,
       autofixService as unknown as AutofixService,
       recordingCache as unknown as AgentRecordingCacheService,
+      workspaceDefaults as unknown as WorkspaceDefaultsService,
     );
   });
 
@@ -150,13 +161,31 @@ describe('TierController', () => {
     expect(await controller.getAutofix(ctx, 'demo')).toEqual({ enabled: false });
   });
 
-  it('GET autofix resolves the mode default via the service when the flag is unset (null)', async () => {
-    // A NULL stored flag is handed to the service, which resolves the
-    // deployment-mode default (here stubbed to ON).
+  it('GET autofix resolves the inherited default via the service when the flag is unset (null)', async () => {
+    // A NULL stored flag is handed to the service, which cascades through the
+    // workspace default to the deployment default (here stubbed to ON).
     resolveAgentService.resolve.mockResolvedValueOnce({ ...agent, autofix_enabled: null });
-    autofixService.resolveEnabled.mockReturnValueOnce(true);
+    autofixService.resolveEnabledForTenant.mockResolvedValueOnce(true);
     expect(await controller.getAutofix(ctx, 'demo')).toEqual({ enabled: true });
-    expect(autofixService.resolveEnabled).toHaveBeenCalledWith(null);
+    expect(autofixService.resolveEnabledForTenant).toHaveBeenCalledWith(ctx.tenantId, null);
+  });
+
+  it('GET recording inherits the workspace default when the agent made no choice', async () => {
+    resolveAgentService.resolve.mockResolvedValueOnce({ ...agent, record_messages: null });
+    workspaceDefaults.get.mockResolvedValueOnce({ autofix: null, recording: false });
+    expect(await controller.getRecording(ctx, 'demo')).toEqual({ enabled: false });
+  });
+
+  it('GET recording falls back to on when neither the agent nor the workspace chose', async () => {
+    resolveAgentService.resolve.mockResolvedValueOnce({ ...agent, record_messages: null });
+    expect(await controller.getRecording(ctx, 'demo')).toEqual({ enabled: true });
+  });
+
+  it('GET recording lets an explicit agent choice outrank the workspace default', async () => {
+    resolveAgentService.resolve.mockResolvedValueOnce({ ...agent, record_messages: false });
+    workspaceDefaults.get.mockResolvedValueOnce({ autofix: null, recording: true });
+    expect(await controller.getRecording(ctx, 'demo')).toEqual({ enabled: false });
+    expect(workspaceDefaults.get).not.toHaveBeenCalled();
   });
 
   it('PATCH autofix updates the enabled flag and invalidates cache', async () => {

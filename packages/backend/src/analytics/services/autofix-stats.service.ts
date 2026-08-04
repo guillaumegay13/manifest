@@ -5,6 +5,7 @@ import { Agent } from '../../entities/agent.entity';
 import { AgentMessage } from '../../entities/agent-message.entity';
 import { ManifestRequest } from '../../entities/request.entity';
 import { AutofixService } from '../../routing/autofix/autofix.service';
+import { WorkspaceDefaultsService } from '../../common/services/workspace-defaults.service';
 import {
   rangeToInterval,
   rangeToPreviousInterval,
@@ -88,6 +89,7 @@ export class AutofixStatsService {
     private readonly messageRepo: Repository<AgentMessage>,
     private readonly autofix: AutofixService,
     private readonly requestVolume: RequestVolumeService,
+    private readonly workspaceDefaults: WorkspaceDefaultsService,
   ) {}
 
   async getWorkspaceStatus(tenantId: string | null): Promise<AutofixStatusResponse> {
@@ -99,8 +101,11 @@ export class AutofixStatsService {
       where: { tenant_id: tenantId, deleted_at: IsNull(), is_playground: false },
       select: ['name', 'autofix_enabled'],
     });
+    // One workspace read for the whole list, then a pure resolve per agent —
+    // the per-agent async variant would issue a (cached) lookup each time.
+    const workspaceDefault = (await this.workspaceDefaults.get(tenantId)).autofix;
     const enabledAgents = agents
-      .filter((agent) => this.autofix.resolveEnabled(agent.autofix_enabled))
+      .filter((agent) => this.autofix.resolveEnabled(agent.autofix_enabled, workspaceDefault))
       .map((agent) => agent.name);
 
     return {

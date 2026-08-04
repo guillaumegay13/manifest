@@ -1,6 +1,6 @@
-import { createResource, createSignal, createEffect, Show, type Component } from 'solid-js';
+import { createResource, createSignal, createEffect, type Component } from 'solid-js';
 import { useSearchParams } from '@solidjs/router';
-import { Portal } from 'solid-js/web';
+import AutofixConsentModal from '../components/AutofixConsentModal.jsx';
 import { getAutofix, updateAutofix } from '../services/api.js';
 import { checkIsSelfHosted } from '../services/setup-status.js';
 
@@ -91,74 +91,14 @@ const SettingsAutofixSection: Component<{ agentName: () => string }> = (props) =
           </div>
         </div>
       </div>
-      <Portal>
-        <Show when={confirmingEnable()}>
-          <div
-            class="modal-overlay"
-            onClick={(event) => {
-              if (event.target === event.currentTarget) setConfirmingEnable(false);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') setConfirmingEnable(false);
-            }}
-          >
-            <div
-              class="modal-card"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="autofix-consent-title"
-              aria-describedby="autofix-consent-description"
-              style="max-width: 500px;"
-            >
-              <h2 class="modal-card__title" id="autofix-consent-title">
-                Enable hosted Auto-fix?
-              </h2>
-              <p class="modal-card__desc" id="autofix-consent-description">
-                Failed requests will be sent to Manifest Auto-fix for diagnosis and repair. Provider
-                authorization credentials are not sent.{' '}
-                <a
-                  href="https://manifest.build/docs/autofix/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  How Auto-fix works
-                </a>
-                .
-              </p>
-              <p class="autofix-consent__legal">
-                By enabling Auto-fix, you agree to Manifest&apos;s{' '}
-                <a href="https://manifest.build/terms" target="_blank" rel="noopener noreferrer">
-                  Terms
-                </a>{' '}
-                and{' '}
-                <a href="https://manifest.build/privacy" target="_blank" rel="noopener noreferrer">
-                  Privacy Policy
-                </a>
-                .
-              </p>
-              <div class="modal-card__footer">
-                <button
-                  type="button"
-                  class="btn btn--ghost btn--sm"
-                  onClick={() => setConfirmingEnable(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  class="btn btn--primary btn--sm"
-                  onClick={() => {
-                    setConfirmingEnable(false);
-                    void saveEnabled(true);
-                  }}
-                >
-                  Agree &amp; enable Auto-fix
-                </button>
-              </div>
-            </div>
-          </div>
-        </Show>
-      </Portal>
+      <AutofixConsentModal
+        open={confirmingEnable()}
+        onCancel={() => setConfirmingEnable(false)}
+        onConfirm={() => {
+          setConfirmingEnable(false);
+          void saveEnabled(true);
+        }}
+      />
     </>
   );
 };

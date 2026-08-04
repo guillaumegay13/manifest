@@ -1,3 +1,4 @@
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -10,6 +11,24 @@ import { HEALING_CLIENT } from '../healing-client';
 import { HttpHealingClient } from '../http-healing-client';
 import { MockHealingClient } from '../mock-healing-client';
 import { NoopHealingClient } from '../noop-healing-client';
+import { WorkspaceDefaultsService } from '../../../common/services/workspace-defaults.service';
+
+/**
+ * WorkspaceDefaultsService reaches AutofixService through the @Global
+ * CommonModule in the real app. This spec boots AutofixModule on its own, so
+ * stand in a module that exports the same token.
+ */
+@Global()
+@Module({
+  providers: [
+    {
+      provide: WorkspaceDefaultsService,
+      useValue: { get: async () => ({ autofix: null, recording: null }), invalidate: () => {} },
+    },
+  ],
+  exports: [WorkspaceDefaultsService],
+})
+class StubWorkspaceDefaultsModule {}
 
 /**
  * Compile AutofixModule with a global ConfigModule seeded from `configValues`
@@ -26,6 +45,7 @@ async function resolveHealingClient(configValues: Record<string, string>) {
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [() => configValues] }),
+        StubWorkspaceDefaultsModule,
         AutofixModule,
       ],
     })
