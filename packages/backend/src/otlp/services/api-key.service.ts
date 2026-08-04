@@ -39,6 +39,14 @@ export class ApiKeyGeneratorService {
     displayName?: string;
     agentCategory?: string;
     agentPlatform?: string;
+    /**
+     * Explicit per-agent settings chosen at creation. Undefined means "no
+     * choice" and stores NULL, so the agent keeps inheriting the workspace /
+     * deployment default instead of being pinned to whatever that default
+     * happened to be on the day it was created.
+     */
+    autofixEnabled?: boolean;
+    recordMessages?: boolean;
   }): Promise<{ tenantId: string; agentId: string; apiKey: string }> {
     let tenantId: string;
     if (params.tenantId) {
@@ -74,6 +82,8 @@ export class ApiKeyGeneratorService {
       description: params.agentDescription ?? null,
       agent_category: params.agentCategory ?? null,
       agent_platform: params.agentPlatform ?? null,
+      autofix_enabled: params.autofixEnabled ?? null,
+      record_messages: params.recordMessages ?? null,
       is_active: true,
       tenant_id: tenantId,
     });

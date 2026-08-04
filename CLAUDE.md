@@ -643,6 +643,8 @@ Still to come (not in this phase): a migration assistant (task-specific → head
 
 **Endpoints:** `GET/PATCH /api/v1/routing/:agentName/autofix` → `{ enabled }` (the *resolved* effective value). `GET/PATCH /api/v1/workspace/defaults` → `{ autofix, recording }` — the workspace layer, where `null` means "no workspace choice".
 
+**`POST /api/v1/agents` accepts optional `autofix_enabled` / `record_messages`.** The Connect Harness modal shows the inherited values and sends a key **only when the user actually flips that control**; an untouched form omits both so the agent stores NULL and keeps inheriting. Echoing the resolved value back would pin every new agent at creation and quietly opt it out of the workspace default, so any new creation surface must preserve this: omit means inherit.
+
 **Env:** `AUTOFIX_HEALING_URL` (unset → inert Noop in production, in-process mock in dev/test), `AUTOFIX_HEALING_API_KEY` (sent as `x-api-key`; required for a production Phoenix, which fails closed without it), `AUTOFIX_GLOBAL_ENABLED` (`false` disables Auto-fix everywhere; default on), `AUTOFIX_TIMEOUT_MS` (per heal call, default `10000`), `AUTOFIX_REPAIRABLE_STATUSES` (default `400,404,422`).
 
 ## Providers & Models

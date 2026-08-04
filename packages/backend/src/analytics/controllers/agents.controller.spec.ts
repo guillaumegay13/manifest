@@ -316,6 +316,8 @@ describe('AgentsController', () => {
         name: 'My Agent',
         agent_category: 'personal',
         agent_platform: 'openclaw',
+        autofix_enabled: false,
+        record_messages: true,
       } as never,
     );
 
@@ -323,10 +325,62 @@ describe('AgentsController', () => {
       expect.objectContaining({
         agentCategory: 'personal',
         agentPlatform: 'openclaw',
+        autofixEnabled: false,
+        recordMessages: true,
       }),
     );
     expect(result.agent.agent_category).toBe('personal');
     expect(result.agent.agent_platform).toBe('openclaw');
+  });
+
+  it('forwards undefined settings when the create form sent no override', async () => {
+    const mockOnboard = jest.fn().mockResolvedValue({
+      tenantId: 't1',
+      agentId: 'a1',
+      apiKey: 'mnfst_key',
+    });
+    const module: TestingModule = await Test.createTestingModule({
+      imports: [CacheModule.register()],
+      controllers: [AgentsController],
+      providers: [
+        { provide: TimeseriesQueriesService, useValue: { getAgentList: jest.fn() } },
+        {
+          provide: AgentLifecycleService,
+          useValue: {
+            deleteAgent: jest.fn(),
+            renameAgent: jest.fn(),
+            updateAgentType: jest.fn(),
+            findAgentInfo: jest.fn().mockResolvedValue(null),
+          },
+        },
+        {
+          provide: ApiKeyGeneratorService,
+          useValue: { onboardAgent: mockOnboard, getKeyForAgent: jest.fn(), rotateKey: jest.fn() },
+        },
+        { provide: ConfigService, useValue: { get: jest.fn() } },
+        { provide: TenantCacheService, useValue: { resolve: jest.fn().mockResolvedValue(null) } },
+        { provide: IngestEventBusService, useValue: { emit: jest.fn() } },
+        {
+          provide: AgentDuplicationService,
+          useValue: { duplicate: jest.fn(), getCopySummary: jest.fn(), suggestName: jest.fn() },
+        },
+        providerServiceProvider(),
+      ],
+    }).compile();
+
+    const ctrl = module.get<AgentsController>(AgentsController);
+    const cm = module.get<Cache>(CACHE_MANAGER);
+    jest.spyOn(cm, 'del').mockResolvedValue(true);
+    await ctrl.createAgent(
+      { tenantId: null, userId: 'user-123' } as never,
+      {
+        name: 'Plain Agent',
+      } as never,
+    );
+
+    const passed = mockOnboard.mock.calls[0][0];
+    expect(passed.autofixEnabled).toBeUndefined();
+    expect(passed.recordMessages).toBeUndefined();
   });
 
   it('returns null category/platform when not provided', async () => {

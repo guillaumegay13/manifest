@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@solidjs/testing-library';
+import { render, screen, fireEvent, waitFor } from '@solidjs/testing-library';
 
 const mockNavigate = vi.fn();
 vi.mock('@solidjs/router', () => ({
@@ -27,6 +27,16 @@ vi.mock('../../src/services/recent-agents.js', () => ({
 const mockRefreshAgents = vi.fn();
 vi.mock('../../src/services/sse.js', () => ({
   refreshAgents: (...args: unknown[]) => mockRefreshAgents(...args),
+}));
+
+const mockGetWorkspaceDefaults = vi.fn();
+vi.mock('../../src/services/api/workspace-defaults.js', () => ({
+  getWorkspaceDefaults: () => mockGetWorkspaceDefaults(),
+}));
+
+const mockCheckIsSelfHosted = vi.fn();
+vi.mock('../../src/services/setup-status.js', () => ({
+  checkIsSelfHosted: () => mockCheckIsSelfHosted(),
 }));
 
 vi.mock('../../src/components/AgentTypeSelect.jsx', () => ({
@@ -70,6 +80,8 @@ describe('AddAgentModal', () => {
     vi.clearAllMocks();
     mockCreateAgent.mockResolvedValue({ agent: { name: 'new-agent' }, apiKey: 'key-1' });
     mockGetGlobalProviders.mockResolvedValue({ providers: [{ provider: 'openai' }] });
+    mockGetWorkspaceDefaults.mockResolvedValue({ autofix: null, recording: null });
+    mockCheckIsSelfHosted.mockResolvedValue(false);
   });
 
   it('renders nothing when closed', () => {
@@ -358,5 +370,116 @@ describe('AddAgentModal', () => {
     const { container, onClose } = renderOpen();
     fireEvent.click(container.querySelector('.modal-card')!);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  describe('agent defaults disclosure', () => {
+    const openAdvanced = async () => {
+      const r = renderOpen();
+      await waitFor(() => expect(screen.getByText('Change')).toBeTruthy());
+      fireEvent.click(screen.getByText('Change'));
+      return r;
+    };
+
+    it('summarises the inherited values without any override', async () => {
+      renderOpen();
+      await waitFor(() => expect(screen.getByText(/Auto-fix on/)).toBeTruthy());
+      expect(screen.getByText('workspace defaults')).toBeTruthy();
+    });
+
+    it('shows the workspace choice over the deployment default', async () => {
+      mockGetWorkspaceDefaults.mockResolvedValue({ autofix: false, recording: false });
+      renderOpen();
+      await waitFor(() => expect(screen.getByText(/Auto-fix off/)).toBeTruthy());
+      expect(screen.getByText(/Recording off/)).toBeTruthy();
+    });
+
+    it('shows Auto-fix off for an unset self-hosted workspace', async () => {
+      mockCheckIsSelfHosted.mockResolvedValue(true);
+      renderOpen();
+      await waitFor(() => expect(screen.getByText(/Auto-fix off/)).toBeTruthy());
+    });
+
+    // The load-bearing rule: an untouched form must not pin the new agent, or
+    // it silently opts out of every future workspace-default change.
+    it('sends no settings keys when the user changes nothing', async () => {
+      const { input, createBtn } = renderOpen();
+      await waitFor(() => expect(screen.getByText('Change')).toBeTruthy());
+      fireEvent.input(input, { target: { value: 'plain' } });
+      fireEvent.click(createBtn);
+      await waitFor(() => expect(mockCreateAgent).toHaveBeenCalled());
+      const payload = mockCreateAgent.mock.calls[0][0];
+      expect(payload).not.toHaveProperty('autofix_enabled');
+      expect(payload).not.toHaveProperty('record_messages');
+    });
+
+    it('sends only the setting the user actually flipped', async () => {
+      const { input, createBtn } = await openAdvanced();
+      fireEvent.click(screen.getByLabelText('Record requests for this harness'));
+      fireEvent.input(input, { target: { value: 'rec-off' } });
+      fireEvent.click(createBtn);
+      await waitFor(() => expect(mockCreateAgent).toHaveBeenCalled());
+      const payload = mockCreateAgent.mock.calls[0][0];
+      expect(payload.record_messages).toBe(false);
+      expect(payload).not.toHaveProperty('autofix_enabled');
+    });
+
+    it('marks the summary as customized once a control is touched', async () => {
+      await openAdvanced();
+      fireEvent.click(screen.getByLabelText('Record requests for this harness'));
+      await waitFor(() => expect(screen.getByText('customized')).toBeTruthy());
+    });
+
+    it('gates enabling Auto-fix behind the consent modal when self-hosted', async () => {
+      mockCheckIsSelfHosted.mockResolvedValue(true);
+      const { input, createBtn } = await openAdvanced();
+      fireEvent.click(screen.getByLabelText('Auto-fix for this harness'));
+
+      await waitFor(() => expect(screen.getByText('Enable hosted Auto-fix?')).toBeTruthy());
+      fireEvent.click(screen.getByText('Agree & enable Auto-fix'));
+
+      fireEvent.input(input, { target: { value: 'healed' } });
+      fireEvent.click(createBtn);
+      await waitFor(() => expect(mockCreateAgent).toHaveBeenCalled());
+      expect(mockCreateAgent.mock.calls[0][0].autofix_enabled).toBe(true);
+    });
+
+    it('cancelling the consent modal leaves the setting inherited', async () => {
+      mockCheckIsSelfHosted.mockResolvedValue(true);
+      const { input, createBtn } = await openAdvanced();
+      fireEvent.click(screen.getByLabelText('Auto-fix for this harness'));
+      await waitFor(() => expect(screen.getByText('Enable hosted Auto-fix?')).toBeTruthy());
+      fireEvent.click(screen.getByText('Cancel'));
+
+      fireEvent.input(input, { target: { value: 'declined' } });
+      fireEvent.click(createBtn);
+      await waitFor(() => expect(mockCreateAgent).toHaveBeenCalled());
+      expect(mockCreateAgent.mock.calls[0][0]).not.toHaveProperty('autofix_enabled');
+    });
+
+    it('still creates agents when the defaults lookup fails', async () => {
+      // Reading an errored resource re-throws in Solid; the modal must degrade
+      // to "no workspace choice" rather than failing to render.
+      mockGetWorkspaceDefaults.mockRejectedValue(new Error('offline'));
+      const { input, createBtn } = renderOpen();
+      await waitFor(() => expect(screen.getByText(/Auto-fix/)).toBeTruthy());
+
+      fireEvent.input(input, { target: { value: 'resilient' } });
+      fireEvent.click(createBtn);
+      await waitFor(() => expect(mockCreateAgent).toHaveBeenCalled());
+      expect(mockCreateAgent.mock.calls[0][0]).not.toHaveProperty('autofix_enabled');
+    });
+
+    it('never gates turning Auto-fix off behind the modal', async () => {
+      mockCheckIsSelfHosted.mockResolvedValue(true);
+      mockGetWorkspaceDefaults.mockResolvedValue({ autofix: true, recording: null });
+      const { input, createBtn } = await openAdvanced();
+      fireEvent.click(screen.getByLabelText('Auto-fix for this harness'));
+      expect(screen.queryByText('Enable hosted Auto-fix?')).toBeNull();
+
+      fireEvent.input(input, { target: { value: 'off-agent' } });
+      fireEvent.click(createBtn);
+      await waitFor(() => expect(mockCreateAgent).toHaveBeenCalled());
+      expect(mockCreateAgent.mock.calls[0][0].autofix_enabled).toBe(false);
+    });
   });
 });

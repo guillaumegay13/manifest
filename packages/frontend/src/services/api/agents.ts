@@ -61,6 +61,13 @@ export interface CreateAgentParams {
   name: string;
   agent_category?: string;
   agent_platform?: string;
+  /**
+   * Explicit settings chosen at creation. **Only send these when the user
+   * actually changed the control.** Passing the inherited value pins the agent
+   * and permanently opts it out of the workspace default.
+   */
+  autofix_enabled?: boolean;
+  record_messages?: boolean;
 }
 
 export interface DuplicateAgentPreview {

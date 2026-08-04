@@ -907,3 +907,34 @@
 .user-discovery-modal__later:focus-visible {
   color: hsl(var(--foreground));
 }
+
+/* Agent defaults disclosure in the Connect Harness modal. Reads as a summary of
+   what the new harness will inherit, so it stays quiet until the user opts to
+   change it. */
+.add-agent-defaults {
+  margin-top: var(--gap-md);
+  padding-top: var(--gap-md);
+  border-top: 1px solid hsl(var(--border));
+}
+
+.add-agent-defaults__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  flex-wrap: wrap;
+}
+
+.add-agent-defaults__values {
+  font-size: var(--font-size-sm);
+  color: hsl(var(--foreground));
+}
+
+.add-agent-defaults__origin {
+  font-size: var(--font-size-sm);
+  color: hsl(var(--muted-foreground));
+  margin-right: auto;
+}
+
+.add-agent-defaults__controls {
+  margin-top: var(--gap-sm);
+}

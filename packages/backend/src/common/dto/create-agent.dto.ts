@@ -6,6 +6,7 @@ import {
   Matches,
   IsOptional,
   IsIn,
+  IsBoolean,
 } from 'class-validator';
 import { AGENT_CATEGORIES, AGENT_PLATFORMS } from 'manifest-shared';
 
@@ -28,4 +29,19 @@ export class CreateAgentDto {
   @IsString()
   @IsIn([...AGENT_PLATFORMS])
   agent_platform?: string;
+
+  /**
+   * Explicit Auto-fix choice made at creation. **Omit to inherit.** Sending a
+   * value pins the agent, so the create form must only send this when the user
+   * actually changed the toggle — echoing back the inherited value would opt
+   * every new agent out of the workspace default the moment it is created.
+   */
+  @IsOptional()
+  @IsBoolean()
+  autofix_enabled?: boolean;
+
+  /** Explicit recording choice made at creation. Omit to inherit. */
+  @IsOptional()
+  @IsBoolean()
+  record_messages?: boolean;
 }

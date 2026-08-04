@@ -6,6 +6,10 @@ let mockSearchParams: Record<string, string | undefined> = {};
 const mockSetSearchParams = vi.fn((next: Record<string, string | undefined>) => {
   mockSearchParams = { ...mockSearchParams, ...next };
 });
+vi.mock('../../src/services/api/workspace-defaults.js', () => ({
+  getWorkspaceDefaults: () => Promise.resolve({ autofix: null, recording: null }),
+}));
+
 vi.mock('@solidjs/router', () => ({
   A: (props: any) => (
     <a href={props.href} class={props.class}>

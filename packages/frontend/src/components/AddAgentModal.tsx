@@ -1,7 +1,10 @@
-import { createSignal, onCleanup, Show, type Component } from 'solid-js';
+import { createResource, createSignal, onCleanup, Show, type Component } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import AgentTypeSelect from './AgentTypeSelect.jsx';
+import AutofixConsentModal from './AutofixConsentModal.jsx';
 import { createAgent, getGlobalProviders } from '../services/api.js';
+import { getWorkspaceDefaults } from '../services/api/workspace-defaults.js';
+import { checkIsSelfHosted } from '../services/setup-status.js';
 import { toast } from '../services/toast-store.js';
 import { markAgentCreated, markSetupPending } from '../services/recent-agents.js';
 import { refreshAgents } from '../services/sse.js';
@@ -25,6 +28,42 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
     PLATFORMS_BY_CATEGORY['personal'][0] ?? null,
   );
   const [creating, setCreating] = createSignal(false);
+
+  // Inherited values, shown so the user can see what the agent will start with.
+  const [workspaceDefaults] = createResource(getWorkspaceDefaults);
+  const [selfHosted] = createResource(checkIsSelfHosted);
+  // NULL means "untouched — let the agent inherit". These are only ever sent to
+  // the API once the user has actually flipped a control: echoing the inherited
+  // value back would pin the new agent and permanently opt it out of the
+  // workspace default, which is the whole point of having one.
+  const [autofixOverride, setAutofixOverride] = createSignal<boolean | null>(null);
+  const [recordingOverride, setRecordingOverride] = createSignal<boolean | null>(null);
+  const [showAdvanced, setShowAdvanced] = createSignal(false);
+  const [confirmingAutofix, setConfirmingAutofix] = createSignal(false);
+
+  // Reading an errored SolidJS resource re-throws, which would take the whole
+  // create modal down with it. A defaults lookup is a nicety, so a failed read
+  // degrades to "no workspace choice" and the form still creates agents.
+  const defaults = () =>
+    workspaceDefaults.loading || workspaceDefaults.error ? undefined : workspaceDefaults();
+  const isSelfHostedSafe = () =>
+    selfHosted.loading || selfHosted.error ? false : (selfHosted() ?? false);
+
+  const inheritedAutofix = () => defaults()?.autofix ?? !isSelfHostedSafe();
+  const inheritedRecording = () => defaults()?.recording ?? true;
+  const autofixOn = () => autofixOverride() ?? inheritedAutofix();
+  const recordingOn = () => recordingOverride() ?? inheritedRecording();
+  const customized = () => autofixOverride() !== null || recordingOverride() !== null;
+
+  const toggleAutofix = () => {
+    if (creating()) return;
+    // Same disclosure gate as every other place Auto-fix can be switched on.
+    if (!autofixOn() && isSelfHostedSafe()) {
+      setConfirmingAutofix(true);
+      return;
+    }
+    setAutofixOverride(!autofixOn());
+  };
 
   // Tracks whether the user dismissed the modal (overlay click / Escape) while a
   // create request was still in flight. A dismissed create must NOT run its
@@ -59,6 +98,10 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
         name: agentName,
         ...(category() ? { agent_category: category()! } : {}),
         ...(platform() ? { agent_platform: platform()! } : {}),
+        // Spread only when overridden, so an untouched form sends no key at all
+        // and the agent stays on the inherited default.
+        ...(autofixOverride() !== null ? { autofix_enabled: autofixOverride()! } : {}),
+        ...(recordingOverride() !== null ? { record_messages: recordingOverride()! } : {}),
       });
       // Local creates do not wait for the asynchronous server-sent event. This
       // immediately reruns the sidebar's harness-list resource with fresh data.
@@ -109,6 +152,10 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
     setName('');
     setCategory('personal');
     setPlatform(PLATFORMS_BY_CATEGORY['personal'][0] ?? null);
+    setAutofixOverride(null);
+    setRecordingOverride(null);
+    setShowAdvanced(false);
+    setConfirmingAutofix(false);
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -163,6 +210,79 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
             </div>
           </div>
 
+          <div class="add-agent-defaults">
+            <div class="add-agent-defaults__summary">
+              <span class="add-agent-defaults__values">
+                Auto-fix {autofixOn() ? 'on' : 'off'} &middot; Recording{' '}
+                {recordingOn() ? 'on' : 'off'}
+              </span>
+              <span class="add-agent-defaults__origin">
+                {customized() ? 'customized' : 'workspace defaults'}
+              </span>
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm"
+                aria-expanded={showAdvanced()}
+                onClick={() => setShowAdvanced(!showAdvanced())}
+                disabled={creating()}
+              >
+                {showAdvanced() ? 'Done' : 'Change'}
+              </button>
+            </div>
+            <Show when={showAdvanced()}>
+              <div class="add-agent-defaults__controls">
+                <div class="settings-card__row">
+                  <div class="settings-card__label">
+                    <span class="settings-card__label-title">Auto-fix failing requests</span>
+                    <span class="settings-card__label-desc">
+                      Repair a fixable error and retry once before falling back.
+                    </span>
+                  </div>
+                  <div class="settings-card__control settings-card__control--end">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={autofixOn()}
+                      aria-label="Auto-fix for this harness"
+                      class="settings-switch"
+                      classList={{ 'settings-switch--on': autofixOn() }}
+                      disabled={creating()}
+                      onClick={toggleAutofix}
+                    >
+                      <span class="settings-switch__track">
+                        <span class="settings-switch__thumb" />
+                      </span>
+                    </button>
+                  </div>
+                </div>
+                <div class="settings-card__row">
+                  <div class="settings-card__label">
+                    <span class="settings-card__label-title">Record requests</span>
+                    <span class="settings-card__label-desc">
+                      Store request and response bodies so you can inspect them later.
+                    </span>
+                  </div>
+                  <div class="settings-card__control settings-card__control--end">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={recordingOn()}
+                      aria-label="Record requests for this harness"
+                      class="settings-switch"
+                      classList={{ 'settings-switch--on': recordingOn() }}
+                      disabled={creating()}
+                      onClick={() => !creating() && setRecordingOverride(!recordingOn())}
+                    >
+                      <span class="settings-switch__track">
+                        <span class="settings-switch__thumb" />
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </Show>
+          </div>
+
           <div class="modal-card__footer">
             <button
               class="btn btn--primary btn--sm"
@@ -174,6 +294,15 @@ const AddAgentModal: Component<{ open: boolean; onClose: () => void }> = (props)
           </div>
         </div>
       </div>
+      <AutofixConsentModal
+        open={confirmingAutofix()}
+        scope="from this harness "
+        onCancel={() => setConfirmingAutofix(false)}
+        onConfirm={() => {
+          setConfirmingAutofix(false);
+          setAutofixOverride(true);
+        }}
+      />
     </Show>
   );
 };

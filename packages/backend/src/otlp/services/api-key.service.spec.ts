@@ -157,6 +157,42 @@ describe('ApiKeyGeneratorService', () => {
       );
     });
 
+    it('stores NULL settings when the caller made no explicit choice', async () => {
+      mockTenantFindOne.mockResolvedValue(null);
+
+      await service.onboardAgent(defaultParams);
+
+      // NULL, not the resolved default: a new agent must keep inheriting the
+      // workspace/deployment default rather than being pinned at creation.
+      expect(mockAgentInsert).toHaveBeenCalledWith(
+        expect.objectContaining({ autofix_enabled: null, record_messages: null }),
+      );
+    });
+
+    it('stores explicit settings when the caller chose them', async () => {
+      mockTenantFindOne.mockResolvedValue(null);
+
+      await service.onboardAgent({
+        ...defaultParams,
+        autofixEnabled: true,
+        recordMessages: false,
+      });
+
+      expect(mockAgentInsert).toHaveBeenCalledWith(
+        expect.objectContaining({ autofix_enabled: true, record_messages: false }),
+      );
+    });
+
+    it('treats an explicit false as a choice, not as "unset"', async () => {
+      mockTenantFindOne.mockResolvedValue(null);
+
+      await service.onboardAgent({ ...defaultParams, autofixEnabled: false });
+
+      expect(mockAgentInsert).toHaveBeenCalledWith(
+        expect.objectContaining({ autofix_enabled: false }),
+      );
+    });
+
     it('should reuse the existing tenant owned by the user', async () => {
       mockTenantFindOne.mockResolvedValue({
         id: 'existing-tenant-id',
