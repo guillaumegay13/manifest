@@ -276,6 +276,7 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionLabel: 'Grok subscription',
     subscriptionAuthMode: 'popup_oauth' as const,
     knownModels: Object.freeze([
+      'grok-4.6',
       'grok-4.5',
       'grok-4.3',
       'grok-4.20-0309-reasoning',
@@ -286,6 +287,9 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
       maxContextWindow: 128000,
       supportsPromptCaching: true,
       supportsBatching: false,
+      modelContextWindows: Object.freeze({
+        'grok-4.6': 500000,
+      }),
     }),
   }),
   copilot: Object.freeze({
