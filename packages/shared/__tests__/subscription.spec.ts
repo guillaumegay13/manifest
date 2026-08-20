@@ -417,6 +417,7 @@ describe('getSubscriptionKnownModels', () => {
 
   it('returns known models for zai', () => {
     const models = getSubscriptionKnownModels('zai');
+    expect(models).toContain('glm-5.3');
     expect(models).toContain('glm-5.1');
     expect(models).toContain('glm-5');
     expect(models).toContain('glm-4.7');
@@ -563,13 +564,14 @@ describe('getSubscriptionCapabilities', () => {
     });
   });
 
-  it('returns capabilities for zai with 204800 context window', () => {
+  it('returns capabilities for zai with plan and model context windows', () => {
     const caps = getSubscriptionCapabilities('zai');
     expect(caps).toMatchObject({
       maxContextWindow: 204800,
       supportsPromptCaching: true,
       supportsBatching: false,
     });
+    expect(caps?.modelContextWindows?.['glm-5.3']).toBe(1048576);
   });
 
   it('returns capabilities for moonshot Kimi Coding Plan', () => {

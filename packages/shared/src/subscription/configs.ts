@@ -219,6 +219,7 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionAuthMode: 'token' as const,
     subscriptionKeyPlaceholder: 'Paste your Z.ai API key',
     knownModels: Object.freeze([
+      'glm-5.3',
       'glm-5.2',
       'glm-5.1',
       'glm-5-turbo',
@@ -231,6 +232,9 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionCapabilities: Object.freeze({
       // Z.ai advertises "200K" as 200 * 1024 = 204800, not 200000 like other providers.
       maxContextWindow: 204800,
+      modelContextWindows: Object.freeze({
+        'glm-5.3': 1048576,
+      }),
       supportsPromptCaching: true,
       supportsBatching: false,
     }),
