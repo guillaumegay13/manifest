@@ -1,4 +1,4 @@
-import { err, ok } from './tool-result';
+import { err, ok, result } from './tool-result';
 
 describe('tool-result', () => {
   it('serializes a payload as a text content block', () => {
@@ -11,6 +11,23 @@ describe('tool-result', () => {
     expect(err('boom')).toEqual({
       content: [{ type: 'text', text: 'boom' }],
       isError: true,
+    });
+  });
+
+  it('wraps a resolved promise and a rejected Error', async () => {
+    await expect(result(Promise.resolve({ a: 1 }))).resolves.toMatchObject({
+      content: [{ type: 'text' }],
+    });
+    await expect(result(Promise.reject(new Error('nope')))).resolves.toMatchObject({
+      isError: true,
+      content: [{ type: 'text', text: 'nope' }],
+    });
+  });
+
+  it('stringifies a non-Error rejection', async () => {
+    await expect(result(Promise.reject('plain'))).resolves.toMatchObject({
+      isError: true,
+      content: [{ type: 'text', text: 'plain' }],
     });
   });
 });

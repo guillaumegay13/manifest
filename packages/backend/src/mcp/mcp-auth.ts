@@ -20,10 +20,6 @@ export function scopesFromClaims(claims: McpAccessTokenClaims): ReadonlySet<stri
   return new Set(claims.scope.split(' ').filter(Boolean));
 }
 
-export function hasScope(operator: McpOperator, scope: string): boolean {
-  return operator.scopes.has(scope);
-}
-
 export { MCP_READ_SCOPE, MCP_WRITE_SCOPE };
 
 /**
