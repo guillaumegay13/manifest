@@ -1,0 +1,21 @@
+packages/frontend/tests/pages/CliAuth.test.tsx
+  s_c03dc0ae96aac3::t_acccb3ded2f927 71
+packages/frontend/src/pages/CliAuth.tsx
+  s_c03dc0ae96aac3::t_4bdee0abe7c794 117-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d69c1afc725ff774422c0c7cd8b79e3466112b2e",
+  "prompts": {},
+  "sessions": {
+    "s_c03dc0ae96aac3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f68d31b96ffeZq8O7BCNwR3dk1",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
