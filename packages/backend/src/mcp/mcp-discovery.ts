@@ -50,16 +50,15 @@ export function mountMcpDiscovery(app: INestApplication): void {
     }
   };
 
-  for (const path of [
-    '/.well-known/oauth-authorization-server',
+  // RFC 8414 for a path issuer puts the metadata under the path-suffixed
+  // well-known location. The bare root form is for origin issuers, so serving
+  // our `/api/auth` issuer document there would advertise a mismatched issuer.
+  expressApp.get(
     '/.well-known/oauth-authorization-server/api/auth',
-  ]) {
-    // Express serves HEAD from the GET route automatically, so there is no
-    // separate HEAD registration.
-    expressApp.get(path, (req: Request, res: Response) => {
+    (req: Request, res: Response) => {
       void serveAuthMetadata(req, res);
-    });
-  }
+    },
+  );
 
   const resourceMetadata = {
     resource: mcpResource,

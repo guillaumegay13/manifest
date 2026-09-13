@@ -6,6 +6,7 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { request, type RequestOptions } from 'node:https';
 import { isIP, type LookupFunction } from 'node:net';
 import { Readable } from 'node:stream';
+import { isSelfHosted } from '../common/utils/detect-self-hosted';
 
 const BODY_FORBIDDEN_RESPONSE_STATUSES = new Set([204, 205, 304]);
 
@@ -21,12 +22,34 @@ function responseHeaders(headers: IncomingHttpHeaders): Headers {
   return result;
 }
 
+/**
+ * Link-local addresses (169.254.0.0/16, fe80::/10) host cloud instance metadata
+ * services. They stay blocked even in self-hosted mode so a client-supplied
+ * CIMD URL cannot be used to reach the cloud metadata endpoint.
+ */
+function isLinkLocalAddress(address: string): boolean {
+  if (address.startsWith('169.254.')) return true;
+  const lower = address.toLowerCase();
+  return (
+    lower.startsWith('fe8') ||
+    lower.startsWith('fe9') ||
+    lower.startsWith('fea') ||
+    lower.startsWith('feb')
+  );
+}
+
 function selectPinnedAddress(addresses: LookupAddress[]): LookupAddress {
   if (addresses.length === 0) {
     throw new TypeError('metadata hostname returned no DNS addresses');
   }
+  // Self-hosted operators control their network, so a CIMD document on a private
+  // or loopback host is legitimate there. Cloud installs keep the strict gate.
+  const allowPrivate = isSelfHosted();
   for (const result of addresses) {
-    if (!isPublicRoutableHost(result.address)) {
+    if (isLinkLocalAddress(result.address)) {
+      throw new TypeError('metadata hostname must not resolve to a link-local address');
+    }
+    if (!allowPrivate && !isPublicRoutableHost(result.address)) {
       throw new TypeError('metadata hostname must resolve only to public-routable addresses');
     }
   }

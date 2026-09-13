@@ -155,13 +155,20 @@ export function registerProviderTools(
             label,
             operator.userId,
           );
-          await deps.modelDiscovery.discoverModels(upserted.provider);
+          let modelsDiscovered = true;
+          try {
+            await deps.modelDiscovery.discoverModels(upserted.provider);
+          } catch {
+            // The connection is already saved; discovery is retryable via refresh.
+            modelsDiscovered = false;
+          }
           return {
             id: upserted.provider.id,
             provider: upserted.provider.provider,
             auth_type: upserted.provider.auth_type,
             is_new: upserted.isNew,
             label: upserted.provider.label,
+            models_discovered: modelsDiscovered,
           };
         })(),
       ),

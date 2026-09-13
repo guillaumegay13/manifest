@@ -320,6 +320,18 @@ describe('MCP tools', () => {
         if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
         else process.env['MANIFEST_MODE'] = previousMode;
       }
+
+      // Discovery failing after the connection is saved still succeeds.
+      const discoveryFails = makeDeps();
+      (discoveryFails.modelDiscovery.discoverModels as jest.Mock).mockRejectedValueOnce(
+        new Error('upstream down'),
+      );
+      const res = await call(registerAll(discoveryFails), 'manifest_provider_connect', {
+        provider: 'openai',
+        agent: 'demo',
+      });
+      expect(res.error).toBeFalsy();
+      expect(res.data).toMatchObject({ models_discovered: false });
     });
 
     it('disconnects and refreshes', async () => {
@@ -777,10 +789,25 @@ describe('MCP tools', () => {
         models: [{ model_name: 'gpt-4o' }],
       });
       expect((await call(tools, 'manifest_model_prices', {})).error).toBeFalsy();
-      // A provider alias exercises the alias branch of the label lookup.
+      // A provider alias resolves to the provider entry in the label lookup.
+      const aliasDeps = makeDeps();
+      (aliasDeps.modelPrices.getAll as jest.Mock).mockReturnValue({
+        models: [
+          {
+            model_name: 'bedrock-model',
+            provider: 'bedrock',
+            input_price_per_million: 1,
+            output_price_per_million: 2,
+            display_name: 'BM',
+            validated: true,
+          },
+        ],
+        lastSyncedAt: null,
+      });
       expect(
-        (await call(tools, 'manifest_model_prices', { provider: 'aws-bedrock' })).data,
-      ).toMatchObject({ models: [] });
+        (await call(registerAll(aliasDeps), 'manifest_model_prices', { provider: 'aws-bedrock' }))
+          .data,
+      ).toMatchObject({ models: [{ provider: 'bedrock' }] });
     });
   });
 

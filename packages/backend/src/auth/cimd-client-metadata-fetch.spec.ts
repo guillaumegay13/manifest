@@ -169,7 +169,52 @@ describe('fetchClientMetadataResource', () => {
       });
       return req;
     });
-    await expect(fetchClientMetadataResource('https://example.com/meta')).rejects.toThrow();
+    await expect(fetchClientMetadataResource('https://example.com/meta')).rejects.toThrow(
+      /Invalid statusText/,
+    );
+  });
+
+  it('answers a HEAD probe with no body', async () => {
+    lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    request.mockImplementation((_url, _opts, cb) => fakeRequest(cb, 200, '{"a":1}'));
+    const response = await fetchClientMetadataResource('https://example.com/meta', {
+      method: 'HEAD',
+    });
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('');
+  });
+
+  it('allows a private host in self-hosted mode but blocks link-local', async () => {
+    const previous = process.env['MANIFEST_MODE'];
+    process.env['MANIFEST_MODE'] = 'selfhosted';
+    try {
+      lookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
+      request.mockImplementation((_url, _opts, cb) => fakeRequest(cb));
+      expect((await fetchClientMetadataResource('https://lan.local/meta')).status).toBe(200);
+
+      lookup.mockResolvedValue([{ address: '169.254.169.254', family: 4 }]);
+      await expect(fetchClientMetadataResource('https://lan.local/meta')).rejects.toThrow(
+        /link-local/,
+      );
+    } finally {
+      if (previous === undefined) delete process.env['MANIFEST_MODE'];
+      else process.env['MANIFEST_MODE'] = previous;
+    }
+  });
+
+  it('blocks a private host in cloud mode', async () => {
+    const previous = process.env['MANIFEST_MODE'];
+    process.env['MANIFEST_MODE'] = 'cloud';
+    try {
+      lookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
+      isPublicRoutableHost.mockReturnValueOnce(false);
+      await expect(fetchClientMetadataResource('https://lan.local/meta')).rejects.toThrow(
+        /public-routable/,
+      );
+    } finally {
+      if (previous === undefined) delete process.env['MANIFEST_MODE'];
+      else process.env['MANIFEST_MODE'] = previous;
+    }
   });
 
   it('rejects a protocol upgrade and destroys its socket', async () => {

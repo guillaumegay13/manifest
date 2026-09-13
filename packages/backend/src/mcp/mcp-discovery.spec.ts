@@ -58,17 +58,21 @@ describe('mountMcpDiscovery', () => {
     await request(makeApp()).head('/.well-known/oauth-protected-resource').expect(200);
   });
 
-  it('proxies the authorization-server metadata', async () => {
+  it('proxies the authorization-server metadata at the path-suffixed well-known', async () => {
     const res = await request(makeApp())
       .get('/.well-known/oauth-authorization-server/api/auth')
       .expect(200);
     expect(res.body).toMatchObject({ issuer: 'http://localhost:3001/api/auth' });
   });
 
+  it('does not serve the issuer document at the origin root well-known', async () => {
+    await request(makeApp()).get('/.well-known/oauth-authorization-server').expect(404);
+  });
+
   it('answers 404 when the authorization-server metadata is unavailable', async () => {
     oauthProviderAuthServerMetadata.mockReturnValue(async () => {
       throw new Error('down');
     });
-    await request(makeApp()).get('/.well-known/oauth-authorization-server').expect(404);
+    await request(makeApp()).get('/.well-known/oauth-authorization-server/api/auth').expect(404);
   });
 });
