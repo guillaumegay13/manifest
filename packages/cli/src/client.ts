@@ -53,6 +53,7 @@ export class ApiClient {
           'redirect_not_allowed',
           `The server redirected ${method} ${url.pathname} (HTTP ${response.status})`,
           'Manifest does not follow API redirects; point --url at the final origin',
+          response.status,
         );
       }
       // Read the body inside the abort scope too: a server that sends headers

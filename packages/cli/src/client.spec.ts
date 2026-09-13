@@ -53,6 +53,7 @@ describe('ApiClient', () => {
     });
     await expect(client.request('GET', '/me')).rejects.toMatchObject({
       code: 'redirect_not_allowed',
+      status: 302,
     });
     // Exactly one request, to the configured origin: the key never follows.
     expect(stub.calls).toHaveLength(1);

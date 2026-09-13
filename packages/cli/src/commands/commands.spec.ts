@@ -2409,6 +2409,27 @@ describe('routing commands', () => {
     ).toBe(1);
     expect(custom.io.lastJson()).toMatchObject({ error: 'auth_type_mismatch' });
 
+    // A same-named model under another provider must not raise a false mismatch
+    // for a custom provider that has not discovered it.
+    const otherProvider = authedIo([
+      { status: 200, body: [{ model_name: 'm', provider: 'openai', auth_type: 'api_key' }] },
+      { status: 200, body: {} },
+      { status: 200, body: {} },
+    ]);
+    expect(
+      await run(otherProvider.io, [
+        'agent',
+        'configure',
+        'john',
+        '--models',
+        'm',
+        '--provider',
+        'custom:abc',
+        '--auth-type',
+        'subscription',
+      ]),
+    ).toBe(0);
+
     const matched = authedIo([
       { status: 200, body: rows },
       { status: 200, body: {} },

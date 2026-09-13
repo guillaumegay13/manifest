@@ -119,10 +119,17 @@ export async function assertModelsDiscovered(
     // Without provider identity there is nothing to disambiguate: name-only.
     if (!enforceProvider) {
       if (index === 0 && authType !== undefined && rowsCarryAuthType) {
-        // A custom provider resolves no id, but the requested auth type must
-        // still match what discovered the primary.
-        const candidates = rows.filter((r) => r.model === m || r.model === bareOf(m));
-        const discovered = [...new Set(candidates.map((r) => r.authType ?? 'api_key'))];
+        // A custom provider resolves no catalog id, but the requested auth type
+        // must still match what discovered the primary. Scope to the requested
+        // provider so a same-named model under another provider cannot raise a
+        // false mismatch or supply the wrong --auth-type hint.
+        const providerFilter = providerId ?? provider;
+        const scoped = rows.filter(
+          (r) =>
+            (r.model === m || r.model === bareOf(m)) &&
+            (providerFilter === undefined || r.provider === providerFilter),
+        );
+        const discovered = [...new Set(scoped.map((r) => r.authType ?? 'api_key'))];
         if (discovered.length > 0 && !discovered.includes(authType)) {
           authTypeMismatch.push({ model: m, discovered });
           return;
