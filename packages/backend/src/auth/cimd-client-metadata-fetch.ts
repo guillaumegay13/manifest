@@ -88,7 +88,9 @@ export const fetchClientMetadataResource: ClientMetadataResourceFetch = async (i
       // `new Response` throws for a status outside 200-599. A throw inside this
       // callback would escape the promise and could crash the process, so reject.
       if (status < 200 || status > 599) {
-        response.resume();
+        // Destroy rather than resume: a server that streams forever would keep
+        // the socket open after the promise rejected.
+        response.destroy();
         reject(new TypeError(`metadata server returned an invalid HTTP status: ${status}`));
         return;
       }
