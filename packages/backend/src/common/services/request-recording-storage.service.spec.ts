@@ -51,6 +51,20 @@ describe('request recording storage selection', () => {
     ).toEqual({ backend: 'filesystem', path: '/data/request-recordings' });
   });
 
+  // Storage keys already begin with `request-recordings/`, so the root must be
+  // the parent of that namespace or the segment is written twice (#2883).
+  it('defaults the filesystem root to the parent of the recording key namespace', () => {
+    expect(
+      resolveRecordingStorage(
+        config({
+          'app.requestRecordingStorage': 'filesystem',
+          'app.nodeEnv': 'production',
+        }),
+        true,
+      ),
+    ).toEqual({ backend: 'filesystem', path: '/data' });
+  });
+
   it('does not fall back to ephemeral filesystem storage in managed Cloud', () => {
     expect(
       resolveRecordingStorage(
@@ -104,7 +118,7 @@ describe('request recording storage selection', () => {
       ),
     ).toEqual({
       backend: 'filesystem',
-      path: '/manifest/.data/request-recordings',
+      path: '/manifest/.data',
     });
     expect(
       resolveRecordingStorage(

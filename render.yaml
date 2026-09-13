@@ -33,7 +33,7 @@ services:
       - key: REQUEST_RECORDING_STORAGE
         value: filesystem
       - key: REQUEST_RECORDING_FILESYSTEM_PATH
-        value: /data/request-recordings
+        value: /data
 
 databases:
   - name: manifest-postgres

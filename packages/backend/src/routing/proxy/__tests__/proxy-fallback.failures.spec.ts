@@ -200,6 +200,32 @@ describe('ProxyFallbackService.tryFallbacks — failure chain by status code', (
     expect(result.failures.map((f) => f.provider)).toEqual(['openai', 'anthropic']);
   });
 
+  it('logs the connection, status and a short error for each failed fallback attempt', async () => {
+    providerClient.forward.mockResolvedValueOnce({
+      response: new Response('{"error":{"message":"invalid api key"}}', { status: 401 }),
+      isGoogle: false,
+      isAnthropic: false,
+      isChatGpt: false,
+    });
+    const warn = jest
+      .spyOn(service['logger'], 'warn')
+      .mockImplementation(() => undefined as unknown as void);
+
+    const routes: ModelRoute[] = [
+      { provider: 'openai', authType: 'subscription', model: 'gpt-4o-mini', keyLabel: 'Work' },
+    ];
+    const result = await runFallbacks(['gpt-4o-mini'], routes);
+
+    expect(result.failures).toHaveLength(1);
+    const line = warn.mock.calls
+      .map((call) => call[0] as string)
+      .find((entry) => entry.includes('Fallback 0: failed'));
+    expect(line).toBeDefined();
+    expect(line).toContain('key=Work');
+    expect(line).toContain('status=401');
+    expect(line).toContain('invalid api key');
+  });
+
   it('advances after a fallback returns HTTP 200 with an empty completion', async () => {
     const realClient = new ProviderClient();
     const originalFetch = global.fetch;

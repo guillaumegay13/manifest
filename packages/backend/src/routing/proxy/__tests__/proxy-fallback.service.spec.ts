@@ -16,6 +16,7 @@ import { ModelPricingCacheService } from '../../../model-prices/model-pricing-ca
 import { AgentModelParamsService } from '../../routing-core/agent-model-params.service';
 import { ProviderParamSpecService } from '../../routing-core/provider-param-spec.service';
 import { AutofixService } from '../../autofix/autofix.service';
+import { CredentialHealthService } from '../../routing-core/credential-health.service';
 import { getProviderParamSpecs, type ProviderParamSpecCatalog } from 'manifest-shared';
 
 const specCatalog: ProviderParamSpecCatalog = [
@@ -54,6 +55,7 @@ describe('ProxyFallbackService', () => {
   let providerParamSpecs: jest.Mocked<ProviderParamSpecService>;
   let reasoningCache: jest.Mocked<Pick<ReasoningContentCache, 'prepareRequest'>>;
   let autofixService: jest.Mocked<AutofixService>;
+  let credentialHealth: CredentialHealthService;
 
   beforeEach(() => {
     providerKeyService = {
@@ -178,6 +180,8 @@ describe('ProxyFallbackService', () => {
       maybeHeal: jest.fn().mockResolvedValue(null),
     } as unknown as jest.Mocked<AutofixService>;
 
+    credentialHealth = new CredentialHealthService();
+
     service = new ProxyFallbackService(
       providerKeyService,
       customProviderRepo,
@@ -194,6 +198,7 @@ describe('ProxyFallbackService', () => {
       providerParamSpecs,
       reasoningCache as unknown as ReasoningContentCache,
       autofixService,
+      credentialHealth,
     );
   });
 
@@ -407,6 +412,9 @@ describe('ProxyFallbackService', () => {
         isAnthropic: false,
         isChatGpt: true,
       });
+      const warn = jest
+        .spyOn(service['logger'], 'warn')
+        .mockImplementation(() => undefined as unknown as void);
 
       const result = await service.tryForwardToProvider({
         provider: 'openai',
@@ -424,6 +432,8 @@ describe('ProxyFallbackService', () => {
       expect(result.response.status).toBe(401);
       expect(openaiOauth.unwrapToken).not.toHaveBeenCalled();
       expect(providerClient.forward).toHaveBeenCalledTimes(1);
+      // The refresh decision must be visible in logs (#2883).
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('cannot be refreshed'));
     });
 
     it('keeps the original rejected-token response readable when refresh cannot recover', async () => {
@@ -455,6 +465,104 @@ describe('ProxyFallbackService', () => {
       expect(result.response.status).toBe(401);
       await expect(result.response.text()).resolves.toBe(errorBody);
       expect(providerClient.forward).toHaveBeenCalledTimes(1);
+    });
+
+    // A 401 is an auth failure, not a transient one: once a subscription token
+    // is known dead, every later request must skip the upstream round-trip and
+    // go straight to the fallback chain (issue #2883).
+    describe('rejected subscription credentials', () => {
+      const deadBlob = JSON.stringify({
+        t: 'invalidated-access',
+        r: 'refresh-token',
+        e: Date.now() + 10 * 60 * 1000,
+      });
+
+      const forwardOpts = () => ({
+        provider: 'openai',
+        apiKey: 'invalidated-access',
+        rawApiKey: deadBlob,
+        providerKeyLabel: 'Work',
+        tenantProviderId: 'up-work',
+        agentId: 'agent-1',
+        tenantId: 'tenant-1',
+        model: 'gpt-5.3-codex',
+        body,
+        stream: false,
+        sessionKey: 'sess-1',
+        authType: 'subscription' as const,
+      });
+
+      it('marks the credential and short-circuits the next request without an upstream call', async () => {
+        openaiOauth.unwrapToken.mockResolvedValue(null);
+        providerClient.forward.mockResolvedValue({
+          response: new Response('unauthorized', { status: 401 }),
+          isGoogle: false,
+          isAnthropic: false,
+          isChatGpt: true,
+        });
+
+        const first = await service.tryForwardToProvider(forwardOpts());
+        expect(first.response.status).toBe(401);
+        expect(providerClient.forward).toHaveBeenCalledTimes(1);
+        expect(credentialHealth.isRejected('up-work', deadBlob)).toBe(true);
+
+        const second = await service.tryForwardToProvider(forwardOpts());
+
+        expect(second.response.status).toBe(401);
+        await expect(second.response.text()).resolves.toContain('re-authentication');
+        // No second upstream call — the dead credential is skipped locally.
+        expect(providerClient.forward).toHaveBeenCalledTimes(1);
+        expect(second.providerCallStarted).toBe(false);
+      });
+
+      it('leaves a credential healthy when the forced refresh recovers the request', async () => {
+        openaiOauth.unwrapToken.mockResolvedValue('fresh-access');
+        providerClient.forward
+          .mockResolvedValueOnce({
+            response: new Response('unauthorized', { status: 401 }),
+            isGoogle: false,
+            isAnthropic: false,
+            isChatGpt: true,
+          })
+          .mockResolvedValueOnce({
+            response: new Response('{"ok":true}', { status: 200 }),
+            isGoogle: false,
+            isAnthropic: false,
+            isChatGpt: true,
+          });
+
+        const result = await service.tryForwardToProvider(forwardOpts());
+
+        expect(result.response.status).toBe(200);
+        expect(credentialHealth.isRejected('up-work', deadBlob)).toBe(false);
+      });
+
+      it('resumes forwarding once the credential is replaced (re-auth)', async () => {
+        openaiOauth.unwrapToken.mockResolvedValue(null);
+        providerClient.forward.mockResolvedValue({
+          response: new Response('unauthorized', { status: 401 }),
+          isGoogle: false,
+          isAnthropic: false,
+          isChatGpt: true,
+        });
+
+        await service.tryForwardToProvider(forwardOpts());
+        expect(providerClient.forward).toHaveBeenCalledTimes(1);
+
+        const reauthedBlob = JSON.stringify({
+          t: 'new-access',
+          r: 'new-refresh',
+          e: Date.now() + 10 * 60 * 1000,
+        });
+        await service.tryForwardToProvider({
+          ...forwardOpts(),
+          apiKey: 'new-access',
+          rawApiKey: reauthedBlob,
+        });
+
+        // The replaced credential is not the rejected one, so it is tried.
+        expect(providerClient.forward).toHaveBeenCalledTimes(2);
+      });
     });
 
     it('catches transport errors and returns synthetic response', async () => {

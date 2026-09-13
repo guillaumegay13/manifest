@@ -50,11 +50,13 @@ export function resolveRecordingStorage(
 ): ResolvedRecordingStorage {
   const requested = (config.get<string>('app.requestRecordingStorage') ?? 'auto').toLowerCase();
   const nodeEnv = config.get<string>('app.nodeEnv') ?? 'development';
+  // The root is the parent of the `request-recordings/` key namespace, exactly
+  // like the S3 bucket. Storage keys already start with `request-recordings/`,
+  // so a root of `/data/request-recordings` would double the segment and write
+  // to `/data/request-recordings/request-recordings/...` (issue #2883).
   const filesystemPath =
     config.get<string>('app.requestRecordingFilesystemPath') ||
-    (nodeEnv === 'production'
-      ? '/data/request-recordings'
-      : join(cwd, '.data', 'request-recordings'));
+    (nodeEnv === 'production' ? '/data' : join(cwd, '.data'));
   const bucket = config.get<string>('app.requestRecordingS3Bucket')?.trim() ?? '';
   const endpoint = config.get<string>('app.requestRecordingS3Endpoint')?.trim() || undefined;
   const region = config.get<string>('app.requestRecordingS3Region')?.trim() ?? '';
