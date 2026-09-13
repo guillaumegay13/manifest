@@ -1,0 +1,33 @@
+packages/backend/src/telemetry/dto/telemetry-payload.ts
+  s_59d09fa9977512::t_35a3e25732375d 70-98
+.changeset/telemetry-cli-mcp-adoption.md
+  s_59d09fa9977512::t_078655e1c8586f 1-5
+CLAUDE.md
+  s_59d09fa9977512::t_c42138e3302670 571-572
+  s_59d09fa9977512::t_078655e1c8586f 561-570
+packages/backend/src/telemetry/telemetry.module.ts
+  s_59d09fa9977512::t_35a3e25732375d 4,13-15
+packages/backend/src/telemetry/payload-builder.service.spec.ts
+  s_59d09fa9977512::t_8f1224d5aeaed1 3,5,36-50,60-64,77-80,138-149,157-158,547-617,629-639
+  s_59d09fa9977512::t_078655e1c8586f 618-628
+  s_59d09fa9977512::t_6add1e9ea37311 640
+packages/backend/src/telemetry/payload-builder.service.ts
+  s_59d09fa9977512::t_35a3e25732375d 1,3,7,11,19-68,94-95,103-105,118-119,129-130,156-162,266-345,419-425
+  s_59d09fa9977512::t_acfd7732c283b3 426
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b2d884616fc01ba16210beed55df8994f4a9281a",
+  "prompts": {},
+  "sessions": {
+    "s_59d09fa9977512": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "66211ba5-40d3-41cb-90d9-9893e6637fdc",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
