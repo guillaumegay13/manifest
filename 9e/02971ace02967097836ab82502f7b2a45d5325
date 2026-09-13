@@ -1,0 +1,84 @@
+packages/cli/src/args.spec.ts
+  s_c03dc0ae96aac3::t_8338dda6e2de64 41-53
+packages/cli/src/commands/agent.ts
+  s_c03dc0ae96aac3::t_d0a86c9e95c740 110
+  s_c03dc0ae96aac3::t_86cdef22c96457 223
+  s_c03dc0ae96aac3::t_96fbff755b4920 269
+  s_c03dc0ae96aac3::t_53a46107bb123f 280-284
+  s_c03dc0ae96aac3::t_76ac94bc25d7ae 352
+  s_c03dc0ae96aac3::t_e2a64784c72e97 151
+  s_c03dc0ae96aac3::t_3631fede54f11d 237-240
+  s_c03dc0ae96aac3::t_b342f07b169bf2 115-119
+  s_c03dc0ae96aac3::t_9ffc554d7887b7 339
+  s_c03dc0ae96aac3::t_3b3f70aa14e4dd 366
+  s_c03dc0ae96aac3::t_4c39a451cd69ec 88
+packages/cli/src/commands/commands.spec.ts
+  s_c03dc0ae96aac3::t_feaa8c6da5a1fd 2595-2648
+packages/cli/src/commands/custom-provider.ts
+  s_c03dc0ae96aac3::t_2faadb8c402bde 18
+  s_c03dc0ae96aac3::t_a9d7f5f6ce7fe9 89-93
+  s_c03dc0ae96aac3::t_d03d0a7543fd64 79
+packages/cli/src/commands/requests.ts
+  s_c03dc0ae96aac3::t_a31812d2b641e2 56
+packages/cli/src/commands/configure.ts
+  s_c03dc0ae96aac3::t_06084a93751741 40
+  s_c03dc0ae96aac3::t_5c5c9306b6dad0 78
+packages/cli/src/commands/doctor.ts
+  s_c03dc0ae96aac3::t_79009bec3f01f3 48
+packages/cli/src/commands/auth.ts
+  s_c03dc0ae96aac3::t_88ef7af9665177 126
+  s_c03dc0ae96aac3::t_722a1741d01416 154
+  s_c03dc0ae96aac3::t_597ab5b5eec3dc 161
+  s_c03dc0ae96aac3::t_b79b5556bc28fd 20
+  s_c03dc0ae96aac3::t_0df515aea5d3e9 95
+packages/cli/src/commands/models.ts
+  s_c03dc0ae96aac3::t_c9ba3517da19db 31
+packages/cli/src/commands/model-prices.ts
+  s_c03dc0ae96aac3::t_c94d4e0ee0122d 35
+packages/cli/src/args.ts
+  s_c03dc0ae96aac3::t_f5b742c4f07022 61-67
+  s_c03dc0ae96aac3::t_e16402d6a8b98f 8-13
+packages/cli/src/commands/run.ts
+  s_c03dc0ae96aac3::t_25adc4b08ea22f 52-55
+packages/cli/src/commands/provider.ts
+  s_c03dc0ae96aac3::t_035cb39d45cd04 316
+  s_c03dc0ae96aac3::t_6aaa77be05e608 16
+  s_c03dc0ae96aac3::t_ef16a09421f92b 44
+  s_c03dc0ae96aac3::t_05958ca9bb0cd8 383-386
+  s_c03dc0ae96aac3::t_59de08835a260e 298
+  s_c03dc0ae96aac3::t_972e4956155729 279-282
+  s_c03dc0ae96aac3::t_b2d088769ba2ad 415
+packages/cli/src/commands/model-check.ts
+  s_c03dc0ae96aac3::t_bbc6b761582e10 63,74
+  s_c03dc0ae96aac3::t_d6ec19e9c991ab 66
+  s_c03dc0ae96aac3::t_15905fca51249a 3,5-12,17-23,32-38,48,50-62,64-65,67-69,73,75
+packages/cli/src/commands/routing.ts
+  s_c03dc0ae96aac3::t_7e53321adf8e20 168
+  s_c03dc0ae96aac3::t_4842dfc5cccde8 94
+  s_c03dc0ae96aac3::t_c6c2857f0fe5d5 228
+  s_c03dc0ae96aac3::t_24cc8741063f59 473
+  s_c03dc0ae96aac3::t_b62bb9dae913bd 101
+  s_c03dc0ae96aac3::t_651fab6563f3c4 183
+  s_c03dc0ae96aac3::t_6f72763bcd15a8 467
+  s_c03dc0ae96aac3::t_f1acb2f6d53fff 56
+  s_c03dc0ae96aac3::t_78d6c5b447a0d7 139
+packages/cli/src/commands/skill.ts
+  s_c03dc0ae96aac3::t_617d80e7de8223 27
+  s_c03dc0ae96aac3::t_ebb48954d27e2e 63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9e02971ace02967097836ab82502f7b2a45d5325",
+  "prompts": {},
+  "sessions": {
+    "s_c03dc0ae96aac3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f68d31b96ffeZq8O7BCNwR3dk1",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
