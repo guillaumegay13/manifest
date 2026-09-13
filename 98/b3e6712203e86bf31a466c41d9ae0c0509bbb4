@@ -1,0 +1,39 @@
+packages/backend/src/common/utils/log-sanitize.spec.ts
+  s_dac9b30fc8fc02::t_d6e2e15e918d5d 1-19
+packages/backend/src/routing/routing-core/credential-health.service.ts
+  s_dac9b30fc8fc02::t_f63371def4b565 62-63
+  s_dac9b30fc8fc02::t_1910391b5facd0 158-162
+packages/backend/src/routing/proxy/proxy.service.ts
+  s_dac9b30fc8fc02::t_c7d83f1d03448a 753-754
+  s_dac9b30fc8fc02::t_ae0113cb21f7eb 864-865
+packages/backend/src/routing/routing-core/credential-health.service.spec.ts
+  s_dac9b30fc8fc02::t_121a9edd813202 116-138
+packages/backend/src/routing/routing-core/provider.service.ts
+  s_dac9b30fc8fc02::t_ef743622a728b6 21
+  s_dac9b30fc8fc02::t_da746a7ef64a1c 7-8
+  s_dac9b30fc8fc02::t_60a5bd4733fc73 97-104
+  s_dac9b30fc8fc02::t_cfd4a58acf536b 433-435
+  s_dac9b30fc8fc02::t_a0104ed4031843 502
+packages/backend/src/common/utils/log-sanitize.ts
+  s_dac9b30fc8fc02::t_67bb0343e86f32 10-17,19-20
+packages/backend/src/routing/routing-core/__tests__/provider.service.spec.ts
+  s_dac9b30fc8fc02::t_3c672883aed2a5 3
+  s_dac9b30fc8fc02::t_53a618b223ea64 533-541
+  s_dac9b30fc8fc02::t_c20ae7f2de8baf 532,542-596
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "98b3e6712203e86bf31a466c41d9ae0c0509bbb4",
+  "prompts": {},
+  "sessions": {
+    "s_dac9b30fc8fc02": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f63d8bfb1ffewWOt35107DVUfd",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
