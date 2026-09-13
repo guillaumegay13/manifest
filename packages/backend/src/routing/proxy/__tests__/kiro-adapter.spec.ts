@@ -633,12 +633,27 @@ describe('kiro-adapter', () => {
     expect(usage?.estimated).toBe(true);
   });
 
-  it('does not invent usage when the stream carries neither tokens nor a percentage', async () => {
+  it('estimates usage from the prompt and response for the real Kiro event shape', async () => {
     const source = streamFrom([
-      eventFrame('assistantResponseEvent', { content: 'hello' }),
-      eventFrame('metadataEvent', { stopReason: 'end_turn' }),
-      eventFrame('meteringEvent', { usage: [{ unit: 'credit', value: 1 }] }),
+      eventFrame('initial-response', { conversationId: 'c1' }),
+      eventFrame('assistantResponseEvent', { content: 'x'.repeat(40) }),
+      eventFrame('meteringEvent', { unit: 'credit', unitPlural: 'credits', usage: 0.01 }),
     ]);
+
+    const response = new Response(
+      createKiroOpenAiStream(source, 'claude-sonnet-4.5', undefined, 100),
+    );
+
+    expect(finalSseUsage(await response.text())).toEqual({
+      prompt_tokens: 100,
+      completion_tokens: 10,
+      total_tokens: 110,
+      estimated: true,
+    });
+  });
+
+  it('emits no usage when there is neither a prompt estimate nor output text', async () => {
+    const source = streamFrom([eventFrame('messageStopEvent', { stopReason: 'end_turn' })]);
 
     const response = new Response(createKiroOpenAiStream(source, 'auto'));
 
@@ -671,6 +686,40 @@ describe('kiro-adapter', () => {
       total_tokens: 3000,
       estimated: true,
     });
+  });
+
+  it('estimates usage for a real Kiro stream with no usage event (non-streaming)', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(
+        streamFrom([
+          eventFrame('initial-response', { conversationId: 'c1' }),
+          eventFrame('assistantResponseEvent', { content: 'Pong' }),
+          eventFrame('meteringEvent', { unit: 'credit', unitPlural: 'credits', usage: 0.0099 }),
+        ]),
+        { status: 200 },
+      ),
+    );
+
+    const response = await forwardKiroChat({
+      apiKey: 'ksk_test',
+      model: 'claude-sonnet-4.5',
+      body: { messages: [{ role: 'user', content: 'Say pong in one word.' }] },
+      stream: false,
+      timeoutMs: 1000,
+    });
+    const json = (await response.json()) as {
+      usage: {
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+        estimated?: boolean;
+      };
+    };
+
+    expect(json.usage.estimated).toBe(true);
+    expect(json.usage.prompt_tokens).toBeGreaterThan(0);
+    expect(json.usage.completion_tokens).toBeGreaterThan(0);
+    expect(json.usage.total_tokens).toBe(json.usage.prompt_tokens + json.usage.completion_tokens);
   });
 
   it('includes emitted tool input in the estimated completion tokens', async () => {

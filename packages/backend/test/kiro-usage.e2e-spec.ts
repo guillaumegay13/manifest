@@ -4,13 +4,15 @@
  *
  * Drives a real OpenAI-compatible POST through the proxy stack with a stubbed
  * Kiro `GenerateAssistantResponse` upstream that returns an AWS event stream.
- * Asserts the `agent_messages` row carries non-zero input/output tokens, and
- * that cache counts Kiro reports in a `tokenUsage` block reach the cache
- * columns instead of being dropped by `normalizeUsage`.
+ * Asserts the `agent_messages` row carries non-zero input/output tokens for the
+ * stream shape live Kiro actually returns (`initial-response`,
+ * `assistantResponseEvent`, credit-only `meteringEvent`), and that cache counts
+ * Kiro reports in a `tokenUsage` block reach the cache columns instead of being
+ * dropped by `normalizeUsage`.
  *
  * Without the fix:
- *   - usage is only read from a `metadataEvent.tokenUsage` block Kiro never
- *     sends, so `contextUsageEvent` was ignored and every row logged 0
+ *   - usage was only read from a `metadataEvent.tokenUsage` block Kiro never
+ *     sends, so every row logged 0
  *   - `normalizeUsage` returned only prompt/completion/total, so cache fields
  *     never reached `cache_read_tokens` / `cache_creation_tokens`
  */
@@ -182,13 +184,20 @@ async function prepare(): Promise<DataSource> {
   return ds;
 }
 
+function realKiroStream(content: string): Uint8Array[] {
+  // The shape live GenerateAssistantResponse actually returns: no tokenUsage
+  // and no contextUsageEvent, just content and a credit metering event.
+  return [
+    eventFrame('initial-response', { conversationId: 'c1' }),
+    eventFrame('assistantResponseEvent', { content }),
+    eventFrame('meteringEvent', { unit: 'credit', unitPlural: 'credits', usage: 0.0099 }),
+  ];
+}
+
 describe('Kiro token usage round-trip (#2884)', () => {
-  it('records estimated input/output tokens from a contextUsageEvent (streaming)', async () => {
+  it('records estimated input/output tokens for a real Kiro stream', async () => {
     const ds = await prepare();
-    nextKiroEvents = [
-      eventFrame('assistantResponseEvent', { content: 'x'.repeat(40) }),
-      eventFrame('contextUsageEvent', { contextUsagePercentage: 1.5 }),
-    ];
+    nextKiroEvents = realKiroStream('Pong');
 
     const res = await request(app.getHttpServer())
       .post('/v1/chat/completions')
@@ -200,18 +209,41 @@ describe('Kiro token usage round-trip (#2884)', () => {
       })
       .expect(200);
 
-    // The client-visible SSE carries a usage block, marked estimated.
+    // The client-visible SSE carries an estimated usage block.
     expect(res.text).toContain('"estimated":true');
-    expect(res.text).toContain('"total_tokens":3000');
 
     const rows = await waitForRecordedMessage(ds);
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe('success');
-    expect(Number(rows[0].input_tokens)).toBe(2990);
-    expect(Number(rows[0].output_tokens)).toBe(10);
+    expect(Number(rows[0].input_tokens)).toBeGreaterThan(0);
+    expect(Number(rows[0].output_tokens)).toBeGreaterThan(0);
   });
 
-  it('fills the cache columns from a tokenUsage block (non-streaming)', async () => {
+  it('records estimated tokens for a real Kiro stream (non-streaming)', async () => {
+    const ds = await prepare();
+    nextKiroEvents = realKiroStream('Pong');
+
+    const res = await request(app.getHttpServer())
+      .post('/v1/chat/completions')
+      .set('Authorization', `Bearer ${TEST_OTLP_KEY}`)
+      .send({
+        model: MODEL,
+        stream: false,
+        messages: [{ role: 'user', content: 'Say pong.' }],
+      })
+      .expect(200);
+
+    expect(res.body.usage.estimated).toBe(true);
+    expect(res.body.usage.prompt_tokens).toBeGreaterThan(0);
+    expect(res.body.usage.completion_tokens).toBeGreaterThan(0);
+
+    const rows = await waitForRecordedMessage(ds);
+    expect(rows).toHaveLength(1);
+    expect(Number(rows[0].input_tokens)).toBe(res.body.usage.prompt_tokens);
+    expect(Number(rows[0].output_tokens)).toBe(res.body.usage.completion_tokens);
+  });
+
+  it('fills the cache columns when a tokenUsage block is present', async () => {
     const ds = await prepare();
     nextKiroEvents = [
       eventFrame('assistantResponseEvent', { content: 'pong' }),
