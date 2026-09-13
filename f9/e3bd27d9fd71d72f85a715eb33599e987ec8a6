@@ -1,0 +1,38 @@
+packages/cli/src/commands/commands.spec.ts
+  s_b2b5a4b0535460::t_7c7d61cdd87abb 2390-2410
+packages/cli/src/client.ts
+  s_b2b5a4b0535460::t_00cb2bb365ebb3 38-42,51-57
+packages/cli/src/client.spec.ts
+  s_b2b5a4b0535460::t_0be3eba3b69d2b 47-59
+packages/cli/src/commands/model-check.ts
+  s_b2b5a4b0535460::t_4f57a197535431 100-113,121-130
+  s_b2b5a4b0535460::t_de29dbd2915861 162
+  s_b2b5a4b0535460::t_3d5a2c8fc54fc9 157-161,163-164
+  s_b2b5a4b0535460::t_3a0e9f84da19d2 79
+packages/cli/src/commands/run.ts
+  s_b2b5a4b0535460::t_f20348078cfa6a 60-61,63-66,70
+  s_b2b5a4b0535460::t_76a3d678462d08 62,67-69,71,75
+packages/cli/src/config.ts
+  s_b2b5a4b0535460::t_f177531e65950b 51,53,61-70
+packages/cli/src/config.spec.ts
+  s_b2b5a4b0535460::t_06429721ec3631 78
+  s_b2b5a4b0535460::t_bbb339cb73106a 80-86
+packages/cli/src/commands/run.spec.ts
+  s_b2b5a4b0535460::t_6276cdd42f5e9e 109-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f9e3bd27d9fd71d72f85a715eb33599e987ec8a6",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
