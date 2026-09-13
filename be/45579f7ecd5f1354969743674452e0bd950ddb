@@ -1,0 +1,28 @@
+packages/cli/src/commands/commands.spec.ts
+  s_59d09fa9977512::t_fc5832e0155585 1857,2396-2399
+packages/backend/src/mcp/mcp.controller.spec.ts
+  s_59d09fa9977512::t_fc5832e0155585 115-131
+packages/backend/src/mcp/mcp.controller.ts
+  s_59d09fa9977512::t_fc5832e0155585 1,115-133,182-189
+  s_59d09fa9977512::t_636f2d07b99d86 190-192
+packages/cli/src/commands/routing.ts
+  s_59d09fa9977512::t_fc5832e0155585 9,393-396
+.changeset/cli-user-agent-mcp-405.md
+  s_59d09fa9977512::t_134b6536db078e 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "be45579f7ecd5f1354969743674452e0bd950ddb",
+  "prompts": {},
+  "sessions": {
+    "s_59d09fa9977512": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "66211ba5-40d3-41cb-90d9-9893e6637fdc",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
