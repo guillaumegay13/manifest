@@ -1021,6 +1021,9 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
           header_tier_id: headerTierId ?? null,
           header_tier_name: headerTierName ?? null,
           header_tier_color: headerTierColor ?? null,
+          // Autofix audit for a fallback hop Phoenix was consulted on, so a
+          // recovered hop keeps its issue/patch/operations like a healed primary.
+          ...autofixColumns(f.autofix, f.autofixRole ?? 'original'),
         }),
       );
     }
