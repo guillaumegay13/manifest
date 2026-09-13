@@ -210,6 +210,12 @@ describe('fetchClientMetadataResource', () => {
       await expect(fetchClientMetadataResource('https://lan.local/meta')).rejects.toThrow(
         /cloud metadata/,
       );
+
+      // Alibaba/OCI IMDS, covered by the shared classifier.
+      lookup.mockResolvedValue([{ address: '100.100.100.200', family: 4 }]);
+      await expect(fetchClientMetadataResource('https://lan.local/meta')).rejects.toThrow(
+        /cloud metadata/,
+      );
     } finally {
       if (previous === undefined) delete process.env['MANIFEST_MODE'];
       else process.env['MANIFEST_MODE'] = previous;

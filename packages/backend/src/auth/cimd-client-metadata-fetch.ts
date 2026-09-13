@@ -7,6 +7,7 @@ import { request, type RequestOptions } from 'node:https';
 import { isIP, type LookupFunction } from 'node:net';
 import { Readable } from 'node:stream';
 import { isSelfHosted } from '../common/utils/detect-self-hosted';
+import { isCloudMetadataIp } from '../common/utils/url-validation';
 
 const BODY_FORBIDDEN_RESPONSE_STATUSES = new Set([204, 205, 304]);
 
@@ -22,21 +23,14 @@ function responseHeaders(headers: IncomingHttpHeaders): Headers {
   return result;
 }
 
-/**
- * Positively identified cloud instance-metadata addresses (AWS/GCP/Azure
- * 169.254.169.254, AWS IMDSv6 fd00:ec2::254). These stay blocked even in
- * self-hosted mode; other link-local addresses are the operator's call.
- */
-function isCloudMetadataAddress(address: string): boolean {
-  return address === '169.254.169.254' || address.toLowerCase() === 'fd00:ec2::254';
-}
-
 function selectPinnedAddress(addresses: LookupAddress[], allowPrivate: boolean): LookupAddress {
   if (addresses.length === 0) {
     throw new TypeError('metadata hostname returned no DNS addresses');
   }
   for (const result of addresses) {
-    if (isCloudMetadataAddress(result.address)) {
+    // Reuse the shared SSRF classifier: it covers AWS/GCP/Azure, Alibaba/OCI,
+    // and IPv4-mapped IPv6 forms.
+    if (isCloudMetadataIp(result.address)) {
       throw new TypeError('metadata hostname must not resolve to a cloud metadata address');
     }
     if (!allowPrivate && !isPublicRoutableHost(result.address)) {
