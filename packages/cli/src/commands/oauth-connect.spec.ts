@@ -117,6 +117,24 @@ describe('device flow', () => {
     }
   });
 
+  it('threads --region into the device start query', async () => {
+    OAUTH_POLL.deviceIntervalOverrideMs = 1;
+    OAUTH_POLL.timeoutMs = 200;
+    const urls: string[] = [];
+    const client = {
+      request: async (method: string, url: string) => {
+        urls.push(url);
+        return url.includes('/start')
+          ? { flowId: 'f1', userCode: 'C', verificationUri: 'https://m/verify' }
+          : { status: 'success' };
+      },
+    } as unknown as ApiClient;
+    const io = makeIo({ isTTY: true });
+    io.openBrowser = () => true;
+    await subscriptionConnect(io, client, 'minimax', 'a', 'cn');
+    expect(urls[0]).toBe('/oauth/minimax/start?agentName=a&region=cn');
+  });
+
   it('surfaces an error poll and times out on endless pending', async () => {
     OAUTH_POLL.deviceIntervalOverrideMs = 1;
     OAUTH_POLL.timeoutMs = 500;
@@ -184,7 +202,7 @@ describe('subscriptionConnect edge paths', () => {
     expect(io.errLines.join('\n')).toContain('Open this URL');
   });
 
-  it('counts entries without connection_count as one connection', async () => {
+  it('detects a newly appeared subscription connection', async () => {
     OAUTH_POLL.intervalMs = 1;
     OAUTH_POLL.timeoutMs = 500;
     const io = makeIo({ isTTY: true });
@@ -194,7 +212,50 @@ describe('subscriptionConnect edge paths', () => {
       fakeClient([
         { providers: [] },
         { url: 'https://xai/auth' },
-        { providers: [{ provider: 'xai', auth_type: 'subscription' }, 'junk'] },
+        {
+          providers: [
+            {
+              provider: 'xai',
+              auth_type: 'subscription',
+              connections: [{ id: 'c1', is_active: true }],
+            },
+            'junk',
+          ],
+        },
+      ]),
+      'xai',
+      'a',
+    );
+    expect(io.lastJson()).toEqual({ connected: 'xai', auth_type: 'subscription', agent: 'a' });
+  });
+
+  it('detects a reactivated connection (same id, inactive to active)', async () => {
+    OAUTH_POLL.intervalMs = 1;
+    OAUTH_POLL.timeoutMs = 500;
+    const io = makeIo({ isTTY: true });
+    io.openBrowser = () => true;
+    await subscriptionConnect(
+      io,
+      fakeClient([
+        {
+          providers: [
+            {
+              provider: 'xai',
+              auth_type: 'subscription',
+              connections: [{ id: 'c1', is_active: false }],
+            },
+          ],
+        },
+        { url: 'https://xai/auth' },
+        {
+          providers: [
+            {
+              provider: 'xai',
+              auth_type: 'subscription',
+              connections: [{ id: 'c1', is_active: true }],
+            },
+          ],
+        },
       ]),
       'xai',
       'a',

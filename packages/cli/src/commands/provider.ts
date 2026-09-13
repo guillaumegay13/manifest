@@ -4,11 +4,13 @@ import { slugifyAgentName } from '../slug';
 import { parseArgs, requirePositional, requireYes } from '../args';
 import { readCredential } from '../secrets';
 import { PROVIDER_CATALOG } from '../provider-catalog.gen';
-import { subscriptionConnect } from './oauth-connect';
+import { subscriptionConnect, supportsSubscription } from './oauth-connect';
 
 /**
- * Lists what CAN be connected — no auth, no network. Aliases stay internal
+ * Lists what the CLI can connect — no auth, no network. Aliases stay internal
  * (they feed resolveProviderId); the output is id + displayName + authTypes.
+ * Subscription is only advertised when the CLI can actually drive that
+ * provider's sign-in, so the catalog never promises a mode `connect` rejects.
  */
 export async function providerCatalog(io: CliIo, argv: string[]): Promise<void> {
   parseArgs(argv, {});
@@ -16,7 +18,7 @@ export async function providerCatalog(io: CliIo, argv: string[]): Promise<void> 
     providers: PROVIDER_CATALOG.map(({ id, displayName, authTypes }) => ({
       id,
       displayName,
-      authTypes,
+      authTypes: authTypes.filter((t) => t !== 'subscription' || supportsSubscription(id)),
     })),
   });
 }
@@ -314,7 +316,7 @@ export async function providerConnect(io: CliIo, argv: string[]): Promise<void> 
 
   if (authType === 'subscription') {
     const { client } = clientFromFlags(io, args);
-    await subscriptionConnect(io, client, provider, agent);
+    await subscriptionConnect(io, client, provider, agent, args.strings['region']);
     return;
   }
 

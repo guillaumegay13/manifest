@@ -93,11 +93,16 @@ function readIfPresent(file: string): string | null {
 /**
  * Every place the skill could already be installed, detected runtime first.
  * Used by `doctor` to answer "does the agent driving me have the guide?".
+ * When a runtime is detected, ONLY its own skills directory counts — a guide
+ * in another runtime's directory is one that runtime will never read.
  */
 export function installedSkillPath(io: CliIo): string | null {
   const runtime = detectAgentRuntime(io.env);
+  if (runtime) {
+    const file = skillFileIn(resolveHomePath(io.env, runtime.skillsDir));
+    return fs.existsSync(file) ? file : null;
+  }
   const candidates = [
-    ...(runtime ? [resolveHomePath(io.env, runtime.skillsDir)] : []),
     resolveHomePath(io.env, DEFAULT_SKILLS_DIR),
     resolveHomePath(io.env, AGENTS_SKILLS_DIR),
     path.join(process.cwd(), '.claude', 'skills'),

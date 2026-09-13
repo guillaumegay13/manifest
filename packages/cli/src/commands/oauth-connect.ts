@@ -23,6 +23,11 @@ const OAUTH_FLOWS: Record<string, 'redirect' | 'paste' | 'device'> = {
   minimax: 'device',
 };
 
+/** Whether the CLI can run this provider's subscription sign-in today. */
+export function supportsSubscription(providerId: string): boolean {
+  return providerId in OAUTH_FLOWS;
+}
+
 /**
  * Poll cadence; mutable so tests can shrink the clock.
  * `intervalMs` drives the redirect flow only. The device flow obeys the
@@ -45,16 +50,27 @@ function deviceSleepMs(suggestedMs: number | undefined): number {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function subscriptionConnectionCount(payload: unknown, providerId: string): number {
+/**
+ * A fingerprint of the provider's subscription connections: `id` plus active
+ * flag. Detect completion by any transition — a new connection, or an
+ * inactive one reactivated — instead of a tenant-wide count that reactivating
+ * the same row leaves unchanged.
+ */
+function subscriptionConnectionSignature(payload: unknown, providerId: string): string {
   const providers = (payload as { providers?: unknown })?.providers;
-  if (!Array.isArray(providers)) return 0;
-  return providers
-    .filter(
-      (p): p is { provider?: string; auth_type?: string; connection_count?: number } =>
-        typeof p === 'object' && p !== null,
-    )
-    .filter((p) => p.provider === providerId && p.auth_type === 'subscription')
-    .reduce((sum, p) => sum + (typeof p.connection_count === 'number' ? p.connection_count : 1), 0);
+  if (!Array.isArray(providers)) return '';
+  const parts: string[] = [];
+  for (const p of providers) {
+    if (typeof p !== 'object' || p === null) continue;
+    const group = p as { provider?: string; auth_type?: string; connections?: unknown };
+    if (group.provider !== providerId || group.auth_type !== 'subscription') continue;
+    for (const c of Array.isArray(group.connections) ? group.connections : []) {
+      if (typeof c !== 'object' || c === null) continue;
+      const conn = c as { id?: unknown; is_active?: unknown };
+      if (typeof conn.id === 'string') parts.push(`${conn.id}:${conn.is_active === true ? 1 : 0}`);
+    }
+  }
+  return parts.sort().join(',');
 }
 
 export async function subscriptionConnect(
@@ -62,6 +78,7 @@ export async function subscriptionConnect(
   client: ApiClient,
   providerId: string,
   agent: string,
+  region?: string,
 ): Promise<void> {
   if (!io.isTTY) {
     throw new CliError(
@@ -84,9 +101,11 @@ export async function subscriptionConnect(
   if (flow === 'device') {
     // Device flow is terminal-native: show the code, open the verification
     // page, poll the backend until the user approves there.
+    const startQuery = new URLSearchParams({ agentName: agent });
+    if (region) startQuery.set('region', region);
     const start = (await client.request(
       'POST',
-      `/oauth/${providerId}/start?agentName=${encodeURIComponent(agent)}`,
+      `/oauth/${providerId}/start?${startQuery.toString()}`,
     )) as { flowId: string; userCode: string; verificationUri: string; pollIntervalMs?: number };
     const opened = open(start.verificationUri);
     io.stderr(`Your code: ${start.userCode}`);
@@ -148,7 +167,10 @@ export async function subscriptionConnect(
   }
 
   // redirect flow: completion is server-side; watch the connection appear.
-  const before = subscriptionConnectionCount(await client.request('GET', '/providers'), providerId);
+  const before = subscriptionConnectionSignature(
+    await client.request('GET', '/providers'),
+    providerId,
+  );
   const authorize = (await client.request(
     'GET',
     `/oauth/${providerId}/authorize?agentName=${encodeURIComponent(agent)}`,
@@ -163,8 +185,11 @@ export async function subscriptionConnect(
   const deadline = Date.now() + OAUTH_POLL.timeoutMs;
   while (Date.now() < deadline) {
     await sleep(OAUTH_POLL.intervalMs);
-    const now = subscriptionConnectionCount(await client.request('GET', '/providers'), providerId);
-    if (now > before) {
+    const now = subscriptionConnectionSignature(
+      await client.request('GET', '/providers'),
+      providerId,
+    );
+    if (now !== before) {
       printJson(io, { connected: providerId, auth_type: 'subscription', agent });
       return;
     }

@@ -30,8 +30,13 @@ export async function modelsList(io: CliIo, argv: string[]): Promise<void> {
     booleans: ['cost', 'capabilities'],
   });
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
-  const providerFilter = args.strings['provider']
-    ? resolveProviderId(args.strings['provider'])
+  // Custom providers are addressed by their raw `custom:<id>` key, which the
+  // catalog does not contain — accept it before the catalog lookup.
+  const providerInput = args.strings['provider'];
+  const providerFilter = providerInput
+    ? /^custom:/i.test(providerInput.trim())
+      ? providerInput.trim()
+      : resolveProviderId(providerInput)
     : null;
   const includeCost = Boolean(args.booleans['cost']);
   const includeCapabilities = Boolean(args.booleans['capabilities']);

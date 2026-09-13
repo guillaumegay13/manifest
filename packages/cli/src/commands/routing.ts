@@ -190,25 +190,34 @@ export const routingCustom = {
       },
     })) as { id: string };
 
-    const route = await client.request(
-      'PUT',
-      agentPath(agent, `/header-tiers/${encodeURIComponent(tier.id)}/override`),
-      {
-        body: { model, provider, authType: args.strings['auth-type'] ?? 'api_key' },
-      },
-    );
+    const route = { model, provider, authType: args.strings['auth-type'] ?? 'api_key' };
+    let routeResult: unknown;
     let fallbacks: unknown;
-    if (fallbackModels.length > 0) {
-      fallbacks = await client.request(
+    try {
+      routeResult = await client.request(
         'PUT',
-        agentPath(agent, `/header-tiers/${encodeURIComponent(tier.id)}/fallbacks`),
-        { body: { models: fallbackModels } },
+        agentPath(agent, `/header-tiers/${encodeURIComponent(tier.id)}/override`),
+        { body: route },
       );
+      if (fallbackModels.length > 0) {
+        fallbacks = await client.request(
+          'PUT',
+          agentPath(agent, `/header-tiers/${encodeURIComponent(tier.id)}/fallbacks`),
+          { body: { models: fallbackModels } },
+        );
+      }
+    } catch (error) {
+      // Roll back the tier so a failed route-write does not leave an enabled,
+      // unrouted tier behind. Best-effort: surface the original error.
+      await client
+        .request('DELETE', agentPath(agent, `/header-tiers/${encodeURIComponent(tier.id)}`))
+        .catch(() => undefined);
+      throw error;
     }
     printJson(io, {
       agent,
       tier,
-      route,
+      route: routeResult,
       ...(fallbacks !== undefined ? { fallbacks } : {}),
     });
   },
@@ -298,9 +307,10 @@ function parseResponsesSurface(parsed: Record<string, unknown>): SurfaceResult {
  * A 2xx with `{}` or `[]` must not read as a verified route.
  */
 function hasSurfacePayload(surface: string, parsed: Record<string, unknown>): boolean {
-  if (surface === 'messages') return Array.isArray(parsed['content']);
-  if (surface === 'responses') return Array.isArray(parsed['output']);
-  return Array.isArray(parsed['choices']);
+  const nonEmpty = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
+  if (surface === 'messages') return nonEmpty(parsed['content']);
+  if (surface === 'responses') return nonEmpty(parsed['output']);
+  return nonEmpty(parsed['choices']);
 }
 
 /**

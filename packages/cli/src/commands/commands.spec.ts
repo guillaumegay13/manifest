@@ -1006,6 +1006,10 @@ describe('provider commands', () => {
     const out = io.lastJson() as { providers: Array<Record<string, unknown>> };
     expect(out.providers.length).toBeGreaterThan(20);
     expect(out.providers.some((p) => p['id'] === 'openai')).toBe(true);
+    // Subscription is only advertised when the CLI can drive that sign-in.
+    const byId = new Map(out.providers.map((p) => [p['id'], p]));
+    expect(byId.get('xai')?.['authTypes']).toContain('subscription');
+    expect(byId.get('qwen')?.['authTypes']).not.toContain('subscription');
     // display-only noise stays out of the CLI surface
     for (const p of out.providers) {
       expect(Object.keys(p).sort()).toEqual(['authTypes', 'displayName', 'id']);
@@ -1182,7 +1186,13 @@ describe('provider commands', () => {
       {
         status: 200,
         body: {
-          providers: [{ provider: 'xai', auth_type: 'subscription', connection_count: 1 }],
+          providers: [
+            {
+              provider: 'xai',
+              auth_type: 'subscription',
+              connections: [{ id: 'c1', is_active: true }],
+            },
+          ],
         },
       },
     ]);
@@ -1917,6 +1927,42 @@ describe('routing test', () => {
       message: expect.stringContaining('M101'),
       hint: expect.stringContaining('routing status john'),
     });
+  });
+
+  it('rejects a 2xx whose surface payload is empty', async () => {
+    const { io } = authedIo([{ status: 200, body: { choices: [] } }]);
+    saveAgentKey(io.env, HOST, 'john', 'k');
+    expect(await run(io, ['routing', 'test', 'john', '--as', 'openclaw'])).toBe(1);
+    expect(io.lastJson()).toMatchObject({
+      error: 'route_test_failed',
+      message: expect.stringContaining('no chat_completions payload'),
+    });
+  });
+
+  it('routing custom create rolls back the tier when the route write fails', async () => {
+    const { io, calls } = authedIo([
+      { status: 201, body: { id: 't1' } }, // POST header-tiers
+      { status: 500, body: { message: 'boom' } }, // PUT override
+      { status: 200, body: {} }, // DELETE rollback
+    ]);
+    expect(
+      await run(io, [
+        'routing',
+        'custom',
+        'create',
+        'a',
+        '--name',
+        't',
+        '--model',
+        'm',
+        '--provider',
+        'p',
+        '--force',
+      ]),
+    ).toBe(1);
+    const last = calls[calls.length - 1];
+    expect(last.method).toBe('DELETE');
+    expect(last.url).toContain('/header-tiers/t1');
   });
 
   it('surfaces real HTTP errors and transport failures', async () => {

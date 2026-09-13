@@ -55,7 +55,18 @@ function deriveCatalog(shared) {
 }
 
 async function main() {
-  const shared = require('manifest-shared');
+  let shared;
+  try {
+    shared = require('manifest-shared');
+  } catch {
+    // A clean checkout has no built workspace dependency; fail with the fix
+    // instead of a bare MODULE_NOT_FOUND.
+    console.error(
+      'manifest-shared is not built. Build it first:\n  npm run build --workspace=packages/shared',
+    );
+    process.exitCode = 1;
+    return;
+  }
   const catalog = deriveCatalog(shared);
   const platforms = derivePlatforms(shared);
   const categories = deriveCategories(shared);
