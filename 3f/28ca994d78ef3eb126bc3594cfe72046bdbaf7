@@ -1,0 +1,21 @@
+packages/backend/test/proxy-fallback-auth.e2e-spec.ts
+  s_dac9b30fc8fc02::t_4689febc93119e 310-317
+packages/backend/src/routing/routing-core/credential-health.service.ts
+  s_dac9b30fc8fc02::t_bce3c244d252ab 57-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3f28ca994d78ef3eb126bc3594cfe72046bdbaf7",
+  "prompts": {},
+  "sessions": {
+    "s_dac9b30fc8fc02": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f63d8bfb1ffewWOt35107DVUfd",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}

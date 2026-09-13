@@ -1,0 +1,22 @@
+packages/cli/src/telemetry.ts
+  s_59d09fa9977512::t_aff3500fe608a4 95-103,105-107,111,114,117,120,135-137,139,225-226,252
+packages/cli/src/telemetry.spec.ts
+  s_59d09fa9977512::t_aff3500fe608a4 263,266-267,279-291
+  s_59d09fa9977512::t_8b90940eac867a 292-294
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "25bbed80b8054f5116b0bffcfcdcc54cbba15c36",
+  "prompts": {},
+  "sessions": {
+    "s_59d09fa9977512": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "66211ba5-40d3-41cb-90d9-9893e6637fdc",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}

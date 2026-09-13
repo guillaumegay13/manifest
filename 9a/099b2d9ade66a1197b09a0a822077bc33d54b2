@@ -1,0 +1,25 @@
+packages/backend/src/routing/routing-core/credential-health.service.ts
+  s_dac9b30fc8fc02::t_290deb838db2ae 56-72
+packages/frontend/tests/pages/ProviderPages.test.tsx
+  s_dac9b30fc8fc02::t_01801a9103facd 277-317
+packages/backend/src/routing/routing-core/credential-health.service.spec.ts
+  s_dac9b30fc8fc02::t_4fda656d69f032 105-113
+packages/backend/src/routing/routing-core/provider-key.service.spec.ts
+  s_dac9b30fc8fc02::t_28c8f0127c8474 270-290
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9a099b2d9ade66a1197b09a0a822077bc33d54b2",
+  "prompts": {},
+  "sessions": {
+    "s_dac9b30fc8fc02": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f63d8bfb1ffewWOt35107DVUfd",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}

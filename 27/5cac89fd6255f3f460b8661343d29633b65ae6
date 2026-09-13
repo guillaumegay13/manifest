@@ -1,0 +1,30 @@
+packages/backend/src/routing/proxy/kiro-adapter.ts
+  s_672ba23b853e57::t_ebd84fd0662665 915-916
+  s_672ba23b853e57::t_12cf4646ac4557 990-991
+  s_672ba23b853e57::t_710e2833c5808e 3,10-11,16-20,23-34,790-794,807-808,838-850,853,855,861-914,917,978-989,992-993,1073-1075,1118,1131
+  s_672ba23b853e57::t_585f97e59a08ed 21-22
+packages/backend/test/kiro-usage.e2e-spec.ts
+  s_672ba23b853e57::t_e98f43c5d85ad8 1-141,143-255
+  s_672ba23b853e57::t_97d5a0f79bb255 142
+packages/backend/src/routing/proxy/__tests__/kiro-adapter.spec.ts
+  s_672ba23b853e57::t_4a69e018485875 581-674
+  s_672ba23b853e57::t_a459c9b98e8e23 194-203
+.changeset/kiro-usage-tracking.md
+  s_672ba23b853e57::t_93d0fb6da91739 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "275cac89fd6255f3f460b8661343d29633b65ae6",
+  "prompts": {},
+  "sessions": {
+    "s_672ba23b853e57": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f63f84bc6ffeq1EUinGNRRseqC",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}

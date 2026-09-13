@@ -1,0 +1,98 @@
+.changeset/subscription-auth-health.md
+  s_2b3ab1501e4541::t_9cf619239dc3c6 1-7
+docker/docker-compose.yml
+  s_2b3ab1501e4541::t_ada71e09926b47 93
+packages/backend/test/proxy-fallback-auth.e2e-spec.ts
+  s_2b3ab1501e4541::t_e9d74cc133bd8b 221
+  s_2b3ab1501e4541::t_ba1a33171be3d2 171-177
+  s_2b3ab1501e4541::t_145c63e66e230a 29
+  s_2b3ab1501e4541::t_66b98bf7b4e4f3 304-323,325-341,357-363,367-370
+  s_2b3ab1501e4541::t_78d70a79018923 324
+  s_2b3ab1501e4541::t_c1f8b9bddd7b57 342-356
+  s_2b3ab1501e4541::t_113c4c251eeaaa 13-19,364-366
+packages/backend/src/routing/routing-core/routing-core.module.ts
+  s_2b3ab1501e4541::t_a58f731c7550bf 60
+  s_2b3ab1501e4541::t_beaa7c7fdf4d77 46
+  s_2b3ab1501e4541::t_ace4b84e960149 17
+packages/backend/src/routing/routing-core/credential-health.service.ts
+  s_2b3ab1501e4541::t_aa15b64291ae3c 1-106,111-152
+  s_2b3ab1501e4541::t_113c4c251eeaaa 107-110
+packages/backend/src/common/services/request-recording-storage.service.ts
+  s_2b3ab1501e4541::t_e32ea8d5098e4a 53-56,59
+packages/frontend/src/pages/providers/ProviderConnectionsPage.tsx
+  s_2b3ab1501e4541::t_41b382cd6c323c 23
+  s_2b3ab1501e4541::t_4d00290183feb7 773-778
+  s_2b3ab1501e4541::t_2181c7d7520c48 179-198
+packages/backend/src/routing/routing-core/provider-key.service.spec.ts
+  s_2b3ab1501e4541::t_f18422c1e1ad01 2
+  s_2b3ab1501e4541::t_113c4c251eeaaa 200-205,216-221,238-240
+  s_2b3ab1501e4541::t_4c345860cb873d 251,257-258,263-268
+  s_2b3ab1501e4541::t_fac3fe9a64b0b0 180-199,206-215,222-237,241-250,252-256,259-262,269-270
+packages/backend/src/routing/proxy/proxy-fallback.service.ts
+  s_2b3ab1501e4541::t_847517859c9097 1
+  s_2b3ab1501e4541::t_6db6dc517e4d35 100
+  s_2b3ab1501e4541::t_9872f046106c75 178-182,185
+  s_2b3ab1501e4541::t_356294194c646d 92
+  s_2b3ab1501e4541::t_39dc6e7b7a7b81 345-346
+  s_2b3ab1501e4541::t_a2329f469cf9d7 562-569,579
+  s_2b3ab1501e4541::t_fb9829b4b323bc 57-60
+  s_2b3ab1501e4541::t_00d90ff54befcb 870-879
+  s_2b3ab1501e4541::t_d8b4f86e7df644 110,113-119
+  s_2b3ab1501e4541::t_ef2295de139452 183-184
+  s_2b3ab1501e4541::t_774c9a9d65aaa4 457-465
+  s_2b3ab1501e4541::t_165d4e7d3da2f7 718-792
+  s_2b3ab1501e4541::t_d56b4bebfc9d25 120
+packages/backend/src/routing/tenant-providers.controller.ts
+  s_2b3ab1501e4541::t_2f02167f7aa934 85-89
+  s_2b3ab1501e4541::t_0f79452ad51ce1 1
+  s_2b3ab1501e4541::t_e973133fcce979 8
+  s_2b3ab1501e4541::t_396921790da9f7 44-46
+  s_2b3ab1501e4541::t_b15083778db59e 9
+  s_2b3ab1501e4541::t_b5a233c4a1f888 13-24
+  s_2b3ab1501e4541::t_c905640f3a4411 76-78,84,90-103,110,116
+  s_2b3ab1501e4541::t_4b257c25ebd1aa 12
+packages/backend/src/routing/proxy/__tests__/proxy-fallback.failures.spec.ts
+  s_2b3ab1501e4541::t_3f429e6bbbb641 203-228
+render.yaml
+  s_2b3ab1501e4541::t_ab2e0834447b2a 36
+packages/backend/src/common/services/request-recording-storage.service.spec.ts
+  s_2b3ab1501e4541::t_a22b551f0d7d15 54-67
+  s_2b3ab1501e4541::t_59ced91c5af931 121
+packages/backend/src/routing/routing-core/credential-health.service.spec.ts
+  s_2b3ab1501e4541::t_113c4c251eeaaa 1
+  s_2b3ab1501e4541::t_0ca4d9fff3d65d 2-116
+packages/backend/src/routing/routing-core/provider-key.service.ts
+  s_2b3ab1501e4541::t_92b91d49ce9754 70
+  s_2b3ab1501e4541::t_27050b0260c677 1
+  s_2b3ab1501e4541::t_fef83486a0d97b 17
+  s_2b3ab1501e4541::t_5a9211a10ce18a 63-69,71
+  s_2b3ab1501e4541::t_080dab323380c6 136-141,143,145-151,171,175-213
+packages/backend/src/routing/tenant-providers.controller.spec.ts
+  s_2b3ab1501e4541::t_7c426b3a6e2e0a 2
+  s_2b3ab1501e4541::t_0c6112725c1d99 95-121
+packages/frontend/src/services/api/providers.ts
+  s_2b3ab1501e4541::t_62547a0ea6ee35 14-26
+packages/backend/src/routing/proxy/__tests__/proxy-fallback.service.spec.ts
+  s_2b3ab1501e4541::t_85f6cfca1ed997 183-184,201
+  s_2b3ab1501e4541::t_94e4bbbcc9f511 415-417,435-436
+  s_2b3ab1501e4541::t_a4a61bc7a2d950 58
+  s_2b3ab1501e4541::t_4248224c793263 19
+  s_2b3ab1501e4541::t_9fb5f1c8f40f84 470-565
+  s_2b3ab1501e4541::t_e5ac2992d1aac9 468-469
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8fcd2f29810753f86d2fb87581d23ec4d6b1b984",
+  "prompts": {},
+  "sessions": {
+    "s_2b3ab1501e4541": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f63f824beffefOwPX2qB5Ff5c1",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}

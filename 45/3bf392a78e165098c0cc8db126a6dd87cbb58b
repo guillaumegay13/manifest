@@ -1,0 +1,25 @@
+packages/backend/src/common/services/request-recording-storage.service.ts
+  s_dac9b30fc8fc02::t_5c28cc63f8e469 55-57
+render.yaml
+  s_dac9b30fc8fc02::t_5c28cc63f8e469 36
+docker/docker-compose.yml
+  s_dac9b30fc8fc02::t_5c28cc63f8e469 93
+packages/backend/src/common/services/request-recording-storage.service.spec.ts
+  s_dac9b30fc8fc02::t_5c28cc63f8e469 107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "453bf392a78e165098c0cc8db126a6dd87cbb58b",
+  "prompts": {},
+  "sessions": {
+    "s_dac9b30fc8fc02": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f63d8bfb1ffewWOt35107DVUfd",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
