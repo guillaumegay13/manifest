@@ -1,4 +1,5 @@
 import { DataSource, Repository } from 'typeorm';
+import type { Cache } from 'cache-manager';
 import { TenantProvider } from '../entities/tenant-provider.entity';
 import { AgentEnabledProvider } from '../entities/agent-enabled-provider.entity';
 import { Agent } from '../entities/agent.entity';
@@ -30,6 +31,7 @@ import { ModelPricesService } from '../model-prices/model-prices.service';
 export interface McpToolDeps {
   dataSource: DataSource;
   tenantCache: TenantCacheService;
+  cacheManager: Cache;
   agentListCache: AgentListCacheService;
   eventBus: IngestEventBusService;
   recording: AgentRecordingConfigService;

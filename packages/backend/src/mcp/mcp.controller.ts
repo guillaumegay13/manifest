@@ -1,7 +1,9 @@
-import { Controller, Post, Req, Res } from '@nestjs/common';
+import { Controller, Post, Req, Res, Inject } from '@nestjs/common';
 import { requireMcpAuth } from '@better-auth/mcp';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { fromNodeHeaders } from 'better-auth/node';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import type { Request, Response } from 'express';
 import { DataSource, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -52,6 +54,7 @@ export class McpController {
   constructor(
     private readonly dataSource: DataSource,
     private readonly tenantCache: TenantCacheService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly agentListCache: AgentListCacheService,
     private readonly eventBus: IngestEventBusService,
     private readonly recording: AgentRecordingConfigService,
@@ -82,6 +85,7 @@ export class McpController {
     return {
       dataSource: this.dataSource,
       tenantCache: this.tenantCache,
+      cacheManager: this.cacheManager,
       agentListCache: this.agentListCache,
       eventBus: this.eventBus,
       recording: this.recording,
@@ -129,9 +133,29 @@ export class McpController {
       method: req.method,
       headers: fromNodeHeaders(req.headers),
     });
-    const response = await verify(webRequest);
-    await sendWebResponse(response, res);
+    try {
+      const response = await verify(webRequest);
+      await sendWebResponse(response, res);
+    } catch (error) {
+      // A throw here (for example a tenant lookup failure) must still answer
+      // JSON-RPC, not a Nest-shaped 500, or the MCP client session breaks.
+      await sendWebResponse(internalErrorResponse(error), res);
+    }
   }
+}
+
+function internalErrorResponse(error: unknown): globalThis.Response {
+  return new globalThis.Response(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      error: {
+        code: -32603,
+        message: error instanceof Error ? error.message : 'Internal error',
+      },
+      id: null,
+    }),
+    { status: 500, headers: { 'Content-Type': 'application/json' } },
+  );
 }
 
 function unauthorizedResponse(): globalThis.Response {

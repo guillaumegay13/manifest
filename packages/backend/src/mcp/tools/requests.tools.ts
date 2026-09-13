@@ -1,12 +1,12 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import {
+  MESSAGE_ORIGIN_FILTER_VALUES,
+  MESSAGE_STATUS_FILTER_VALUES,
+} from '../../analytics/dto/messages-query.dto';
 import { McpOperator } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
-import { err, ok } from '../tool-result';
-
-function result(promise: Promise<unknown>) {
-  return promise.then(ok).catch((e: unknown) => err(e instanceof Error ? e.message : String(e)));
-}
+import { result } from '../tool-result';
 
 /**
  * Request ledger readout. Mirrors the API's opaque-cursor pagination: one page
@@ -23,13 +23,13 @@ export function registerRequestTools(
       title: 'Get requests',
       description: 'List recent Manifest requests (provider attempts) with cursor pagination.',
       inputSchema: z.object({
-        agent: z.string().min(1).optional(),
-        range: z.string().min(1).optional(),
-        status: z.string().min(1).optional(),
-        provider: z.string().min(1).optional(),
-        origin: z.string().min(1).optional(),
+        agent: z.string().min(1).max(100).optional(),
+        range: z.string().min(1).max(50).optional(),
+        status: z.enum(MESSAGE_STATUS_FILTER_VALUES).optional(),
+        provider: z.string().min(1).max(100).optional(),
+        origin: z.enum(MESSAGE_ORIGIN_FILTER_VALUES).optional(),
         limit: z.number().int().min(1).max(200).optional(),
-        cursor: z.string().min(1).optional(),
+        cursor: z.string().min(1).max(500).optional(),
       }),
       annotations: { readOnlyHint: true },
     },
@@ -40,11 +40,13 @@ export function registerRequestTools(
             tenantId: operator.tenantId,
             agent_name: agent,
             range,
-            status: status as never,
+            status,
             provider,
-            origin: origin as never,
+            origin,
             limit: Math.min(limit ?? 50, 200),
             cursor,
+            // The handler discards filter metadata; do not build it.
+            include_filter_options: false,
           })) as {
             items?: unknown[];
             next_cursor?: string | null;

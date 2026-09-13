@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AnalyticsModule } from '../analytics/analytics.module';
+import { CommonModule } from '../common/common.module';
 import { AutofixModule } from '../routing/autofix/autofix.module';
 import { CustomProviderModule } from '../routing/custom-provider/custom-provider.module';
 import { HeaderTiersModule } from '../routing/header-tiers/header-tiers.module';
@@ -21,6 +22,7 @@ import { McpController } from './mcp.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([TenantProvider, AgentEnabledProvider, Agent]),
+    CommonModule,
     AnalyticsModule,
     RoutingCoreModule,
     HeaderTiersModule,

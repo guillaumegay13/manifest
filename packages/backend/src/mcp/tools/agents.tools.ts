@@ -5,11 +5,7 @@ import { PLAYGROUND_AGENT_SLUG } from '../../common/constants/playground.constan
 import { slugify } from '../../common/utils/slugify';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
-import { err, ok } from '../tool-result';
-
-function result(promise: Promise<unknown>) {
-  return promise.then(ok).catch((e: unknown) => err(e instanceof Error ? e.message : String(e)));
-}
+import { ok, result } from '../tool-result';
 
 /**
  * Agent lifecycle tools. The write path mirrors AgentsController exactly —
@@ -24,6 +20,12 @@ export function registerAgentTools(
 ): void {
   const invalidate = async (tenantId: string | null): Promise<void> => {
     if (tenantId) await deps.agentListCache.invalidate(tenantId);
+  };
+
+  // The dashboard caches a workspace Autofix verdict under this key; a create or
+  // update that flips Autofix must drop it or the sidebar keeps the old state.
+  const invalidateAutofixStatus = async (tenantId: string | null): Promise<void> => {
+    if (tenantId) await deps.cacheManager.del(`${tenantId}:/api/v1/autofix/status`);
   };
 
   server.registerTool(
@@ -63,7 +65,7 @@ export function registerAgentTools(
     'manifest_agent_get',
     {
       title: 'Get an agent',
-      description: 'Fetch one harness by name or display name.',
+      description: 'Fetch one harness by name (slug).',
       inputSchema: z.object({ agent: z.string().min(1) }),
       annotations: { readOnlyHint: true },
     },
@@ -112,7 +114,10 @@ export function registerAgentTools(
           const slug = slugify(name);
           if (!slug) throw new Error('Agent name produces an empty slug');
           if (slug === PLAYGROUND_AGENT_SLUG) throw new Error('"Playground" is a reserved name');
-          if (autofix_enabled === true) await deps.autofixStats.recordAutofixConsent();
+          if (autofix_enabled === true) {
+            await deps.autofixStats.recordAutofixConsent();
+            await invalidateAutofixStatus(operator.tenantId);
+          }
           const created = await deps.apiKeys.onboardAgent({
             tenantId: operator.tenantId,
             ownerUserId: operator.userId,
@@ -126,12 +131,21 @@ export function registerAgentTools(
           try {
             await deps.providers.enableAllProvidersForAgent(created.agentId, created.tenantId);
           } catch (error) {
-            // A committed agent with zero enabled providers is unroutable —
-            // roll back rather than leave a broken harness behind.
-            await deps.lifecycle.deleteAgent(created.tenantId, slug).catch(() => undefined);
+            // A committed agent with zero enabled providers is unroutable — roll
+            // back rather than leave a broken harness behind. If the rollback
+            // itself fails the agent survives, so still drop the caches that may
+            // have captured it before rethrowing the original error.
+            try {
+              await deps.lifecycle.deleteAgent(created.tenantId, slug);
+            } catch {
+              // Best effort: the caller sees the provider error either way.
+            }
+            await invalidate(created.tenantId);
+            await invalidateAutofixStatus(created.tenantId);
             throw error;
           }
           await invalidate(created.tenantId);
+          await invalidateAutofixStatus(created.tenantId);
           deps.eventBus.emit(created.tenantId, 'agent', operator.userId);
           return {
             agent: {
@@ -165,6 +179,9 @@ export function registerAgentTools(
           if (name !== undefined) {
             const slug = slugify(name);
             if (!slug) throw new Error('Agent name produces an empty slug');
+            if (slug === PLAYGROUND_AGENT_SLUG) {
+              throw new Error('"Playground" is a reserved name');
+            }
             await deps.lifecycle.renameAgent(operator.tenantId, agent, slug, name.trim());
           }
           if (agent_category !== undefined || agent_platform !== undefined) {

@@ -1,14 +1,23 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
-import { SHARED_PROVIDERS, SUPPORTED_SUBSCRIPTION_PROVIDER_IDS } from 'manifest-shared';
+import {
+  CUSTOM_PROVIDER_ALIAS_MAX_LENGTH,
+  CUSTOM_PROVIDER_ALIAS_PATTERN,
+  SHARED_PROVIDER_BY_ID_OR_ALIAS,
+  SHARED_PROVIDERS,
+  SUPPORTED_SUBSCRIPTION_PROVIDER_IDS,
+  normalizeProviderName,
+  type ModelRoute,
+} from 'manifest-shared';
 import { AgentEnabledProvider } from '../../entities/agent-enabled-provider.entity';
+import { TenantProvider } from '../../entities/tenant-provider.entity';
+import {
+  CLOUD_LOCAL_PROVIDER_MESSAGE,
+  isProviderAvailableForDeployment,
+} from '../../common/utils/provider-availability';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
-import { err, ok } from '../tool-result';
-
-function result(promise: Promise<unknown>) {
-  return promise.then(ok).catch((e: unknown) => err(e instanceof Error ? e.message : String(e)));
-}
+import { ok, result } from '../tool-result';
 
 const AUTH_TYPES = ['api_key', 'subscription', 'local'] as const;
 
@@ -126,6 +135,14 @@ export function registerProviderTools(
           const resolved = await deps.resolveAgent.resolve(operator.tenantId, agent, {
             allowPlayground: true,
           });
+          const normalized = provider.trim().toLowerCase();
+          const known =
+            SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalized) ??
+            SHARED_PROVIDER_BY_ID_OR_ALIAS.get(normalizeProviderName(normalized));
+          if (!known) throw new Error(`Unknown provider: ${provider}`);
+          if (!isProviderAvailableForDeployment(provider)) {
+            throw new Error(CLOUD_LOCAL_PROVIDER_MESSAGE);
+          }
           const upserted = await deps.providers.upsertProvider(
             resolved.id,
             resolved.tenant_id,
@@ -225,10 +242,17 @@ export function registerProviderTools(
       inputSchema: z.object({
         name: z.string().min(1).max(50),
         base_url: z.string().url(),
-        alias: z.string().min(1).nullable().optional(),
+        alias: z
+          .string()
+          .trim()
+          .toLowerCase()
+          .max(CUSTOM_PROVIDER_ALIAS_MAX_LENGTH)
+          .regex(CUSTOM_PROVIDER_ALIAS_PATTERN)
+          .nullable()
+          .optional(),
         api_kind: z.enum(['openai', 'anthropic']).optional(),
         api_key: z.string().min(1).optional(),
-        models: z.array(z.string().min(1)).optional(),
+        models: z.array(z.string().min(1).max(100)).max(500).optional(),
       }),
     },
     async ({ name, base_url, alias, api_kind, api_key, models }) =>
@@ -335,6 +359,14 @@ async function setAgentProviderEnabled(
       .orIgnore()
       .execute();
   } else {
+    // Disabling a connection that a route still points at would leave that
+    // route unusable, so reject it exactly as the REST controller does.
+    const affected = await findAffectedRoutes(deps, agent.id, connection);
+    if (affected.length > 0) {
+      throw new Error(
+        "Can't disable provider while its models are assigned to this harness's routing. Update routing first.",
+      );
+    }
     await deps.agentEnabledProviderRepo.delete({
       agent_id: agent.id,
       tenant_provider_id: connection.id,
@@ -342,4 +374,52 @@ async function setAgentProviderEnabled(
   }
   await deps.providers.recalculateTiers(agent.id, agent.tenant_id);
   return { ok: true, agent: agent.name, provider, enabled };
+}
+
+/**
+ * Routes that would break if this connection were disabled: a tier or
+ * specificity assignment whose primary route or fallback resolves to the
+ * connection. Mirrors AgentEnabledProvidersController.findAffectedRoutes.
+ */
+async function findAffectedRoutes(
+  deps: McpToolDeps,
+  agentId: string,
+  provider: TenantProvider,
+): Promise<string[]> {
+  const providerModels = new Set(
+    (Array.isArray(provider.cached_models) ? provider.cached_models : []).map((m) => m.id),
+  );
+  const providerName = provider.provider.toLowerCase();
+  const providerAuthType = provider.auth_type;
+  const providerLabel = provider.label?.toLowerCase();
+  const belongs = (route: ModelRoute | null): boolean => {
+    if (!route) return false;
+    if (route.provider) {
+      if (route.provider.toLowerCase() !== providerName) return false;
+      if (route.authType && route.authType !== providerAuthType) return false;
+      if (route.keyLabel && providerLabel && route.keyLabel.toLowerCase() !== providerLabel) {
+        return false;
+      }
+      if (!route.keyLabel && provider.priority !== 0 && providerLabel !== 'default') return false;
+      return true;
+    }
+    return providerModels.has(route.model);
+  };
+
+  const affected: string[] = [];
+  const tiers = await deps.tiers.getTiers(agentId, provider.tenant_id);
+  for (const tier of tiers) {
+    if (belongs(tier.override_route)) affected.push(`${tier.tier}: primary`);
+    for (const [i, fallback] of (tier.fallback_routes ?? []).entries()) {
+      if (belongs(fallback)) affected.push(`${tier.tier}: fallback ${i + 1}`);
+    }
+  }
+  const assignments = await deps.specificity.getAssignments(agentId);
+  for (const assignment of assignments) {
+    if (belongs(assignment.override_route)) affected.push(`${assignment.category}: primary`);
+    for (const [i, fallback] of (assignment.fallback_routes ?? []).entries()) {
+      if (belongs(fallback)) affected.push(`${assignment.category}: fallback ${i + 1}`);
+    }
+  }
+  return affected;
 }

@@ -81,10 +81,9 @@ function mountMcpDiscovery(app: INestApplication): void {
     '/.well-known/oauth-authorization-server',
     '/.well-known/oauth-authorization-server/api/auth',
   ]) {
+    // Express serves HEAD from the GET route automatically, so there is no
+    // separate HEAD registration.
     expressApp.get(path, (req: express.Request, res: express.Response) => {
-      void serveAuthMetadata(req, res);
-    });
-    expressApp.head(path, (req: express.Request, res: express.Response) => {
       void serveAuthMetadata(req, res);
     });
   }
@@ -102,10 +101,6 @@ function mountMcpDiscovery(app: INestApplication): void {
     expressApp.get(path, (_req: express.Request, res: express.Response) => {
       cors(res);
       res.status(200).json(resourceMetadata);
-    });
-    expressApp.head(path, (_req: express.Request, res: express.Response) => {
-      cors(res);
-      res.status(200).send();
     });
   }
 }
