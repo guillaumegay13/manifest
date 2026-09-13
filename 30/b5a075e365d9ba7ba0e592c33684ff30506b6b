@@ -1,0 +1,124 @@
+packages/backend/src/mcp/tool-deps.ts
+  s_b2b5a4b0535460::t_750ab3afd735e2 39
+  s_b2b5a4b0535460::t_18a94c9c9673c5 50
+  s_b2b5a4b0535460::t_db477dec039b61 4
+  s_b2b5a4b0535460::t_ff7105f5194c1a 1-3,5-11,13-22,24-38,40-49,51-52,54
+  s_b2b5a4b0535460::t_bb326061c1336d 23
+  s_b2b5a4b0535460::t_68dc1e533dbdb5 53
+  s_b2b5a4b0535460::t_5c6c6e5871717d 12
+packages/frontend/src/components/AuthGuard.tsx
+  s_b2b5a4b0535460::t_17b711e187c3f4 23-27
+packages/backend/src/app.module.ts
+  s_b2b5a4b0535460::t_d78fda4eac96ce 39
+  s_b2b5a4b0535460::t_560d56330c8874 118
+.changeset/mcp-http-oauth.md
+  s_b2b5a4b0535460::t_0c6bc5fe0d751e 1-5
+packages/backend/src/auth/auth.instance.ts
+  s_b2b5a4b0535460::t_c27f9af5e31c98 19
+  s_b2b5a4b0535460::t_a8e913a986d4ac 29-41,43
+  s_b2b5a4b0535460::t_2b0d0bc829168e 20
+  s_b2b5a4b0535460::t_4385fa19af5b9a 42
+  s_b2b5a4b0535460::t_45a7b760349702 3-5
+  s_b2b5a4b0535460::t_5e1d747729f652 239-241
+  s_b2b5a4b0535460::t_d049ea82010ec8 234-238
+  s_b2b5a4b0535460::t_00a5f1eedc1a24 93-130
+  s_b2b5a4b0535460::t_3c9814a5b47bde 44,131,135,163,165,242
+packages/backend/src/analytics/analytics.module.ts
+  s_b2b5a4b0535460::t_0b4071a7881415 97-104
+packages/backend/src/mcp/tools/routing.tools.ts
+  s_b2b5a4b0535460::t_cf296469282499 394-509
+  s_b2b5a4b0535460::t_8b384e42a0a985 16-26
+  s_b2b5a4b0535460::t_82a38c4ac7a04e 1-2,6-13,86-97,99-137,140-164,167-199,202-235,238-271,510-564,567-582
+  s_b2b5a4b0535460::t_c774413310deec 3-4,14-15,27-85
+  s_b2b5a4b0535460::t_301f0250967e5e 138-139,165-166,200-201,236-237,272-273,565-566
+  s_b2b5a4b0535460::t_963e41cfef201a 5,98
+  s_b2b5a4b0535460::t_dec8a8f4eac73d 274-393
+  s_b2b5a4b0535460::t_a08677bab813b8 583-599
+packages/frontend/src/pages/Consent.tsx
+  s_b2b5a4b0535460::t_b11d053a99a1cd 1-153
+packages/frontend/src/index.tsx
+  s_b2b5a4b0535460::t_f89b5eff62ec07 35
+  s_b2b5a4b0535460::t_efe918ca47a2d8 149-150
+  s_b2b5a4b0535460::t_f7c0f87e2b4496 151
+packages/backend/src/main.ts
+  s_b2b5a4b0535460::t_9816f6a50f6fd7 9
+  s_b2b5a4b0535460::t_00df110c3f4841 48
+  s_b2b5a4b0535460::t_acc3e410567cce 37-47,49-108
+  s_b2b5a4b0535460::t_8883c39ef36247 4
+  s_b2b5a4b0535460::t_0f464450d17129 10-16,109-111,310-311
+packages/backend/src/model-prices/model-prices.module.ts
+  s_b2b5a4b0535460::t_7c155ccc646e06 23
+packages/backend/src/mcp/tools/environment.tools.ts
+  s_b2b5a4b0535460::t_30c7f8d01e0946 1-137
+packages/backend/src/auth/cimd-client-metadata-fetch.ts
+  s_b2b5a4b0535460::t_0a50e93145bbcf 1-99
+packages/backend/src/mcp/tools/models.tools.ts
+  s_b2b5a4b0535460::t_f0454b93e8aebb 1-35,37-53,59-62
+  s_b2b5a4b0535460::t_838cd7ddb01251 36
+  s_b2b5a4b0535460::t_d0d204d9f1d508 54-58
+packages/backend/src/mcp/mcp-server.factory.ts
+  s_b2b5a4b0535460::t_66d1f81efe2e95 36,41
+  s_b2b5a4b0535460::t_fbd5617e0b9779 1-4,6-35,37-40,42-43
+  s_b2b5a4b0535460::t_c8504d75aaea9f 5
+packages/backend/src/mcp/mcp-auth.spec.ts
+  s_b2b5a4b0535460::t_4cfbdad854627e 1-45
+packages/backend/src/auth/mcp-scopes.ts
+  s_b2b5a4b0535460::t_2ba328d5c9e70c 1-8
+packages/backend/src/mcp/tools/requests.tools.ts
+  s_b2b5a4b0535460::t_1ae1a7a48b76a2 1-61
+packages/backend/src/mcp/tool-result.spec.ts
+  s_b2b5a4b0535460::t_d9d3b1f224b7b7 1-16
+packages/backend/src/mcp/tools/identity.tools.ts
+  s_b2b5a4b0535460::t_4caeeaaf608bc8 1-89
+  s_b2b5a4b0535460::t_9c89f822c0e0d0 90-94
+packages/backend/src/auth/auth.instance.spec.ts
+  s_b2b5a4b0535460::t_adeff7cbb76af0 484-500
+  s_b2b5a4b0535460::t_81a1952fe0c57b 12-25
+  s_b2b5a4b0535460::t_2b5669057b0825 503,511,515,523
+  s_b2b5a4b0535460::t_64ce86fd4c33b6 524-528
+packages/backend/src/mcp/tool-result.ts
+  s_b2b5a4b0535460::t_042927bc3e9e1f 1-16
+packages/backend/src/mcp/mcp-auth.ts
+  s_b2b5a4b0535460::t_f5ab1c90c8f834 1,3-49
+  s_b2b5a4b0535460::t_6db701a6b9af6a 2
+packages/backend/src/mcp/tools/agents.tools.ts
+  s_b2b5a4b0535460::t_20f596d3fa1411 88-91
+  s_b2b5a4b0535460::t_d794b3ef10c8f6 1-5,7-49,52-87,92-233
+  s_b2b5a4b0535460::t_cb93614644cc23 50-51
+  s_b2b5a4b0535460::t_41975eafee4b75 6
+  s_b2b5a4b0535460::t_bd326f877183ec 234-236
+packages/backend/src/mcp/tools/providers.tools.ts
+  s_b2b5a4b0535460::t_361ae367a20081 103-106
+  s_b2b5a4b0535460::t_de5519ef6cd933 82-102
+  s_b2b5a4b0535460::t_79938c5cef3249 4
+  s_b2b5a4b0535460::t_218b32692d5ed0 159,165
+  s_b2b5a4b0535460::t_6d6e7ccac4a378 1-3,6-81,107-118,120-124,126-158,160-164,166-218,276-335,337-345
+  s_b2b5a4b0535460::t_d11ccf56075959 119,125
+  s_b2b5a4b0535460::t_274e59220fdde1 5
+  s_b2b5a4b0535460::t_2cd08fb5b58891 219-275
+  s_b2b5a4b0535460::t_39a9f6b0c1d07a 336
+packages/backend/src/mcp/mcp.controller.ts
+  s_b2b5a4b0535460::t_249e9e45811add 102
+  s_b2b5a4b0535460::t_f93ba761dcf274 72
+  s_b2b5a4b0535460::t_3b3058a69b1634 6
+  s_b2b5a4b0535460::t_9e63b299b1465e 28
+  s_b2b5a4b0535460::t_dd10cb9f94686e 1-5,7-27,29-71,73-101,103-159
+packages/backend/src/mcp/mcp.module.ts
+  s_b2b5a4b0535460::t_dfed8a967044d7 1-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "30b5a075e365d9ba7ba0e592c33684ff30506b6b",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
