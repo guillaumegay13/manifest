@@ -68,9 +68,7 @@ describe('CliAuth', () => {
     render(() => <CliAuth />);
     // The informed-consent boundary: understating the grant is a spec failure.
     expect(
-      screen.getByText(
-        /full access to your workspace, renewed while you keep using it up to a fixed maximum/i,
-      ),
+      screen.getByText(/full access to your workspace\. Revoke it any time/i),
     ).toBeTruthy();
     expect(screen.getByText('mnfst logout')).toBeTruthy();
   });

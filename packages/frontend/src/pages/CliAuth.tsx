@@ -114,9 +114,8 @@ const CliAuth: Component = () => {
                 <div class="auth-header">
                   <h1 class="auth-header__title">Authorize the Manifest CLI?</h1>
                   <p class="auth-header__subtitle">
-                    This grants the CLI on this machine full access to your workspace, renewed while
-                    you keep using it up to a fixed maximum. Revoke it any time by running{' '}
-                    <code>mnfst logout</code>.
+                    This grants the CLI on this machine full access to your workspace. Revoke it any
+                    time by running <code>mnfst logout</code>.
                   </p>
                 </div>
                 {/* .auth-form is the column that stretches the submit button edge
