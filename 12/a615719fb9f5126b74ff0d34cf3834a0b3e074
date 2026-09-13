@@ -1,0 +1,34 @@
+packages/cli/scripts/generate-provider-catalog.cjs
+  s_c03dc0ae96aac3::t_f83eeb1a698753 61-62,64
+packages/cli/src/commands/models.ts
+  s_c03dc0ae96aac3::t_a7777fead95746 39
+packages/cli/src/commands/model-check.ts
+  s_c03dc0ae96aac3::t_f10a85e72f5da2 65-69,71
+packages/cli/src/commands/provider.ts
+  s_c03dc0ae96aac3::t_6bd7645094fe24 17-22
+packages/cli/src/commands/oauth-connect.ts
+  s_c03dc0ae96aac3::t_b729c7ba63c2e6 168-169
+  s_c03dc0ae96aac3::t_eca7c3cc5b444f 54-56,58,60-61,69,72
+  s_c03dc0ae96aac3::t_1ac8e370b073b1 187,191
+packages/cli/src/commands/commands.spec.ts
+  s_c03dc0ae96aac3::t_0cc29c3f8028bb 2649-2700
+packages/cli/src/commands/oauth-connect.spec.ts
+  s_c03dc0ae96aac3::t_83e978fc7d3f3a 232-257
+  s_c03dc0ae96aac3::t_800c76d7ac9be1 258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "12a615719fb9f5126b74ff0d34cf3834a0b3e074",
+  "prompts": {},
+  "sessions": {
+    "s_c03dc0ae96aac3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f68d31b96ffeZq8O7BCNwR3dk1",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
