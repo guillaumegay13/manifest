@@ -37,6 +37,7 @@ export async function agentConfigure(io: CliIo, argv: string[]): Promise<void> {
       'recording',
     ],
     booleans: ['force'],
+    maxPositionals: 1,
   });
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
 
@@ -74,7 +75,7 @@ export async function agentConfigure(io: CliIo, argv: string[]): Promise<void> {
       throw new CliError('missing_flag', '--models must be a comma-separated list of model ids');
     }
     const provider = requireString(args, 'provider');
-    await assertModelsDiscovered(client, agent, models, Boolean(args.booleans['force']));
+    await assertModelsDiscovered(client, agent, models, Boolean(args.booleans['force']), provider);
     const route = {
       model: models[0],
       provider,

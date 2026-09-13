@@ -53,7 +53,7 @@ interface HeaderTierListRow {
  * deprecated complexity-routing flag, so this composes the real config.)
  */
 export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, URL_ONLY);
+  const args = parseArgs(argv, { ...URL_ONLY, maxPositionals: 1 });
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const { client } = clientFromFlags(io, args);
 
@@ -91,14 +91,14 @@ export async function routingStatus(io: CliIo, argv: string[]): Promise<void> {
 }
 
 export async function routingFallbacksGet(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, URL_ONLY);
+  const args = parseArgs(argv, { ...URL_ONLY, maxPositionals: 1 });
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const { client } = clientFromFlags(io, args);
   printJson(io, await client.request('GET', agentPath(agent, '/tiers/default/fallbacks')));
 }
 
 export async function routingFallbacksClear(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url'], booleans: ['yes'] });
+  const args = parseArgs(argv, { strings: ['url'], booleans: ['yes'], maxPositionals: 1 });
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   requireYes(args, `clear the default-route fallbacks of "${agent}"`);
   const { client } = clientFromFlags(io, args);
@@ -136,7 +136,7 @@ async function findCustomTier(
 
 export const routingCustom = {
   list: async (io: CliIo, argv: string[]): Promise<void> => {
-    const args = parseArgs(argv, URL_ONLY);
+    const args = parseArgs(argv, { ...URL_ONLY, maxPositionals: 1 });
     const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
     const { client } = clientFromFlags(io, args);
     printJson(io, await client.request('GET', agentPath(agent, '/header-tiers')));
@@ -165,6 +165,7 @@ export const routingCustom = {
         'header-value',
       ],
       booleans: ['force'],
+      maxPositionals: 1,
     });
     const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
     const name = requireString(args, 'name');
@@ -179,6 +180,7 @@ export const routingCustom = {
       agent,
       [model, ...fallbackModels],
       Boolean(args.booleans['force']),
+      provider,
     );
 
     const tier = (await client.request('POST', agentPath(agent, '/header-tiers'), {
@@ -223,7 +225,7 @@ export const routingCustom = {
   },
 
   delete: async (io: CliIo, argv: string[]): Promise<void> => {
-    const args = parseArgs(argv, { strings: ['url'], booleans: ['yes'] });
+    const args = parseArgs(argv, { strings: ['url'], booleans: ['yes'], maxPositionals: 2 });
     const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
     const nameOrId = requirePositional(args, 1, '<tier-name-or-id>');
     const { client } = clientFromFlags(io, args);
@@ -462,13 +464,13 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
 function toggleCommand(feature: 'autofix' | 'recording') {
   return {
     get: async (io: CliIo, argv: string[]): Promise<void> => {
-      const args = parseArgs(argv, URL_ONLY);
+      const args = parseArgs(argv, { ...URL_ONLY, maxPositionals: 1 });
       const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
       const { client } = clientFromFlags(io, args);
       printJson(io, await client.request('GET', agentPath(agent, `/${feature}`)));
     },
     set: async (io: CliIo, argv: string[]): Promise<void> => {
-      const args = parseArgs(argv, { strings: ['url', 'enabled'] });
+      const args = parseArgs(argv, { strings: ['url', 'enabled'], maxPositionals: 1 });
       const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
       const enabled = parseBooleanFlag(requireString(args, 'enabled'), 'enabled');
       const { client } = clientFromFlags(io, args);

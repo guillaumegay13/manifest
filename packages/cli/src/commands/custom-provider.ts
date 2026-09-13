@@ -15,6 +15,7 @@ export const providerCustom = {
     const args = parseArgs(argv, {
       strings: ['url', 'agent', 'name', 'endpoint', 'api', 'credential-env'],
       booleans: ['credential-stdin'],
+      maxPositionals: 0,
     });
     const name = requireString(args, 'name');
     const baseUrl = requireString(args, 'endpoint');
@@ -75,7 +76,7 @@ export const providerCustom = {
   },
 
   list: async (io: CliIo, argv: string[]): Promise<void> => {
-    const args = parseArgs(argv, { strings: ['url', 'agent'] });
+    const args = parseArgs(argv, { strings: ['url', 'agent'], maxPositionals: 0 });
     const agent = await resolveDiscoveryAgent(io, args);
     const { client } = clientFromFlags(io, args);
     printJson(
@@ -85,7 +86,11 @@ export const providerCustom = {
   },
 
   remove: async (io: CliIo, argv: string[]): Promise<void> => {
-    const args = parseArgs(argv, { strings: ['url', 'agent'], booleans: ['yes'] });
+    const args = parseArgs(argv, {
+      strings: ['url', 'agent'],
+      booleans: ['yes'],
+      maxPositionals: 1,
+    });
     const nameOrId = requirePositional(args, 0, '<name-or-id>');
     const agent = await resolveDiscoveryAgent(io, args);
     const { client } = clientFromFlags(io, args);

@@ -2592,6 +2592,60 @@ describe('routing commands', () => {
     expect(calls2[0].url).toBe(`${HOST}/api/v1/routing/john/header-tiers`);
   });
 
+  it('custom create rejects a model discovered only under another provider', async () => {
+    const { io, calls } = authedIo([
+      {
+        status: 200,
+        body: [
+          { model_name: 'claude-x', provider: 'anthropic' },
+          { model_name: 'gpt-4o', provider: 'openai' },
+        ],
+      },
+    ]);
+    expect(
+      await run(io, [
+        'routing',
+        'custom',
+        'create',
+        'john',
+        '--name',
+        'x',
+        '--model',
+        'claude-x',
+        '--provider',
+        'openai',
+      ]),
+    ).toBe(1);
+    expect(io.lastJson()).toMatchObject({
+      error: 'unknown_model',
+      message: expect.stringContaining('under openai'),
+    });
+    // Only the discovery call ran; no tier was written.
+    expect(calls).toHaveLength(1);
+  });
+
+  it('custom create accepts a provider-qualified model under its own provider', async () => {
+    const { io } = authedIo([
+      { status: 200, body: [{ model_name: 'gpt-4o', provider: 'openai' }] },
+      { status: 201, body: { id: 't1' } },
+      { status: 200, body: {} },
+    ]);
+    expect(
+      await run(io, [
+        'routing',
+        'custom',
+        'create',
+        'john',
+        '--name',
+        'x',
+        '--model',
+        'openai/gpt-4o',
+        '--provider',
+        'openai',
+      ]),
+    ).toBe(0);
+  });
+
   it('custom list and delete resolve tiers by name', async () => {
     const { io, calls } = authedIo([{ status: 200, body: [{ id: 'ht-1', name: 'test' }] }]);
     expect(await run(io, ['routing', 'custom', 'list', 'john'])).toBe(0);

@@ -45,7 +45,7 @@ function messageOf(error: unknown): string {
  * JSON object; exit is non-zero when any check actually failed.
  */
 export async function doctor(io: CliIo, argv: string[]): Promise<number> {
-  const args = parseArgs(argv, { strings: ['url'] });
+  const args = parseArgs(argv, { strings: ['url'], maxPositionals: 0 });
   const checks: Check[] = [];
 
   // a. config — which credential is in play, and where the origin came from.

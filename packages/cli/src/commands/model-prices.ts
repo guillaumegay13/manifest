@@ -32,7 +32,7 @@ function cleanPrice(value: unknown): unknown {
  * --provider takes catalog ids/aliases and matches either form.
  */
 export async function modelPrices(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url', 'provider'] });
+  const args = parseArgs(argv, { strings: ['url', 'provider'], maxPositionals: 0 });
   const providerId = args.strings['provider'] ? resolveProviderId(args.strings['provider']) : null;
   const accepted = new Set(
     providerId === null

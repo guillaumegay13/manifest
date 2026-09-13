@@ -49,7 +49,10 @@ export async function runCmd(io: CliIo, argv: string[]): Promise<number> {
     throw new CliError('missing_command', 'No command given after --');
   }
 
-  const args = parseArgs(argv.slice(0, sep), { strings: ['url', 'agent', 'env'] });
+  const args = parseArgs(argv.slice(0, sep), {
+    strings: ['url', 'agent', 'env'],
+    maxPositionals: 0,
+  });
   const agentName = slugifyAgentName(requireString(args, 'agent'));
   const envVar = args.strings['env'] ?? 'MANIFEST_AGENT_KEY';
   if (!ENV_NAME_RE.test(envVar) || envVar === 'MANIFEST_AGENT_URL') {

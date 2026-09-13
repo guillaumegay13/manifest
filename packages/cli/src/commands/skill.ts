@@ -24,7 +24,7 @@ function skillFileIn(dir: string): string {
  * output is meant to be read or piped into a file, not parsed.
  */
 export async function skillShow(io: CliIo, argv: string[]): Promise<void> {
-  parseArgs(argv, {});
+  parseArgs(argv, { maxPositionals: 0 });
   io.stdout(SKILL_MD);
 }
 
@@ -60,7 +60,7 @@ function resolveTarget(
  * this on every invocation.
  */
 export async function skillInstall(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { booleans: ['agents-dir', 'project'] });
+  const args = parseArgs(argv, { booleans: ['agents-dir', 'project'], maxPositionals: 0 });
   const { dir, target } = resolveTarget(io, args);
   const file = skillFileIn(dir);
 

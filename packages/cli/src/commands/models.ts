@@ -28,6 +28,7 @@ export async function modelsList(io: CliIo, argv: string[]): Promise<void> {
   const args = parseArgs(argv, {
     strings: ['url', 'provider'],
     booleans: ['cost', 'capabilities'],
+    maxPositionals: 1,
   });
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   // Custom providers are addressed by their raw `custom:<id>` key, which the

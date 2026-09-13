@@ -5,6 +5,12 @@ export interface FlagSpec {
   strings?: readonly string[];
   /** Flags that are on/off: `--flag`. */
   booleans?: readonly string[];
+  /**
+   * Maximum number of positionals this command accepts. Omit where the command
+   * consumes the remainder on purpose (e.g. `routing test`'s prompt). A typo
+   * past the last positional is then a hard error, not a silent no-op.
+   */
+  maxPositionals?: number;
 }
 
 export interface ParsedArgs {
@@ -51,6 +57,13 @@ export function parseArgs(argv: readonly string[], spec: FlagSpec): ParsedArgs {
     }
     out.strings[name] = value;
     i++;
+  }
+  if (spec.maxPositionals !== undefined && out.positionals.length > spec.maxPositionals) {
+    throw new CliError(
+      'unexpected_argument',
+      `Unexpected argument: ${out.positionals[spec.maxPositionals]}`,
+      'Run mnfst --help for the command usage',
+    );
   }
   return out;
 }

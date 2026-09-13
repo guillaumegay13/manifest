@@ -85,7 +85,7 @@ function renderSetup(platform: string | undefined, origin: string, keyRef: strin
 }
 
 export async function agentSetup(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url'], booleans: ['reveal'] });
+  const args = parseArgs(argv, { strings: ['url'], booleans: ['reveal'], maxPositionals: 1 });
   const name = requirePositional(args, 0, '<agent-name>');
   const slug = slugifyAgentName(name);
   const { client, target } = clientFromFlags(io, args);
@@ -107,12 +107,16 @@ export async function agentSetup(io: CliIo, argv: string[]): Promise<void> {
 }
 
 export async function agentPlatforms(io: CliIo, argv: string[]): Promise<void> {
-  parseArgs(argv, {});
+  parseArgs(argv, { maxPositionals: 0 });
   printJson(io, { platforms: [...CLI_AGENT_PLATFORMS] });
 }
 
 export async function agentList(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url'], booleans: ['include-playground'] });
+  const args = parseArgs(argv, {
+    strings: ['url'],
+    booleans: ['include-playground'],
+    maxPositionals: 0,
+  });
   const { client } = clientFromFlags(io, args);
   const result = await client.request('GET', '/agents', {
     query: { includePlayground: args.booleans['include-playground'] ? 'true' : undefined },
@@ -144,6 +148,7 @@ export async function agentCreate(io: CliIo, argv: string[]): Promise<void> {
   const args = parseArgs(argv, {
     strings: ['url', 'name', 'key-file', 'category', 'platform'],
     booleans: ['if-absent'],
+    maxPositionals: 0,
   });
   const name = requireString(args, 'name');
   const platform = requirePlatform(args);
@@ -215,7 +220,7 @@ export async function agentCreate(io: CliIo, argv: string[]): Promise<void> {
 }
 
 export async function agentGet(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, URL_ONLY);
+  const args = parseArgs(argv, { ...URL_ONLY, maxPositionals: 1 });
   const name = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const { client } = clientFromFlags(io, args);
   const result = (await client.request('GET', `/agents/${encodeURIComponent(name)}`)) as {
@@ -229,7 +234,10 @@ export async function agentGet(io: CliIo, argv: string[]): Promise<void> {
 }
 
 export async function agentUpdate(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url', 'name', 'category', 'platform'] });
+  const args = parseArgs(argv, {
+    strings: ['url', 'name', 'category', 'platform'],
+    maxPositionals: 1,
+  });
   const name = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const category = validateCategory(args);
   const body: Record<string, string> = {};
@@ -258,7 +266,7 @@ export async function agentUpdate(io: CliIo, argv: string[]): Promise<void> {
 }
 
 export async function agentDelete(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url'], booleans: ['yes'] });
+  const args = parseArgs(argv, { strings: ['url'], booleans: ['yes'], maxPositionals: 1 });
   const name = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   requireYes(args, `delete agent "${name}"`);
   const { client, target } = clientFromFlags(io, args);
@@ -269,7 +277,11 @@ export async function agentDelete(io: CliIo, argv: string[]): Promise<void> {
 }
 
 export async function agentRotateKey(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url', 'key-file'], booleans: ['yes'] });
+  const args = parseArgs(argv, {
+    strings: ['url', 'key-file'],
+    booleans: ['yes'],
+    maxPositionals: 1,
+  });
   const name = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   requireYes(args, `rotate the API key of "${name}" (the previous key stops working)`);
   const keyFile = args.strings['key-file']
@@ -324,7 +336,7 @@ export async function resolveAgentKey(
 }
 
 export async function agentKeyPathCmd(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, URL_ONLY);
+  const args = parseArgs(argv, { ...URL_ONLY, maxPositionals: 1 });
   const name = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const resolved = await resolveAgentKey(io, args, name);
   printJson(io, { agent: name, path: resolved.path, source: resolved.source });
@@ -337,7 +349,7 @@ export async function agentKeyPathCmd(io: CliIo, argv: string[]): Promise<void> 
  * Deliberately prints the raw key, like `agent key show`.
  */
 export async function agentEnv(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url'], booleans: ['export'] });
+  const args = parseArgs(argv, { strings: ['url'], booleans: ['export'], maxPositionals: 1 });
   const name = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const resolved = await resolveAgentKey(io, args, name);
   const prefix = args.booleans['export'] ? 'export ' : '';
@@ -351,7 +363,7 @@ export async function agentEnv(io: CliIo, argv: string[]): Promise<void> {
  * substituted into a config file; the key still never rides in argv.
  */
 export async function agentKeyShow(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url'], booleans: ['raw'] });
+  const args = parseArgs(argv, { strings: ['url'], booleans: ['raw'], maxPositionals: 1 });
   const name = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const resolved = await resolveAgentKey(io, args, name);
   if (args.booleans['raw']) {

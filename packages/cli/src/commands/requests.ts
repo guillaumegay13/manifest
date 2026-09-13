@@ -53,6 +53,7 @@ export async function requestsGet(io: CliIo, argv: string[]): Promise<void> {
   const args = parseArgs(argv, {
     strings: ['url', 'agent', 'range', 'status', 'provider', 'limit', 'cursor', 'origin'],
     booleans: ['full'],
+    maxPositionals: 0,
   });
   let limit: number | undefined;
   if (args.strings['limit'] !== undefined) {

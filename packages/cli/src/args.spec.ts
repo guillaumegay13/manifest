@@ -38,6 +38,19 @@ describe('parseArgs', () => {
   it('rejects a value on a boolean flag', () => {
     expect(() => parseArgs(['--yes=1'], spec)).toThrow('does not take a value');
   });
+
+  it('rejects an extra positional when maxPositionals is set', () => {
+    expect(parseArgs(['a', '--yes'], { ...spec, maxPositionals: 1 }).positionals).toEqual(['a']);
+    try {
+      parseArgs(['a', 'typo'], { maxPositionals: 1 });
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect((e as CliError).code).toBe('unexpected_argument');
+      expect((e as CliError).message).toContain('typo');
+    }
+    // Omitted cap means the remainder is consumed on purpose (e.g. routing test).
+    expect(parseArgs(['a', 'b', 'c'], {}).positionals).toEqual(['a', 'b', 'c']);
+  });
 });
 
 describe('require helpers', () => {

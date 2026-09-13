@@ -13,7 +13,7 @@ import { subscriptionConnect, supportsSubscription } from './oauth-connect';
  * provider's sign-in, so the catalog never promises a mode `connect` rejects.
  */
 export async function providerCatalog(io: CliIo, argv: string[]): Promise<void> {
-  parseArgs(argv, {});
+  parseArgs(argv, { maxPositionals: 0 });
   printJson(io, {
     providers: PROVIDER_CATALOG.map(({ id, displayName, authTypes }) => ({
       id,
@@ -41,7 +41,7 @@ export function resolveProviderId(input: string): string {
 }
 
 export async function providerList(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url', 'agent'] });
+  const args = parseArgs(argv, { strings: ['url', 'agent'], maxPositionals: 0 });
   const { client } = clientFromFlags(io, args);
   const result = await client.request('GET', '/providers');
   if (!args.strings['agent']) {
@@ -276,7 +276,10 @@ async function resolveConnection(
  * so the agent is the first positional, like every agent-scoped command.
  */
 export async function agentProviderEnable(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url', 'auth-type', 'label'] });
+  const args = parseArgs(argv, {
+    strings: ['url', 'auth-type', 'label'],
+    maxPositionals: 2,
+  });
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const input = requirePositional(args, 1, '<provider>');
   const conn = await resolveConnection(io, args, input);
@@ -292,6 +295,7 @@ export async function agentProviderDisable(io: CliIo, argv: string[]): Promise<v
   const args = parseArgs(argv, {
     strings: ['url', 'auth-type', 'label'],
     booleans: ['yes'],
+    maxPositionals: 2,
   });
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
   const input = requirePositional(args, 1, '<provider>');
@@ -309,6 +313,7 @@ export async function providerConnect(io: CliIo, argv: string[]): Promise<void> 
   const args = parseArgs(argv, {
     strings: ['url', 'provider', 'agent', 'credential-env', 'label', 'region', 'auth-type'],
     booleans: ['credential-stdin'],
+    maxPositionals: 1,
   });
   const provider = providerFromArgs(args);
   const agent = await resolveDiscoveryAgent(io, args);
@@ -375,7 +380,10 @@ function modelCounts(result: unknown): Array<Record<string, unknown>> {
  * Discovery is tenant-wide; the agent in the path only performs the call.
  */
 export async function providerRefresh(io: CliIo, argv: string[]): Promise<void> {
-  const args = parseArgs(argv, { strings: ['url', 'agent', 'auth-type'] });
+  const args = parseArgs(argv, {
+    strings: ['url', 'agent', 'auth-type'],
+    maxPositionals: 1,
+  });
   const input = args.positionals[0];
   const provider = input !== undefined ? resolveProviderId(input) : null;
   const agent = await resolveDiscoveryAgent(io, args);
@@ -404,6 +412,7 @@ export async function providerDisconnect(io: CliIo, argv: string[]): Promise<voi
   const args = parseArgs(argv, {
     strings: ['url', 'provider', 'agent', 'auth-type', 'label'],
     booleans: ['yes'],
+    maxPositionals: 1,
   });
   const provider = providerFromArgs(args);
   const agent = await resolveDiscoveryAgent(io, args);
