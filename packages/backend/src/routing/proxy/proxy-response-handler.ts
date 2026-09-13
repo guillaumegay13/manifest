@@ -931,7 +931,11 @@ export function recordSuccess(
         headerTierId: meta.header_tier_id,
         headerTierName: meta.header_tier_name,
         headerTierColor: meta.header_tier_color,
-        autofix: fallbackAutofix ?? autofix,
+        // `autofix` is the primary's record (request-level status); the winning
+        // fallback's own record is passed separately so only it can stamp the
+        // fallback-success row.
+        autofix,
+        fallbackAutofix,
         apiMode,
       }),
       'fallback success',

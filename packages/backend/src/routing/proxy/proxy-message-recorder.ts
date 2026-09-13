@@ -245,6 +245,12 @@ export interface FallbackSuccessOpts extends HeaderTierRef {
   requestParams?: RequestParamDefaults | null;
   /** Request-level Autofix outcome when a failed retry later fell back. */
   autofix?: AutofixRecord;
+  /**
+   * Autofix audit of the winning fallback hop itself. Only this record stamps
+   * the fallback-success row's linkage columns, so an ordinary fallback success
+   * never inherits the primary's Autofix retry metadata.
+   */
+  fallbackAutofix?: AutofixRecord;
   /** API surface to retain when this terminal write creates the Request. */
   apiMode?: ProxyApiMode;
 }
@@ -1164,6 +1170,7 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       headerTierName,
       headerTierColor,
       autofix,
+      fallbackAutofix,
       apiMode,
     } = opts ?? {};
 
@@ -1225,10 +1232,14 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       header_tier_color: headerTierColor ?? null,
       // A healed fallback's winning attempt is the Autofix retry: stamp the
       // group, role, operations, and Phoenix decision so it links to the
-      // original hop recorded in recordFailedFallbacks.
-      ...autofixColumns(autofix, 'retry'),
+      // original hop recorded in recordFailedFallbacks. Only the fallback's own
+      // record qualifies — an ordinary fallback success must not inherit the
+      // primary's Autofix retry metadata.
+      ...autofixColumns(fallbackAutofix, 'retry'),
     });
-    await this.persistRequest(ctx, requestId, row, true, autofix, apiMode);
+    // The request-level Autofix status prefers the fallback's own outcome when
+    // it healed, falling back to the primary's record otherwise.
+    await this.persistRequest(ctx, requestId, row, true, fallbackAutofix ?? autofix, apiMode);
     await this.persistAttempt(row, attempt);
     this.eventBus.emit(ctx.tenantId, 'message', ctx.userId);
   }
