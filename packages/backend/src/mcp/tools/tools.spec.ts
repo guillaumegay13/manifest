@@ -307,6 +307,11 @@ describe('MCP tools', () => {
       expect(
         (await call(tools, 'manifest_provider_connect', { provider: 'nope', agent: 'demo' })).error,
       ).toBe(true);
+      // Local-only providers are rejected outside self-hosted installs.
+      expect(
+        (await call(tools, 'manifest_provider_connect', { provider: 'ollama', agent: 'demo' }))
+          .error,
+      ).toBe(true);
     });
 
     it('disconnects and refreshes', async () => {
@@ -334,6 +339,18 @@ describe('MCP tools', () => {
       expect(
         (await call(tools, 'manifest_provider_custom_remove', { name: 'cp' })).error,
       ).toBeFalsy();
+
+      // An endpoint with no models and no explicit list is an error.
+      const deps = makeDeps();
+      (deps.customProviders.probeModels as jest.Mock).mockResolvedValueOnce([]);
+      expect(
+        (
+          await call(registerAll(deps), 'manifest_provider_custom_add', {
+            name: 'empty',
+            base_url: 'http://127.0.0.1:1/v1',
+          })
+        ).error,
+      ).toBe(true);
     });
 
     it('enables and disables a provider for an agent (route impact blocks disable)', async () => {
@@ -515,6 +532,26 @@ describe('MCP tools', () => {
           })
         ).error,
       ).toBeFalsy();
+      // Default tier with a fallback (set branch) and a custom tier with none.
+      expect(
+        (
+          await call(tools, 'manifest_agent_configure', {
+            agent: 'demo',
+            models: ['gpt-4o', 'gpt-4o'],
+            provider: 'openai',
+          })
+        ).error,
+      ).toBeFalsy();
+      expect(
+        (
+          await call(tools, 'manifest_agent_configure', {
+            agent: 'demo',
+            models: ['gpt-4o'],
+            provider: 'openai',
+            tier: 'test',
+          })
+        ).error,
+      ).toBeFalsy();
       expect(
         (
           await call(tools, 'manifest_agent_configure', {
@@ -581,13 +618,11 @@ describe('MCP tools', () => {
         expect(res.data).toMatchObject({ ok: true, reply: 'OK', surface: 'chat_completions' });
 
         // messages surface
-        global.fetch = jest
-          .fn()
-          .mockResolvedValue(
-            new Response(JSON.stringify({ model: 'm', content: [{ type: 'text', text: 'HI' }] }), {
-              status: 200,
-            }),
-          );
+        global.fetch = jest.fn().mockResolvedValue(
+          new Response(JSON.stringify({ model: 'm', content: [{ type: 'text', text: 'HI' }] }), {
+            status: 200,
+          }),
+        );
         expect(
           (await call(tools, 'manifest_routing_test', { agent: 'demo', as: 'claude-code' })).data,
         ).toMatchObject({ surface: 'messages', reply: 'HI' });
@@ -616,16 +651,14 @@ describe('MCP tools', () => {
         ).toBe(true);
 
         // Manifest error reply
-        global.fetch = jest
-          .fn()
-          .mockResolvedValue(
-            new Response(
-              JSON.stringify({
-                choices: [{ message: { content: '[🦚 Manifest M100] no provider' } }],
-              }),
-              { status: 200 },
-            ),
-          );
+        global.fetch = jest.fn().mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              choices: [{ message: { content: '[🦚 Manifest M100] no provider' } }],
+            }),
+            { status: 200 },
+          ),
+        );
         expect(
           (await call(tools, 'manifest_routing_test', { agent: 'demo', as: 'openclaw' })).error,
         ).toBe(true);
@@ -692,6 +725,12 @@ describe('MCP tools', () => {
       (empty.providers.getProviders as jest.Mock).mockResolvedValue([]);
       (empty.timeseries.getAgentList as jest.Mock).mockResolvedValue([]);
       expect((await call(registerAll(empty), 'manifest_doctor')).data).toMatchObject({ ok: false });
+
+      const hollow = makeDeps();
+      (hollow.providers.getProviders as jest.Mock).mockResolvedValue([
+        { ...CONNECTION, cached_models: [] },
+      ]);
+      expect((await call(registerAll(hollow), 'manifest_doctor')).data).toMatchObject({ ok: true });
     });
   });
 

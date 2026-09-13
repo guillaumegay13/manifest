@@ -44,10 +44,23 @@ describe('fetchClientMetadataResource', () => {
 
   it('fetches and returns a metadata document', async () => {
     lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
-    request.mockImplementation((_url, _opts, cb) => fakeRequest(cb));
+    let captured: { lookup: (...a: unknown[]) => void } | undefined;
+    request.mockImplementation((_url, opts, cb) => {
+      captured = opts as { lookup: (...a: unknown[]) => void };
+      return fakeRequest(cb);
+    });
     const response = await fetchClientMetadataResource('https://example.com/meta');
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('{"ok":true}');
+
+    // The pinned lookup must return the validated address for both the
+    // all-addresses and single-address forms Node may ask for.
+    const all = jest.fn();
+    captured!.lookup('example.com', { all: true }, all);
+    expect(all).toHaveBeenCalledWith(null, [{ address: '93.184.216.34', family: 4 }]);
+    const single = jest.fn();
+    captured!.lookup('example.com', {}, single);
+    expect(single).toHaveBeenCalledWith(null, '93.184.216.34', 4);
   });
 
   it('discards the body for a 204', async () => {
