@@ -1,0 +1,26 @@
+packages/cli/src/commands/model-check.ts
+  s_c03dc0ae96aac3::t_b11dc3607a50b2 50-51
+  s_c03dc0ae96aac3::t_b4e5a6076da11f 77-80,86-87,89-90,104-105,116,129-138
+packages/cli/src/commands/routing.ts
+  s_c03dc0ae96aac3::t_26eaba9eb28105 178,185-186,197,206,210
+packages/cli/src/commands/commands.spec.ts
+  s_c03dc0ae96aac3::t_10a1dfdaf1eefc 2746-2747,2775-2776
+packages/cli/src/commands/configure.ts
+  s_c03dc0ae96aac3::t_e0384ddaa1083b 78-84,86,91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "27a652e75ee0dc101f25ced7065102e78bb33eb5",
+  "prompts": {},
+  "sessions": {
+    "s_c03dc0ae96aac3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f68d31b96ffeZq8O7BCNwR3dk1",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
