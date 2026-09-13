@@ -1,0 +1,32 @@
+packages/backend/src/auth/cimd-client-metadata-fetch.ts
+  s_b2b5a4b0535460::t_83c6bbb7820c30 26-28,30-31,34,39-40
+  s_b2b5a4b0535460::t_39d2218b5d6a9d 79-87,89,91-95,109,111
+  s_b2b5a4b0535460::t_8ac747333ee26c 88,90,96-98
+packages/backend/src/auth/cimd-client-metadata-fetch.spec.ts
+  s_b2b5a4b0535460::t_80fc7295841606 187,191,196-208,211,234-255
+  s_b2b5a4b0535460::t_d4e789cce075f0 256
+packages/backend/src/mcp/mcp-discovery.spec.ts
+  s_b2b5a4b0535460::t_9feccd1949807a 68-71
+packages/backend/src/mcp/tools/providers.tools.ts
+  s_b2b5a4b0535460::t_9c6cc36ef783be 159,162,165,174
+packages/backend/src/mcp/tools/tools.spec.ts
+  s_b2b5a4b0535460::t_384c1cb5ad047f 334-337
+packages/backend/src/mcp/mcp-discovery.ts
+  s_b2b5a4b0535460::t_838728d3dd584d 62-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "eefdea9416b16fbc47f94c56a74a12dd9f668439",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
