@@ -127,7 +127,12 @@ export async function assertModelsDiscovered(
         const scoped = rows.filter(
           (r) =>
             (r.model === m || r.model === bareOf(m)) &&
-            (providerFilter === undefined || r.provider === providerFilter),
+            // Treat a row with no provider as matching: some discovery payloads
+            // carry auth_type but omit provider, and excluding them would let
+            // the mismatch through unchecked.
+            (providerFilter === undefined ||
+              r.provider === undefined ||
+              r.provider === providerFilter),
         );
         const discovered = [...new Set(scoped.map((r) => r.authType ?? 'api_key'))];
         if (discovered.length > 0 && !discovered.includes(authType)) {

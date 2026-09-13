@@ -2409,6 +2409,25 @@ describe('routing commands', () => {
     ).toBe(1);
     expect(custom.io.lastJson()).toMatchObject({ error: 'auth_type_mismatch' });
 
+    // Rows that carry auth data but omit provider still gate the primary.
+    const noProvider = authedIo([
+      { status: 200, body: [{ model_name: 'm', auth_type: 'subscription' }] },
+    ]);
+    expect(
+      await run(noProvider.io, [
+        'agent',
+        'configure',
+        'john',
+        '--models',
+        'm',
+        '--provider',
+        'custom:abc',
+        '--auth-type',
+        'api_key',
+      ]),
+    ).toBe(1);
+    expect(noProvider.io.lastJson()).toMatchObject({ error: 'auth_type_mismatch' });
+
     // A same-named model under another provider must not raise a false mismatch
     // for a custom provider that has not discovered it.
     const otherProvider = authedIo([
