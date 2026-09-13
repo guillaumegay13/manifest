@@ -307,7 +307,14 @@ describe('Proxy fallback success — auth_type/cost_usd attribution (#1173)', ()
  * 401 must be cooled down, not re-tried on every request before falling back.
  */
 describe('Proxy fallback — rejected subscription credential cooldown (#2883)', () => {
-  const chatGptCalls = () => calls.filter((c) => c.url.includes('chatgpt.com')).length;
+  const chatGptCalls = () =>
+    calls.filter((c) => {
+      try {
+        return new URL(c.url).hostname === 'chatgpt.com';
+      } catch {
+        return false;
+      }
+    }).length;
 
   beforeEach(async () => {
     // Primary api_key also 401s so the request reaches the subscription

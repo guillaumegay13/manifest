@@ -54,6 +54,10 @@ interface RejectedEntry {
 export function credentialFingerprint(rawValue: string): string {
   const blob = parseOAuthTokenBlob(rawValue);
   const material = blob ? blob.r || blob.t : rawValue;
+  // Not a password hash: this is an in-memory equality fingerprint used to
+  // notice when a rejected credential has been replaced. It is never persisted
+  // and never verifies a secret, so a fast one-way digest is the right tool.
+  // codeql[js/insufficient-password-hash]
   return createHash('sha256').update(material.slice(0, MAX_FINGERPRINT_MATERIAL)).digest('hex');
 }
 
