@@ -191,6 +191,16 @@ function sseToolCalls(text: string): Array<Record<string, unknown>> {
     });
 }
 
+function finalSseUsage(text: string): Record<string, number> | undefined {
+  let usage: Record<string, number> | undefined;
+  for (const line of text.split('\n')) {
+    if (!line.startsWith('data: ') || line.includes('[DONE]')) continue;
+    const chunk = JSON.parse(line.slice(6)) as { usage?: Record<string, number> };
+    if (chunk.usage) usage = chunk.usage;
+  }
+  return usage;
+}
+
 describe('kiro-adapter', () => {
   beforeEach(() => {
     mockFetch.mockReset();
@@ -566,6 +576,100 @@ describe('kiro-adapter', () => {
     expect(text).toContain('"finish_reason":"stop"');
     expect(text).toContain('"prompt_tokens":7');
     expect(text).toContain('data: [DONE]');
+  });
+
+  it('keeps the cache breakdown in the normalized usage', async () => {
+    const source = streamFrom([
+      eventFrame('assistantResponseEvent', { content: 'hello' }),
+      eventFrame('metadataEvent', {
+        tokenUsage: {
+          uncachedInputTokens: 4,
+          cacheReadInputTokens: 100,
+          cacheWriteInputTokens: 20,
+          outputTokens: 3,
+          totalTokens: 127,
+        },
+      }),
+    ]);
+
+    const response = new Response(createKiroOpenAiStream(source, 'auto'));
+    const text = await response.text();
+
+    expect(text).toContain('"prompt_tokens":124');
+    expect(text).toContain('"cache_read_tokens":100');
+    expect(text).toContain('"cache_creation_tokens":20');
+    expect(text).toContain('"cached_tokens":100');
+    expect(text).toContain('"cache_write_tokens":20');
+  });
+
+  it('estimates usage from a contextUsageEvent when no token block is sent', async () => {
+    const source = streamFrom([
+      eventFrame('assistantResponseEvent', { content: 'x'.repeat(40) }),
+      eventFrame('contextUsageEvent', { contextUsagePercentage: 1.5 }),
+    ]);
+
+    const response = new Response(createKiroOpenAiStream(source, 'claude-sonnet-4.5'));
+
+    expect(finalSseUsage(await response.text())).toEqual({
+      prompt_tokens: 2990,
+      completion_tokens: 10,
+      total_tokens: 3000,
+      estimated: true,
+    });
+  });
+
+  it('falls back to a contextUsagePercentage carried on metadataEvent', async () => {
+    const source = streamFrom([
+      eventFrame('assistantResponseEvent', { content: 'hello' }),
+      eventFrame('metadataEvent', { contextUsagePercentage: 50 }),
+    ]);
+
+    const response = new Response(createKiroOpenAiStream(source, 'auto'));
+    const usage = finalSseUsage(await response.text());
+
+    expect(usage?.total_tokens).toBe(500000);
+    expect((usage?.prompt_tokens ?? 0) + (usage?.completion_tokens ?? 0)).toBe(500000);
+    expect(usage?.estimated).toBe(true);
+  });
+
+  it('does not invent usage when the stream carries neither tokens nor a percentage', async () => {
+    const source = streamFrom([
+      eventFrame('assistantResponseEvent', { content: 'hello' }),
+      eventFrame('metadataEvent', { stopReason: 'end_turn' }),
+      eventFrame('meteringEvent', { usage: [{ unit: 'credit', value: 1 }] }),
+    ]);
+
+    const response = new Response(createKiroOpenAiStream(source, 'auto'));
+
+    expect(finalSseUsage(await response.text())).toBeUndefined();
+  });
+
+  it('reports estimated usage in the non-streaming completion', async () => {
+    mockFetch.mockResolvedValue(
+      new Response(
+        streamFrom([
+          eventFrame('assistantResponseEvent', { content: 'x'.repeat(40) }),
+          eventFrame('contextUsageEvent', { contextUsagePercentage: 1.5 }),
+        ]),
+        { status: 200 },
+      ),
+    );
+
+    const response = await forwardKiroChat({
+      apiKey: 'ksk_test',
+      model: 'claude-sonnet-4.5',
+      body: { messages: [{ role: 'user', content: 'Hello' }] },
+      stream: false,
+      timeoutMs: 1000,
+    });
+    const json = (await response.json()) as { usage: Record<string, number> };
+
+    expect(json.usage).toEqual({
+      prompt_tokens: 2990,
+      completion_tokens: 10,
+      total_tokens: 3000,
+      estimated: true,
+    });
   });
 
   it('converts Kiro toolUseEvent frames into OpenAI tool_calls', async () => {

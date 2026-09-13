@@ -1,15 +1,37 @@
 import { Buffer } from 'node:buffer';
 import { randomUUID } from 'node:crypto';
+import { Logger } from '@nestjs/common';
 import type { DiscoveredModel } from '../../model-discovery/model-fetcher';
 
 export const KIRO_BASE_URL = 'https://q.us-east-1.amazonaws.com';
 export const KIRO_MODELS_TARGET = 'AmazonCodeWhispererService.ListAvailableModels';
 export const KIRO_CHAT_TARGET = 'AmazonCodeWhispererStreamingService.GenerateAssistantResponse';
 
+const logger = new Logger('KiroAdapter');
+
 const KIRO_ORIGIN = 'KIRO_CLI';
 const KIRO_AGENT_MODE = 'SUPERVISED';
 const DEFAULT_KIRO_CONTEXT_WINDOW = 200000;
 const AUTO_KIRO_CONTEXT_WINDOW = 1000000;
+/**
+ * Rough fallback when a Kiro stream reports context usage but no per-token
+ * breakdown: Claude/GPT tokenizers average around four characters per token.
+ */
+const KIRO_ESTIMATED_CHARS_PER_TOKEN = 4;
+
+/**
+ * Kiro event types that carry no usage or content. `meteringEvent` reports
+ * spend in credits, not tokens, so it cannot fill the token columns; the rest
+ * are stream lifecycle/footnote events. Anything outside this set (and outside
+ * the handled event types) is logged so wire-format changes surface early.
+ */
+const IGNORED_KIRO_EVENT_TYPES = new Set([
+  'meteringevent',
+  'messagestopevent',
+  'metricsevent',
+  'codereferenceevent',
+  'supplementaryweblinksevent',
+]);
 
 /**
  * Kiro's tool schema bounds. Names must match `[A-Za-z0-9_-]+`, tool-use ids are
@@ -765,6 +787,11 @@ interface OpenAiUsage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  cache_read_tokens?: number;
+  cache_creation_tokens?: number;
+  prompt_tokens_details?: { cached_tokens: number; cache_write_tokens: number };
+  /** True when token counts were derived locally because Kiro reported none. */
+  estimated?: boolean;
 }
 
 interface KiroToolCallState {
@@ -777,6 +804,8 @@ interface KiroCollectState {
   content: string;
   reasoning: string;
   usage?: OpenAiUsage;
+  /** Fraction (0-100) of the model context window consumed, from Kiro events. */
+  contextUsagePercentage?: number;
   toolCalls: Map<string, KiroToolCallState>;
   toolOrder: string[];
 }
@@ -806,19 +835,86 @@ function numberField(record: Record<string, unknown>, ...keys: string[]): number
 function normalizeUsage(value: unknown): OpenAiUsage | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const usage = value as Record<string, unknown>;
+  const uncachedInput = numberField(usage, 'uncachedInputTokens', 'uncached_input_tokens');
+  const cacheRead = numberField(
+    usage,
+    'cacheReadInputTokens',
+    'cache_read_input_tokens',
+    'cached_tokens',
+  );
+  const cacheWrite = numberField(
+    usage,
+    'cacheWriteInputTokens',
+    'cache_write_input_tokens',
+    'cache_creation_input_tokens',
+  );
   const prompt =
     numberField(usage, 'prompt_tokens', 'inputTokens', 'input_tokens') ||
-    numberField(usage, 'uncachedInputTokens', 'uncached_input_tokens') +
-      numberField(usage, 'cacheReadInputTokens', 'cache_read_input_tokens') +
-      numberField(usage, 'cacheWriteInputTokens', 'cache_write_input_tokens');
+    uncachedInput + cacheRead + cacheWrite;
   const completion = numberField(usage, 'completion_tokens', 'outputTokens', 'output_tokens');
-  const total =
-    numberField(usage, 'total_tokens', 'totalTokens', 'total_tokens') || prompt + completion;
+  const total = numberField(usage, 'total_tokens', 'totalTokens') || prompt + completion;
 
   return {
     prompt_tokens: prompt,
     completion_tokens: completion,
     total_tokens: total,
+    // Kiro reports cache reads/writes separately from the prompt total. Keep the
+    // breakdown so `cache_read_tokens` / `cache_creation_tokens` populate the
+    // request log instead of being discarded with the raw event.
+    ...(cacheRead > 0 ? { cache_read_tokens: cacheRead } : {}),
+    ...(cacheWrite > 0 ? { cache_creation_tokens: cacheWrite } : {}),
+    ...(cacheRead > 0 || cacheWrite > 0
+      ? {
+          prompt_tokens_details: {
+            cached_tokens: cacheRead,
+            cache_write_tokens: cacheWrite,
+          },
+        }
+      : {}),
+  };
+}
+
+function estimateTokensFromText(text: string): number {
+  if (!text) return 0;
+  return Math.ceil(text.length / KIRO_ESTIMATED_CHARS_PER_TOKEN);
+}
+
+/** Text the model emitted this turn: visible content, reasoning, and tool input. */
+function kiroCompletionText(state: KiroCollectState): string {
+  const parts = [state.content, state.reasoning];
+  for (const id of state.toolOrder) {
+    const tool = state.toolCalls.get(id);
+    if (tool) parts.push(tool.name, tool.input);
+  }
+  return parts.filter(Boolean).join('\n');
+}
+
+function kiroContextWindow(model: string): number {
+  return toKiroModelId(model).toLowerCase() === 'auto'
+    ? AUTO_KIRO_CONTEXT_WINDOW
+    : DEFAULT_KIRO_CONTEXT_WINDOW;
+}
+
+/**
+ * Kiro's GenerateAssistantResponse does not report per-token counts. It emits
+ * `contextUsageEvent.contextUsagePercentage`, the fraction of the model's
+ * context window consumed by the full exchange (prompt + completion). When a
+ * `metadataEvent` carries an explicit `tokenUsage` block, that wins; otherwise
+ * derive the total from the percentage and the model's context window, estimate
+ * completion tokens from the emitted text, and mark the result as estimated.
+ */
+function resolveKiroUsage(state: KiroCollectState, model: string): OpenAiUsage | undefined {
+  if (state.usage) return state.usage;
+  const percentage = state.contextUsagePercentage;
+  if (percentage === undefined || percentage <= 0) return undefined;
+
+  const total = Math.max(0, Math.round((percentage / 100) * kiroContextWindow(model)));
+  const completion = Math.min(total, estimateTokensFromText(kiroCompletionText(state)));
+  return {
+    prompt_tokens: Math.max(0, total - completion),
+    completion_tokens: completion,
+    total_tokens: total,
+    estimated: true,
   };
 }
 
@@ -879,8 +975,22 @@ function applyKiroEvent(state: KiroCollectState, event: KiroEvent): Record<strin
     }
     return null;
   }
-  if (eventType.includes('metadata')) {
-    state.usage = normalizeUsage(payload.tokenUsage ?? payload.token_usage);
+  // Kiro emits a dedicated `contextUsageEvent` carrying the authoritative
+  // `contextUsagePercentage`. `metadataEvent` only carries a `stopReason` on
+  // current captures, but accepts the same field (and an explicit `tokenUsage`)
+  // as a fallback so either shape can fill the usage log. A positive value
+  // overwrites an earlier one; absent/zero values leave it untouched.
+  if (eventType.includes('contextusage') || eventType.includes('metadata')) {
+    const tokenUsage = payload.tokenUsage ?? payload.token_usage;
+    if (tokenUsage) state.usage = normalizeUsage(tokenUsage);
+    const percentage = readNumber(
+      payload.contextUsagePercentage ?? payload.context_usage_percentage,
+    );
+    if (percentage !== undefined && percentage > 0) state.contextUsagePercentage = percentage;
+    return null;
+  }
+  if (event.eventType && !IGNORED_KIRO_EVENT_TYPES.has(eventType)) {
+    logger.debug(`Unhandled Kiro event type: ${event.eventType}`);
   }
   return null;
 }
@@ -960,7 +1070,9 @@ export function createKiroOpenAiStream(
         });
 
         const finishReason = toolCalls.length > 0 ? 'tool_calls' : 'stop';
-        controller.enqueue(encoder.encode(openAiChunk(model, {}, finishReason, state.usage)));
+        controller.enqueue(
+          encoder.encode(openAiChunk(model, {}, finishReason, resolveKiroUsage(state, model))),
+        );
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
       } catch (err) {
@@ -1003,6 +1115,7 @@ async function collectKiroCompletion(
     }));
   }
 
+  const usage = resolveKiroUsage(state, model);
   return {
     id: `chatcmpl-${randomUUID()}`,
     object: 'chat.completion',
@@ -1015,7 +1128,7 @@ async function collectKiroCompletion(
         finish_reason: toolCalls.length > 0 ? 'tool_calls' : 'stop',
       },
     ],
-    ...(state.usage ? { usage: state.usage } : {}),
+    ...(usage ? { usage } : {}),
   };
 }
 
