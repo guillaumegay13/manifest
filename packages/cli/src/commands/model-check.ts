@@ -5,6 +5,7 @@ import { resolveProviderId } from './provider';
 interface DiscoveredModel {
   model: string;
   provider?: string;
+  authType?: string;
 }
 
 /** The agent's discovered models (union of its ENABLED connections), with the
@@ -19,6 +20,7 @@ async function discoveredModels(client: ApiClient, agent: string): Promise<Disco
     .map((m) => ({
       model: typeof m['model_name'] === 'string' ? (m['model_name'] as string) : '',
       ...(typeof m['provider'] === 'string' ? { provider: m['provider'] as string } : {}),
+      ...(typeof m['auth_type'] === 'string' ? { authType: m['auth_type'] as string } : {}),
     }))
     .filter((m) => m.model !== '');
 }
@@ -29,12 +31,11 @@ async function discoveredModels(client: ApiClient, agent: string): Promise<Disco
  * out on live traffic. Shared by `agent configure` and `routing custom
  * create` so the two can never drift.
  *
- * When `provider` is given and the backend reports which connection each
- * model came from, the model must be discovered under THAT provider — a model
- * another enabled provider happens to expose is not routable through this one.
- * The provider is resolved through the catalog (aliases included);
- * provider-qualified ids (`openai/gpt-4o`) are matched on their provider part.
- * Unresolvable inputs (custom providers) fall back to the name-only check.
+ * The first model is the route and is pinned to the requested provider. The
+ * rest are fallbacks, stored provider-agnostic: each must be discoverable AND
+ * resolvable to a single connection. A bare fallback name exposed by more than
+ * one `(provider, auth_type)` would be rejected by the backend, so it is
+ * rejected here BEFORE any write, leaving the primary route untouched.
  *
  * `force` skips the check — the backend still routes an uncatalogued model
  * through provider-qualified passthrough, so the CLI must not be the thing
@@ -59,21 +60,22 @@ export async function assertModelsDiscovered(
     }
   }
   const rowsCarryProvider = rows.some((r) => r.provider !== undefined);
-  const names = new Set(rows.map((r) => r.model));
   const enforceProvider = providerId !== null && rowsCarryProvider;
-  const providersFor = (model: string): Set<string> =>
-    new Set(
-      rows
-        .filter((r) => r.model === model && r.provider !== undefined)
-        .map((r) => r.provider as string),
-    );
+  const names = new Set(rows.map((r) => r.model));
+
+  const withProvider = (model: string): DiscoveredModel[] =>
+    rows.filter((r) => r.model === model && r.provider !== undefined);
+  const identitiesFor = (model: string): Set<string> =>
+    new Set(withProvider(model).map((r) => `${r.provider}|${r.authType ?? ''}`));
+  const bareOf = (m: string): string => {
+    const slash = m.indexOf('/');
+    return slash > 0 ? m.slice(slash + 1) : m;
+  };
 
   const missing: string[] = [];
   const ambiguous: string[] = [];
+
   models.forEach((m, index) => {
-    // Only the route (first) model is pinned to this provider. Fallbacks are
-    // stored provider-agnostic and resolved at runtime, so they can belong to
-    // another provider and are checked by name only.
     if (enforceProvider && providerId !== null && index === 0) {
       const pid = providerId;
       const qualified = m.startsWith(`${pid}/`) ? m.slice(pid.length + 1) : m;
@@ -82,22 +84,36 @@ export async function assertModelsDiscovered(
       }
       return;
     }
-    if (!names.has(m)) {
-      missing.push(m);
+    // Without provider identity there is nothing to disambiguate: name-only.
+    if (!enforceProvider) {
+      if (!names.has(m)) missing.push(m);
       return;
     }
-    // A bare fallback exposed by more than one provider cannot be resolved
-    // unambiguously at write time. Reject before the route is written, so a
-    // partial configure never leaves the primary route applied.
-    const providers = providersFor(m);
-    const qualified = [...providers].some((p) => m.startsWith(`${p}/`));
-    if (providers.size > 1 && !qualified) ambiguous.push(m);
+    if (names.has(m)) {
+      if (identitiesFor(m).size > 1) ambiguous.push(m);
+      return;
+    }
+    // Accept a provider-qualified fallback (`provider/model`) whose bare id is
+    // discovered, as long as that provider resolves to one connection.
+    const bare = bareOf(m);
+    if (bare !== m && names.has(bare)) {
+      const prefix = m.slice(0, m.indexOf('/'));
+      const prefixRows = withProvider(bare).filter((r) => r.provider === prefix);
+      if (prefixRows.length === 0) {
+        missing.push(m);
+        return;
+      }
+      const ids = new Set(prefixRows.map((r) => `${r.provider}|${r.authType ?? ''}`));
+      if (ids.size > 1) ambiguous.push(m);
+      return;
+    }
+    missing.push(m);
   });
 
   if (ambiguous.length > 0) {
     throw new CliError(
       'ambiguous_model',
-      `Ambiguous fallback for "${agent}" (several providers expose it): ${ambiguous.join(', ')}`,
+      `Ambiguous fallback for "${agent}" (several connections expose it): ${ambiguous.join(', ')}`,
       'Qualify the fallback with its provider (provider/model), or pass --force',
     );
   }

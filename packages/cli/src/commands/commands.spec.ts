@@ -2712,6 +2712,68 @@ describe('routing commands', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('custom create rejects a fallback exposed by two auth types of one provider', async () => {
+    const { io, calls } = authedIo([
+      {
+        status: 200,
+        body: [
+          { model_name: 'gpt-4o', provider: 'openai', auth_type: 'api_key' },
+          { model_name: 'shared', provider: 'openai', auth_type: 'api_key' },
+          { model_name: 'shared', provider: 'openai', auth_type: 'subscription' },
+        ],
+      },
+    ]);
+    expect(
+      await run(io, [
+        'routing',
+        'custom',
+        'create',
+        'john',
+        '--name',
+        'x',
+        '--model',
+        'gpt-4o',
+        '--provider',
+        'openai',
+        '--fallbacks',
+        'shared',
+      ]),
+    ).toBe(1);
+    expect(io.lastJson()).toMatchObject({ error: 'ambiguous_model' });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('custom create accepts a provider-qualified fallback', async () => {
+    const { io } = authedIo([
+      {
+        status: 200,
+        body: [
+          { model_name: 'gpt-4o', provider: 'openai', auth_type: 'api_key' },
+          { model_name: 'claude-sonnet-4', provider: 'anthropic', auth_type: 'api_key' },
+        ],
+      },
+      { status: 201, body: { id: 't1' } },
+      { status: 200, body: {} },
+      { status: 200, body: {} },
+    ]);
+    expect(
+      await run(io, [
+        'routing',
+        'custom',
+        'create',
+        'john',
+        '--name',
+        'x',
+        '--model',
+        'gpt-4o',
+        '--provider',
+        'openai',
+        '--fallbacks',
+        'anthropic/claude-sonnet-4',
+      ]),
+    ).toBe(0);
+  });
+
   it('custom create accepts a native model id that already carries its provider prefix', async () => {
     const { io } = authedIo([
       { status: 200, body: [{ model_name: 'openai/gpt-4o', provider: 'openai' }] },
