@@ -2647,7 +2647,7 @@ describe('routing commands', () => {
   });
 
   it('custom create allows a fallback discovered under another provider', async () => {
-    const { io } = authedIo([
+    const { io, calls } = authedIo([
       {
         status: 200,
         body: [
@@ -2655,8 +2655,9 @@ describe('routing commands', () => {
           { model_name: 'claude-sonnet-4', provider: 'anthropic' },
         ],
       },
-      { status: 201, body: { id: 't1' } },
-      { status: 200, body: {} },
+      { status: 201, body: { id: 't1' } }, // POST header-tiers
+      { status: 200, body: {} }, // PUT override
+      { status: 200, body: {} }, // PUT fallbacks
     ]);
     expect(
       await run(io, [
@@ -2674,6 +2675,41 @@ describe('routing commands', () => {
         'claude-sonnet-4',
       ]),
     ).toBe(0);
+    expect(calls).toHaveLength(4);
+    expect(calls[3].url).toBe(`${HOST}/api/v1/routing/john/header-tiers/t1/fallbacks`);
+    expect(JSON.parse(calls[3].body!)).toEqual({ models: ['claude-sonnet-4'] });
+  });
+
+  it('custom create rejects an ambiguous fallback before writing anything', async () => {
+    const { io, calls } = authedIo([
+      {
+        status: 200,
+        body: [
+          { model_name: 'gpt-4o', provider: 'openai' },
+          { model_name: 'shared-model', provider: 'openai' },
+          { model_name: 'shared-model', provider: 'anthropic' },
+        ],
+      },
+    ]);
+    expect(
+      await run(io, [
+        'routing',
+        'custom',
+        'create',
+        'john',
+        '--name',
+        'x',
+        '--model',
+        'gpt-4o',
+        '--provider',
+        'openai',
+        '--fallbacks',
+        'shared-model',
+      ]),
+    ).toBe(1);
+    expect(io.lastJson()).toMatchObject({ error: 'ambiguous_model' });
+    // Discovery only; the tier was never created.
+    expect(calls).toHaveLength(1);
   });
 
   it('custom create accepts a native model id that already carries its provider prefix', async () => {

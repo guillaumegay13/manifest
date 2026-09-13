@@ -61,15 +61,46 @@ export async function assertModelsDiscovered(
   const rowsCarryProvider = rows.some((r) => r.provider !== undefined);
   const names = new Set(rows.map((r) => r.model));
   const enforceProvider = providerId !== null && rowsCarryProvider;
+  const providersFor = (model: string): Set<string> =>
+    new Set(
+      rows
+        .filter((r) => r.model === model && r.provider !== undefined)
+        .map((r) => r.provider as string),
+    );
 
-  const missing = models.filter((m, index) => {
+  const missing: string[] = [];
+  const ambiguous: string[] = [];
+  models.forEach((m, index) => {
     // Only the route (first) model is pinned to this provider. Fallbacks are
     // stored provider-agnostic and resolved at runtime, so they can belong to
     // another provider and are checked by name only.
-    if (!enforceProvider || providerId === null || index > 0) return !names.has(m);
-    const qualified = m.startsWith(`${providerId}/`) ? m.slice(providerId.length + 1) : m;
-    return !rows.some((r) => r.provider === providerId && (r.model === m || r.model === qualified));
+    if (enforceProvider && providerId !== null && index === 0) {
+      const pid = providerId;
+      const qualified = m.startsWith(`${pid}/`) ? m.slice(pid.length + 1) : m;
+      if (!rows.some((r) => r.provider === pid && (r.model === m || r.model === qualified))) {
+        missing.push(m);
+      }
+      return;
+    }
+    if (!names.has(m)) {
+      missing.push(m);
+      return;
+    }
+    // A bare fallback exposed by more than one provider cannot be resolved
+    // unambiguously at write time. Reject before the route is written, so a
+    // partial configure never leaves the primary route applied.
+    const providers = providersFor(m);
+    const qualified = [...providers].some((p) => m.startsWith(`${p}/`));
+    if (providers.size > 1 && !qualified) ambiguous.push(m);
   });
+
+  if (ambiguous.length > 0) {
+    throw new CliError(
+      'ambiguous_model',
+      `Ambiguous fallback for "${agent}" (several providers expose it): ${ambiguous.join(', ')}`,
+      'Qualify the fallback with its provider (provider/model), or pass --force',
+    );
+  }
   if (missing.length === 0) return;
   throw new CliError(
     'unknown_model',
