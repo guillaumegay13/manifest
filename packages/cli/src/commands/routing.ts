@@ -294,6 +294,16 @@ function parseResponsesSurface(parsed: Record<string, unknown>): SurfaceResult {
 }
 
 /**
+ * Whether the parsed body carries the fields the selected surface must return.
+ * A 2xx with `{}` or `[]` must not read as a verified route.
+ */
+function hasSurfacePayload(surface: string, parsed: Record<string, unknown>): boolean {
+  if (surface === 'messages') return Array.isArray(parsed['content']);
+  if (surface === 'responses') return Array.isArray(parsed['output']);
+  return Array.isArray(parsed['choices']);
+}
+
+/**
  * Send ONE real request through the agent's route to prove the config works
  * end-to-end — the closing move after `agent configure`. Not an inference
  * client: fixed shape, canned default prompt, facts-first output. Manifest
@@ -404,12 +414,12 @@ export async function routingTest(io: CliIo, argv: string[]): Promise<number | v
       response.status,
     );
   }
-  // A 2xx with a non-JSON or empty body is not a verified route; without this
+  // A 2xx without the surface's payload is not a verified route; without this
   // the surface parser returns an empty reply and the test falsely passes.
-  if (!parsedOk) {
+  if (!parsedOk || !hasSurfacePayload(surface, parsed)) {
     throw new CliError(
       'route_test_failed',
-      `Route test got HTTP ${response.status} but no JSON body`,
+      `Route test got HTTP ${response.status} but no ${surface} payload`,
       'See mnfst routing status ' + agent,
       response.status,
     );

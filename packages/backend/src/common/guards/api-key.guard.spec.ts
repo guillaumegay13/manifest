@@ -511,8 +511,8 @@ describe('ApiKeyGuard', () => {
     } as unknown as ExecutionContext;
 
     await guard.canActivate(ctx);
-    // /me must report the slid deadline, not the pre-refresh one.
-    expect(request.apiKeyExpiresAt).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    // /me must report the slid deadline (ISO UTC), not the pre-refresh one.
+    expect(request.apiKeyExpiresAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(new Date(request.apiKeyExpiresAt!).getTime()).toBeGreaterThan(
       new Date(expiresAt).getTime(),
     );

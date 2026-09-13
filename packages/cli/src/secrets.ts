@@ -17,7 +17,14 @@ export function validateKeyFileDestination(keyFile: string): string {
     );
   }
   const dir = path.dirname(absolute);
-  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+  let dirIsDirectory = false;
+  try {
+    dirIsDirectory = fs.statSync(dir).isDirectory();
+  } catch {
+    // Missing, raced, or unreadable: report it as an invalid destination
+    // rather than leaking a raw internal error.
+  }
+  if (!dirIsDirectory) {
     throw new CliError(
       'key_file_dir_missing',
       `Not a directory: ${dir}`,

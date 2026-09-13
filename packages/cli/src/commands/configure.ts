@@ -40,6 +40,11 @@ export async function agentConfigure(io: CliIo, argv: string[]): Promise<void> {
   });
   const agent = slugifyAgentName(requirePositional(args, 0, '<agent-name>'));
 
+  // Validate an explicitly empty tier first, so `--tier=` reports the real
+  // problem instead of the catch-all "Nothing to configure".
+  if (args.strings['tier'] === '') {
+    throw new CliError('missing_flag', '--tier must name a custom tier');
+  }
   const wantsRoute =
     args.strings['models'] !== undefined ||
     args.strings['provider'] !== undefined ||
@@ -55,9 +60,6 @@ export async function agentConfigure(io: CliIo, argv: string[]): Promise<void> {
   }
   if (args.strings['tier'] !== undefined && !wantsRoute) {
     throw new CliError('missing_flag', '--tier needs --models and --provider');
-  }
-  if (args.strings['tier'] === '') {
-    throw new CliError('missing_flag', '--tier must name a custom tier');
   }
 
   const { client } = clientFromFlags(io, args);

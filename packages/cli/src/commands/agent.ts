@@ -238,9 +238,16 @@ export async function agentUpdate(io: CliIo, argv: string[]): Promise<void> {
   }
   const { client, target } = clientFromFlags(io, args);
   const result = await client.request('PATCH', `/agents/${encodeURIComponent(name)}`, { body });
-  // A rename leaves the old cache entry behind. If that name is later reused,
-  // resolveAgentKey would hand back the previous agent's key, so drop it.
-  if (body['name'] !== undefined) deleteAgentKey(io.env, target.origin, name);
+  // A rename must MOVE the cached key. Leaving it under the old name would let
+  // a later agent that reuses that name inherit this agent's key from cache.
+  if (body['name'] !== undefined) {
+    const nextName = slugifyAgentName(body['name']);
+    if (nextName !== name) {
+      const cached = readAgentKey(io.env, target.origin, name);
+      if (cached) saveAgentKey(io.env, target.origin, nextName, cached);
+      deleteAgentKey(io.env, target.origin, name);
+    }
+  }
   printJson(io, result);
 }
 

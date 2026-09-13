@@ -88,9 +88,10 @@ export class ApiKeyGuard implements CanActivate {
           ? absoluteExpiryAt
           : slidExpiryAt;
       // Stamp the REFRESHED deadline, not the pre-refresh one, so /me reports
-      // what the next request will actually enforce.
+      // what the next request will actually enforce. ISO UTC on the wire (like
+      // the mint response), while the DB update keeps the naive-local form.
       (request as Request & { apiKeyExpiresAt?: string | null }).apiKeyExpiresAt = found.expires_at
-        ? toLocalSqlTimestamp(new Date(nextExpiryAt))
+        ? new Date(nextExpiryAt).toISOString()
         : null;
       this.apiKeyRepo
         .createQueryBuilder()
