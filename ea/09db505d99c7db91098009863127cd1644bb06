@@ -1,0 +1,22 @@
+packages/backend/src/common/utils/url-validation.ts
+  s_b2b5a4b0535460::t_54a97f2bc9b747 119-121
+packages/backend/src/common/utils/url-validation.spec.ts
+  s_b2b5a4b0535460::t_facdf9efd2e0d6 167-169
+  s_b2b5a4b0535460::t_e7feb99ed5568f 170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ea09db505d99c7db91098009863127cd1644bb06",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
