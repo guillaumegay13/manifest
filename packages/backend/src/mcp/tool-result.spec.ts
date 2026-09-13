@@ -16,12 +16,16 @@ describe('tool-result', () => {
 
   it('wraps a resolved promise and a rejected Error', async () => {
     await expect(result(Promise.resolve({ a: 1 }))).resolves.toMatchObject({
-      content: [{ type: 'text' }],
+      content: [{ type: 'text', text: expect.stringContaining('"a": 1') }],
     });
     await expect(result(Promise.reject(new Error('nope')))).resolves.toMatchObject({
       isError: true,
       content: [{ type: 'text', text: 'nope' }],
     });
+  });
+
+  it('normalizes an undefined payload to a valid content block', () => {
+    expect(ok(undefined).content[0].text).toBe('null');
   });
 
   it('stringifies a non-Error rejection', async () => {

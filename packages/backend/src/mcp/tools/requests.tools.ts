@@ -4,6 +4,7 @@ import {
   MESSAGE_ORIGIN_FILTER_VALUES,
   MESSAGE_STATUS_FILTER_VALUES,
 } from '../../analytics/dto/messages-query.dto';
+import { RANGE_VALUES } from '../../common/utils/range.util';
 import { McpOperator } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
 import { result } from '../tool-result';
@@ -24,7 +25,7 @@ export function registerRequestTools(
       description: 'List recent Manifest requests (provider attempts) with cursor pagination.',
       inputSchema: z.object({
         agent: z.string().min(1).max(100).optional(),
-        range: z.string().min(1).max(50).optional(),
+        range: z.enum(RANGE_VALUES).optional(),
         status: z.enum(MESSAGE_STATUS_FILTER_VALUES).optional(),
         provider: z.string().min(1).max(100).optional(),
         origin: z.enum(MESSAGE_ORIGIN_FILTER_VALUES).optional(),

@@ -141,4 +141,28 @@ describe('fetchClientMetadataResource', () => {
     expect(response.headers.get('x-multi')).toBe('a, b');
     expect(response.headers.get('x-one')).toBe('c');
   });
+
+  it('rejects an out-of-range HTTP status instead of throwing', async () => {
+    lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    request.mockImplementation((_url, _opts, cb) => fakeRequest(cb, 700, ''));
+    await expect(fetchClientMetadataResource('https://example.com/meta')).rejects.toThrow(
+      /invalid HTTP status/,
+    );
+  });
+
+  it('rejects a protocol upgrade and destroys its socket', async () => {
+    lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    const socket = { destroy: jest.fn() };
+    request.mockImplementation(() => {
+      const req = new EventEmitter() as EventEmitter & { end: jest.Mock; destroy: jest.Mock };
+      req.end = jest.fn();
+      req.destroy = jest.fn();
+      process.nextTick(() => req.emit('upgrade', {}, socket));
+      return req;
+    });
+    await expect(fetchClientMetadataResource('https://example.com/meta')).rejects.toThrow(
+      /upgrade/,
+    );
+    expect(socket.destroy).toHaveBeenCalled();
+  });
 });

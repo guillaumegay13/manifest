@@ -146,7 +146,9 @@ export function registerProviderTools(
           const upserted = await deps.providers.upsertProvider(
             resolved.id,
             resolved.tenant_id,
-            provider,
+            // Persist the canonical id, not the alias the caller typed, or every
+            // later lookup (refresh/disable) fails to find the connection.
+            known.id,
             api_key,
             auth_type,
             region,
@@ -412,6 +414,13 @@ async function findAffectedRoutes(
     if (belongs(tier.override_route)) affected.push(`${tier.tier}: primary`);
     for (const [i, fallback] of (tier.fallback_routes ?? []).entries()) {
       if (belongs(fallback)) affected.push(`${tier.tier}: fallback ${i + 1}`);
+    }
+  }
+  const headerTiers = await deps.headerTiers.list(agentId);
+  for (const tier of headerTiers) {
+    if (belongs(tier.override_route)) affected.push(`${tier.name}: primary`);
+    for (const [i, fallback] of (tier.fallback_routes ?? []).entries()) {
+      if (belongs(fallback)) affected.push(`${tier.name}: fallback ${i + 1}`);
     }
   }
   const assignments = await deps.specificity.getAssignments(agentId);

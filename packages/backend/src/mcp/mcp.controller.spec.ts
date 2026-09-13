@@ -63,6 +63,10 @@ describe('McpController', () => {
     await makeController('tenant-1').handle(req, res as never);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.send).toHaveBeenCalledWith('OK');
+    expect(requireMcpAuth).toHaveBeenCalledWith(expect.anything(), expect.any(Function), {
+      resource: 'http://localhost:3001/api/v1/mcp',
+      requiredScopes: ['mcp:read'],
+    });
   });
 
   it('answers 401 with a WWW-Authenticate challenge when the operator is gone', async () => {
@@ -95,7 +99,8 @@ describe('McpController', () => {
     const body = JSON.parse(res.send.mock.calls[0][0] as string) as {
       error: { code: number; message: string };
     };
-    expect(body.error).toMatchObject({ code: -32603, message: 'boom' });
+    // The caller gets a constant message; the detail is logged server-side.
+    expect(body.error).toMatchObject({ code: -32603, message: 'Internal error' });
   });
 
   it('answers a non-Error throw with a generic JSON-RPC 500', async () => {

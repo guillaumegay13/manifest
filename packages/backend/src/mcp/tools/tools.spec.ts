@@ -307,11 +307,19 @@ describe('MCP tools', () => {
       expect(
         (await call(tools, 'manifest_provider_connect', { provider: 'nope', agent: 'demo' })).error,
       ).toBe(true);
-      // Local-only providers are rejected outside self-hosted installs.
-      expect(
-        (await call(tools, 'manifest_provider_connect', { provider: 'ollama', agent: 'demo' }))
-          .error,
-      ).toBe(true);
+      // Local-only providers are rejected outside self-hosted installs. Pin the
+      // deployment mode so a container marker cannot flip isSelfHosted().
+      const previousMode = process.env['MANIFEST_MODE'];
+      process.env['MANIFEST_MODE'] = 'cloud';
+      try {
+        expect(
+          (await call(tools, 'manifest_provider_connect', { provider: 'ollama', agent: 'demo' }))
+            .error,
+        ).toBe(true);
+      } finally {
+        if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
+        else process.env['MANIFEST_MODE'] = previousMode;
+      }
     });
 
     it('disconnects and refreshes', async () => {
@@ -503,6 +511,20 @@ describe('MCP tools', () => {
             badge_color: 'indigo',
             model: 'gpt-4o',
             provider: 'openai',
+          })
+        ).error,
+      ).toBe(true);
+
+      // Fallbacks without a primary route are rejected.
+      expect(
+        (
+          await call(tools, 'manifest_routing_custom_create', {
+            agent: 'demo',
+            name: 'tier3',
+            header_key: 'x',
+            header_value: 'y',
+            badge_color: 'indigo',
+            fallbacks: ['gpt-4o'],
           })
         ).error,
       ).toBe(true);
@@ -730,7 +752,9 @@ describe('MCP tools', () => {
       (hollow.providers.getProviders as jest.Mock).mockResolvedValue([
         { ...CONNECTION, cached_models: [] },
       ]);
-      expect((await call(registerAll(hollow), 'manifest_doctor')).data).toMatchObject({ ok: true });
+      expect((await call(registerAll(hollow), 'manifest_doctor')).data).toMatchObject({
+        ok: false,
+      });
     });
   });
 

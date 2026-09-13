@@ -85,19 +85,30 @@ export const fetchClientMetadataResource: ClientMetadataResourceFetch = async (i
     };
     const clientRequest = request(url, options, (response) => {
       const status = response.statusCode ?? 500;
+      // `new Response` throws for a status outside 200-599. A throw inside this
+      // callback would escape the promise and could crash the process, so reject.
+      if (status < 200 || status > 599) {
+        response.resume();
+        reject(new TypeError(`metadata server returned an invalid HTTP status: ${status}`));
+        return;
+      }
       const hasNoBody =
         webRequest.method === 'HEAD' || BODY_FORBIDDEN_RESPONSE_STATUSES.has(status);
       // Drain the response when we are discarding it, or a 205 with a body keeps
       // the socket alive until the peer times out.
       if (hasNoBody) response.resume();
       const body = hasNoBody ? null : (Readable.toWeb(response) as unknown as BodyInit);
-      resolve(
-        new Response(body, {
-          headers: responseHeaders(response.headers),
-          status,
-          statusText: response.statusMessage,
-        }),
-      );
+      try {
+        resolve(
+          new Response(body, {
+            headers: responseHeaders(response.headers),
+            status,
+            statusText: response.statusMessage,
+          }),
+        );
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     });
     clientRequest.once('timeout', () =>
       clientRequest.destroy(new Error('CIMD metadata request timed out')),

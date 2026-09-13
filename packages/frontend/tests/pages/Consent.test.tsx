@@ -100,7 +100,7 @@ describe('Consent', () => {
     expect(consentCall?.[1]).toMatchObject({ method: 'POST' });
   });
 
-  it('denies without navigating away', async () => {
+  it('denies and redirects to the client callback with an error', async () => {
     const { assign, restore } = stubLocation();
     restoreLocation = restore;
     mockFetch.mockResolvedValue(jsonResponse({ url: 'https://claude.ai/cb?error=denied' }));
@@ -109,6 +109,7 @@ describe('Consent', () => {
     fireEvent.click(screen.getByRole('button', { name: /deny/i }));
 
     await waitFor(() => expect(assign).toHaveBeenCalled());
+    expect(assign.mock.calls[0][0]).toContain('error=denied');
     const body = JSON.parse(mockFetch.mock.calls.at(-1)?.[1]?.body as string) as {
       accept: boolean;
     };

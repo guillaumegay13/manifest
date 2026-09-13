@@ -1,4 +1,4 @@
-import { Controller, Post, Req, Res, Inject } from '@nestjs/common';
+import { Controller, Post, Req, Res, Inject, Logger } from '@nestjs/common';
 import { requireMcpAuth } from '@better-auth/mcp';
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { fromNodeHeaders } from 'better-auth/node';
@@ -51,6 +51,8 @@ import { McpToolDeps } from './tool-deps';
  */
 @Controller('api/v1/mcp')
 export class McpController {
+  private readonly logger = new Logger(McpController.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly tenantCache: TenantCacheService,
@@ -137,21 +139,21 @@ export class McpController {
       const response = await verify(webRequest);
       await sendWebResponse(response, res);
     } catch (error) {
-      // A throw here (for example a tenant lookup failure) must still answer
-      // JSON-RPC, not a Nest-shaped 500, or the MCP client session breaks.
-      await sendWebResponse(internalErrorResponse(error), res);
+      // Log the detail server-side; the OAuth caller gets a constant message so
+      // database or infrastructure errors cannot leak through the response.
+      this.logger.error(
+        `MCP request failed: ${error instanceof Error ? error.stack : String(error)}`,
+      );
+      await sendWebResponse(internalErrorResponse(), res);
     }
   }
 }
 
-function internalErrorResponse(error: unknown): globalThis.Response {
+function internalErrorResponse(): globalThis.Response {
   return new globalThis.Response(
     JSON.stringify({
       jsonrpc: '2.0',
-      error: {
-        code: -32603,
-        message: error instanceof Error ? error.message : 'Internal error',
-      },
+      error: { code: -32603, message: 'Internal error' },
       id: null,
     }),
     { status: 500, headers: { 'Content-Type': 'application/json' } },

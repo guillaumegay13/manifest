@@ -67,9 +67,9 @@ export function registerIdentityTools(
             .map((c) => `${c.provider}/${c.auth_type}${c.label ? `/${c.label}` : ''}`);
           checks.push({
             name: 'providers',
-            // No connections means nothing can route at all, so this is a real
-            // failure, not a warning — and it makes the verdict able to be false.
-            status: connections.length === 0 ? 'fail' : hollow.length > 0 ? 'warn' : 'ok',
+            // No connections means nothing can route; a hollow connection (active
+            // with zero cached models) is equally unusable. Both fail the verdict.
+            status: connections.length === 0 || hollow.length > 0 ? 'fail' : 'ok',
             detail: {
               connections: connections.length,
               // An active connection with zero cached models is unusable by

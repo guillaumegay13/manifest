@@ -5,7 +5,9 @@
  * failures rather than data.
  */
 export function ok(payload: unknown) {
-  return { content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] };
+  // JSON.stringify(undefined) is undefined, which would make the content block
+  // carry an undefined text. Normalize so the result is always a valid block.
+  return { content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) ?? 'null' }] };
 }
 
 export function err(message: string) {

@@ -205,9 +205,11 @@ export function registerRoutingTools(
         result(
           (async () => {
             const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
+            if (enabled) await deps.autofixStats.recordAutofixConsent();
             await deps.agentRepo.update(agent.id, { autofix_enabled: enabled });
             deps.resolveAgent.invalidate(agent.tenant_id, agentName);
-            return await { enabled: deps.autofix.resolveEnabled(enabled) };
+            await deps.cacheManager.del(`${agent.tenant_id}:/api/v1/autofix/status`);
+            return { enabled: deps.autofix.resolveEnabled(enabled) };
           })(),
         ),
     );
@@ -468,21 +470,34 @@ export function registerRoutingTools(
                     badge_color: 'indigo' as never,
                   }));
                 output['tier'] = { id: target.id, name: target.name, created: !hit };
-                output['route'] = await deps.headerTiers.setOverride(
-                  agent.id,
-                  agent.tenant_id,
-                  target.id,
-                  primary,
-                  provider,
-                  authType,
-                  key_label ?? null,
-                );
-                output['fallbacks'] = await setOrClear(
-                  () =>
-                    deps.headerTiers.setFallbacks(agent.id, agent.tenant_id, target.id, fallbacks),
-                  () => deps.headerTiers.clearFallbacks(agent.id, target.id),
-                  fallbacks,
-                );
+                try {
+                  output['route'] = await deps.headerTiers.setOverride(
+                    agent.id,
+                    agent.tenant_id,
+                    target.id,
+                    primary,
+                    provider,
+                    authType,
+                    key_label ?? null,
+                  );
+                  output['fallbacks'] = await setOrClear(
+                    () =>
+                      deps.headerTiers.setFallbacks(
+                        agent.id,
+                        agent.tenant_id,
+                        target.id,
+                        fallbacks,
+                      ),
+                    () => deps.headerTiers.clearFallbacks(agent.id, target.id),
+                    fallbacks,
+                  );
+                } catch (error) {
+                  // The tier was created by this call; drop it so a failed
+                  // route/fallback write does not leave an enabled empty tier.
+                  if (!hit)
+                    await deps.headerTiers.delete(agent.id, target.id).catch(() => undefined);
+                  throw error;
+                }
               } else {
                 output['route'] = await deps.tiers.setOverride(
                   agent.id,
@@ -501,8 +516,10 @@ export function registerRoutingTools(
               }
             }
             if (autofix !== undefined) {
+              if (autofix) await deps.autofixStats.recordAutofixConsent();
               await deps.agentRepo.update(agent.id, { autofix_enabled: autofix });
               deps.resolveAgent.invalidate(agent.tenant_id, agentName);
+              await deps.cacheManager.del(`${agent.tenant_id}:/api/v1/autofix/status`);
               output['autofix'] = { enabled: deps.autofix.resolveEnabled(autofix) };
             }
             if (recording !== undefined) {
@@ -548,6 +565,11 @@ export function registerRoutingTools(
         result(
           (async () => {
             const agent = await deps.resolveAgent.resolve(operator.tenantId, agentName);
+            if (fallbacks && fallbacks.length > 0 && !model) {
+              // Fallbacks without a primary route leave matching requests
+              // unroutable, so reject instead of persisting a broken tier.
+              throw new Error('fallbacks require a model (the primary route)');
+            }
             const tier = await deps.headerTiers.create(agent.id, agent.tenant_id, {
               name,
               header_key,
