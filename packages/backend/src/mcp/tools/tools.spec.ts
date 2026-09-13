@@ -777,6 +777,10 @@ describe('MCP tools', () => {
         models: [{ model_name: 'gpt-4o' }],
       });
       expect((await call(tools, 'manifest_model_prices', {})).error).toBeFalsy();
+      // A provider alias exercises the alias branch of the label lookup.
+      expect(
+        (await call(tools, 'manifest_model_prices', { provider: 'aws-bedrock' })).data,
+      ).toMatchObject({ models: [] });
     });
   });
 
@@ -808,6 +812,15 @@ describe('MCP tools', () => {
         { ...CONNECTION, cached_models: [] },
       ]);
       expect((await call(registerAll(hollow), 'manifest_doctor')).data).toMatchObject({
+        ok: false,
+      });
+
+      // Hollow connection with no label exercises the label-less branch.
+      const hollowNoLabel = makeDeps();
+      (hollowNoLabel.providers.getProviders as jest.Mock).mockResolvedValue([
+        { ...CONNECTION, label: '', cached_models: [] },
+      ]);
+      expect((await call(registerAll(hollowNoLabel), 'manifest_doctor')).data).toMatchObject({
         ok: false,
       });
     });
@@ -845,6 +858,20 @@ describe('MCP tools', () => {
         true,
       );
       expect(ro.has('manifest_agent_env')).toBe(false);
+      // Read-only generic setup omits the write-only env guidance.
+      const roDeps = makeDeps();
+      (roDeps.lifecycle.findAgentInfo as jest.Mock).mockResolvedValue({
+        agent_name: 'demo',
+        display_name: 'Demo',
+        agent_category: 'coding',
+        agent_platform: 'unknown-platform',
+      });
+      const roSetup = await call(
+        registerAll(roDeps, { ...OPERATOR, scopes: new Set(['mcp:read']) }),
+        'manifest_agent_setup',
+        { agent: 'demo' },
+      );
+      expect((roSetup.data as { setup: string }).setup).not.toContain('manifest_agent_env');
     });
 
     it('returns env lines and the guide', async () => {
