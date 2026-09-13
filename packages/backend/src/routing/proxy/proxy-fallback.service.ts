@@ -5,6 +5,7 @@ import type { AuthType, ModelRoute } from 'manifest-shared';
 import { applyRequestParamDefaults } from 'manifest-shared';
 import { AgentModelParamsService } from '../routing-core/agent-model-params.service';
 import { ProviderParamSpecService } from '../routing-core/provider-param-spec.service';
+import { AutofixService, type AutofixAttempt } from '../autofix/autofix.service';
 
 /**
  * Context for the per-attempt param-defaults merge. Carries the agentId so
@@ -151,6 +152,7 @@ export class ProxyFallbackService {
     private readonly modelParamsService: AgentModelParamsService,
     private readonly providerParamSpecs: ProviderParamSpecService,
     private readonly reasoningCache: ReasoningContentCache,
+    private readonly autofixService: AutofixService,
   ) {}
 
   /**
@@ -337,10 +339,60 @@ export class ProxyFallbackService {
         startProviderAttempt,
       });
 
-      if (forward.response.ok) {
+      // Autofix runs on a failed fallback hop too, not just the primary: a
+      // fallback that rejects a request-side param (e.g. an unsupported
+      // response_format) can carry its own Phoenix patch, and retrying it on
+      // this same transport recovers the request instead of recording a dead
+      // hop. Consent is enforced inside maybeHeal, exactly like the primary.
+      let autofixAttempt: AutofixAttempt | null = null;
+      let preHealErrorBody: string | null = null;
+      if (
+        !forward.response.ok &&
+        this.autofixService.isRepairable(forward.response.status) &&
+        forward.wireRequestBody &&
+        forward.retryWireBody
+      ) {
+        // Keep the failed body readable for the audit row if the patch heals —
+        // maybeHeal consumes the live response.
+        preHealErrorBody = await forward.response.clone().text();
+        autofixAttempt = await this.maybeHealFallback({
+          forward,
+          agentId,
+          tenantId,
+          provider,
+          model,
+          authType,
+          apiMode,
+          tenantProviderId,
+          providerKeyLabel,
+          signal,
+          startProviderAttempt,
+        });
+      }
+      const finalForward = autofixAttempt?.forward ?? forward;
+
+      if (finalForward.response.ok) {
+        // The hop that failed first is still recorded when Autofix recovers it,
+        // so a healed fallback keeps the same audit trail as a healed primary.
+        if (autofixAttempt && preHealErrorBody !== null) {
+          failures.push({
+            model,
+            provider,
+            fallbackIndex: i,
+            status: forward.response.status,
+            errorBody: preHealErrorBody,
+            authType,
+            tenantProviderId,
+            // Selected-row label (credentials.keyLabel already folded in above),
+            // so this row's label and tenant_provider_id name the same connection.
+            keyLabel: providerKeyLabel,
+            attempt: forward.attempt,
+            providerCallStarted: forward.providerCallStarted,
+          });
+        }
         return {
           success: {
-            forward,
+            forward: finalForward,
             model,
             provider,
             fallbackIndex: i,
@@ -354,21 +406,21 @@ export class ProxyFallbackService {
         };
       }
 
-      const errorBody = await forward.response.text();
-      await forward.attempt?.finishRecording?.(recordingResponseFromText(errorBody));
+      const errorBody = await finalForward.response.text();
+      await finalForward.attempt?.finishRecording?.(recordingResponseFromText(errorBody));
       failures.push({
         model,
         provider,
         fallbackIndex: i,
-        status: forward.response.status,
+        status: finalForward.response.status,
         errorBody,
         authType,
         tenantProviderId,
         // Selected-row label (credentials.keyLabel already folded in above),
         // so this row's label and tenant_provider_id name the same connection.
         keyLabel: providerKeyLabel,
-        attempt: forward.attempt,
-        providerCallStarted: forward.providerCallStarted,
+        attempt: finalForward.attempt,
+        providerCallStarted: finalForward.providerCallStarted,
       });
 
       const existing = failedAuthByProvider.get(provider.toLowerCase());
@@ -376,9 +428,62 @@ export class ProxyFallbackService {
       updated.add(authType);
       failedAuthByProvider.set(provider.toLowerCase(), updated);
 
-      if (!shouldTriggerFallback(forward.response.status)) break;
+      if (!shouldTriggerFallback(finalForward.response.status)) break;
     }
     return { success: null, failures };
+  }
+
+  /**
+   * Heal a failed fallback hop before giving up on it. Phoenix patches are
+   * scoped per provider/model, so a fallback model with its own known issue can
+   * be recovered even when the primary could not. The patched body is resent
+   * through the SAME fallback transport (`retryWireBody`) rather than
+   * re-resolved against the full routing chain: the fallback is already the
+   * deliberate alternative route, and hopping back to the primary here would
+   * undo that.
+   *
+   * Returns null when there is nothing to retry (no wire body / retry hook) or
+   * Autofix declines (off for the agent, non-repairable status, no patch) —
+   * callers then keep the original failure.
+   */
+  private async maybeHealFallback(input: {
+    forward: ForwardResult;
+    agentId: string;
+    tenantId: string;
+    provider: string;
+    model: string;
+    authType: AuthType;
+    apiMode?: ProxyApiMode;
+    tenantProviderId: string | null;
+    providerKeyLabel?: string;
+    signal?: AbortSignal;
+    startProviderAttempt?: StartProviderAttempt;
+  }): Promise<AutofixAttempt | null> {
+    const { forward } = input;
+    const wireRequestBody = forward.wireRequestBody;
+    if (!wireRequestBody || !forward.retryWireBody) return null;
+    const apiMode = forward.wireApiMode ?? input.apiMode;
+    if (!apiMode) return null;
+    return this.autofixService.maybeHeal({
+      forward,
+      agentId: input.agentId,
+      tenantId: input.tenantId,
+      provider: input.provider,
+      model: input.model,
+      authType: input.authType,
+      apiMode,
+      requestBody: wireRequestBody,
+      reforward: (healedBody) =>
+        this.retryWireBody(forward, healedBody, {
+          provider: input.provider,
+          model: input.model,
+          authType: input.authType,
+          tenantProviderId: input.tenantProviderId,
+          providerKeyLabel: input.providerKeyLabel,
+          startProviderAttempt: input.startProviderAttempt,
+          signal: input.signal,
+        }),
+    });
   }
 
   private routeCredentialDeps(): RouteCredentialDeps {
