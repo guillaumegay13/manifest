@@ -416,6 +416,40 @@ describe('MCP tools', () => {
       });
       expect(blocked.error).toBe(true);
     });
+
+    it('scans tier, header-tier, and specificity fallbacks for the disabled provider', async () => {
+      const deps = makeDeps();
+      (deps.providers.getProviders as jest.Mock).mockResolvedValue([
+        { ...CONNECTION, priority: 1, label: 'work' },
+      ]);
+      const matching = {
+        provider: 'openai',
+        authType: 'api_key',
+        model: 'gpt-4o',
+        keyLabel: 'work',
+      };
+      (deps.tiers.getTiers as jest.Mock).mockResolvedValue([
+        // No keyLabel, priority!=0, label!='default' → not affected.
+        {
+          tier: 'default',
+          override_route: { provider: 'openai', authType: 'api_key', model: 'gpt-4o' },
+          fallback_routes: [],
+        },
+        { tier: 'team', override_route: null, fallback_routes: [matching] },
+      ]);
+      (deps.headerTiers.list as jest.Mock).mockResolvedValue([
+        { id: 'h1', name: 'hdr', override_route: null, fallback_routes: [matching] },
+      ]);
+      (deps.specificity.getAssignments as jest.Mock).mockResolvedValue([
+        // No provider field → matched by model id.
+        { category: 'coding', override_route: null, fallback_routes: [{ model: 'gpt-4o' }] },
+      ]);
+      const blocked = await call(registerAll(deps), 'manifest_agent_provider_disable', {
+        agent: 'demo',
+        provider: 'openai',
+      });
+      expect(blocked.error).toBe(true);
+    });
   });
 
   describe('routing tools', () => {
@@ -616,6 +650,27 @@ describe('MCP tools', () => {
         (await call(tools, 'manifest_agent_configure', { agent: 'demo', models: ['gpt-4o'] }))
           .error,
       ).toBe(true);
+    });
+
+    it('rejects tier-only config and rolls back a failed new custom tier', async () => {
+      const tools = registerAll(makeDeps());
+      // tier with another toggle set reaches the "tier needs models" guard.
+      expect(
+        (await call(tools, 'manifest_agent_configure', { agent: 'demo', tier: 'x', autofix: true }))
+          .error,
+      ).toBe(true);
+
+      const deps = makeDeps();
+      (deps.headerTiers.list as jest.Mock).mockResolvedValueOnce([]);
+      (deps.headerTiers.setOverride as jest.Mock).mockRejectedValueOnce(new Error('boom'));
+      const res = await call(registerAll(deps), 'manifest_agent_configure', {
+        agent: 'demo',
+        models: ['gpt-4o'],
+        provider: 'openai',
+        tier: 'new',
+      });
+      expect(res.error).toBe(true);
+      expect(deps.headerTiers.delete).toHaveBeenCalledWith('agent-1', 'h1');
     });
 
     it('runs an end-to-end route test across surfaces', async () => {

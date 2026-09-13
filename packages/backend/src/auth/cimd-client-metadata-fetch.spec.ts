@@ -150,6 +150,28 @@ describe('fetchClientMetadataResource', () => {
     );
   });
 
+  it('rejects a malformed status line instead of throwing', async () => {
+    lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
+    request.mockImplementation((_url, _opts, cb) => {
+      const req = new EventEmitter() as EventEmitter & { end: jest.Mock; destroy: jest.Mock };
+      req.end = jest.fn();
+      req.destroy = jest.fn();
+      process.nextTick(() => {
+        const stream = Readable.from([Buffer.from('{}')]) as Readable & {
+          statusCode: number;
+          statusMessage: string;
+          headers: Record<string, string>;
+        };
+        stream.statusCode = 200;
+        stream.statusMessage = 'bad\nvalue';
+        stream.headers = {};
+        cb(stream as never);
+      });
+      return req;
+    });
+    await expect(fetchClientMetadataResource('https://example.com/meta')).rejects.toThrow();
+  });
+
   it('rejects a protocol upgrade and destroys its socket', async () => {
     lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
     const socket = { destroy: jest.fn() };
