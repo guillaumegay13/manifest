@@ -1,0 +1,32 @@
+packages/backend/src/routing/routing-core/credential-health.service.ts
+  s_dac9b30fc8fc02::t_3a14704581ed4d 91-96
+packages/backend/src/routing/routing-core/provider-key.service.spec.ts
+  s_dac9b30fc8fc02::t_55ee29fdfaf601 236-283
+packages/backend/src/routing/proxy/__tests__/proxy-fallback.failures.spec.ts
+  s_dac9b30fc8fc02::t_b3f7353b292932 229-249,253-263
+  s_dac9b30fc8fc02::t_6c0acb386d76ba 250-252
+packages/backend/src/routing/proxy/__tests__/proxy-fallback.service.spec.ts
+  s_dac9b30fc8fc02::t_82914b2384014c 566-602
+packages/backend/src/routing/routing-core/provider-key.service.ts
+  s_dac9b30fc8fc02::t_51c346995b6860 206-210
+packages/backend/src/routing/routing-core/credential-health.service.spec.ts
+  s_dac9b30fc8fc02::t_e38266c2cc8d25 105-117
+packages/backend/src/routing/tenant-providers.controller.spec.ts
+  s_dac9b30fc8fc02::t_f7d3bfe2df2ca6 122-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "02a577c30c39b2a5c0ff52aaa2fc9fed96f16ffb",
+  "prompts": {},
+  "sessions": {
+    "s_dac9b30fc8fc02": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f63d8bfb1ffewWOt35107DVUfd",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
