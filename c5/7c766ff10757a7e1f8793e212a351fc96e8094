@@ -1,0 +1,37 @@
+packages/shared/__tests__/subscription.spec.ts
+  s_f727e1dc494a91::t_08b7da50a28ae8 260,270
+  s_f727e1dc494a91::t_b401647b90fe5b 432
+  s_f727e1dc494a91::t_03320b42604aef 427,435
+  s_f727e1dc494a91::t_df41cc5bae3ea4 267
+packages/frontend/src/services/providers.ts
+  s_f727e1dc494a91::t_608b136a4d7f91 271
+packages/shared/src/subscription/configs.ts
+  s_f727e1dc494a91::t_b7cbb41f345d83 267
+.changeset/refresh-gemini-subscription-models.md
+  s_f727e1dc494a91::t_30eeef402aa275 1-5
+packages/backend/src/model-discovery/model-fallback.spec.ts
+  s_f727e1dc494a91::t_b3311886ef780c 440
+  s_f727e1dc494a91::t_029a4ff79229b3 421,441
+packages/backend/src/model-discovery/model-discovery.service.spec.ts
+  s_f727e1dc494a91::t_e4873478260cc3 2615
+  s_f727e1dc494a91::t_76bbf2bcd0f3a1 2616
+  s_f727e1dc494a91::t_60126aa5e8d41a 2551
+README.md
+  s_f727e1dc494a91::t_1f9c37358fa456 102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c57c766ff10757a7e1f8793e212a351fc96e8094",
+  "prompts": {},
+  "sessions": {
+    "s_f727e1dc494a91": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f661acf29ffeqgoDibpxP0V41N",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
