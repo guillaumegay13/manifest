@@ -65,8 +65,10 @@ describe('mountMcpDiscovery', () => {
     expect(res.body).toMatchObject({ issuer: 'http://localhost:3001/api/auth' });
   });
 
-  it('does not serve the issuer document at the origin root well-known', async () => {
-    await request(makeApp()).get('/.well-known/oauth-authorization-server').expect(404);
+  it('answers the origin root well-known with JSON, not the SPA shell', async () => {
+    const res = await request(makeApp()).get('/.well-known/oauth-authorization-server').expect(404);
+    expect(res.body).toMatchObject({ statusCode: 404 });
+    expect(res.headers['access-control-allow-origin']).toBe('*');
   });
 
   it('answers 404 when the authorization-server metadata is unavailable', async () => {

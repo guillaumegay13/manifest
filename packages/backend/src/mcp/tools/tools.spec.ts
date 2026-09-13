@@ -331,7 +331,10 @@ describe('MCP tools', () => {
         agent: 'demo',
       });
       expect(res.error).toBeFalsy();
-      expect(res.data).toMatchObject({ models_discovered: false });
+      expect(res.data).toMatchObject({
+        models_discovered: false,
+        discovery_error: 'upstream down',
+      });
     });
 
     it('disconnects and refreshes', async () => {

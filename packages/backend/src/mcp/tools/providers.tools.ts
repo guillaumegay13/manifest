@@ -156,11 +156,13 @@ export function registerProviderTools(
             operator.userId,
           );
           let modelsDiscovered = true;
+          let discoveryError: string | undefined;
           try {
             await deps.modelDiscovery.discoverModels(upserted.provider);
-          } catch {
+          } catch (error) {
             // The connection is already saved; discovery is retryable via refresh.
             modelsDiscovered = false;
+            discoveryError = error instanceof Error ? error.message : String(error);
           }
           return {
             id: upserted.provider.id,
@@ -169,6 +171,7 @@ export function registerProviderTools(
             is_new: upserted.isNew,
             label: upserted.provider.label,
             models_discovered: modelsDiscovered,
+            ...(discoveryError ? { discovery_error: discoveryError } : {}),
           };
         })(),
       ),

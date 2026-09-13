@@ -184,17 +184,31 @@ describe('fetchClientMetadataResource', () => {
     expect(await response.text()).toBe('');
   });
 
-  it('allows a private host in self-hosted mode but blocks link-local', async () => {
+  it('allows a private host in self-hosted mode regardless of the public gate', async () => {
     const previous = process.env['MANIFEST_MODE'];
     process.env['MANIFEST_MODE'] = 'selfhosted';
     try {
+      isPublicRoutableHost.mockReturnValue(false);
       lookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
       request.mockImplementation((_url, _opts, cb) => fakeRequest(cb));
       expect((await fetchClientMetadataResource('https://lan.local/meta')).status).toBe(200);
 
+      // A host.containers.internal-style link-local address is allowed too.
+      lookup.mockResolvedValue([{ address: '169.254.1.2', family: 4 }]);
+      expect((await fetchClientMetadataResource('https://lan.local/meta')).status).toBe(200);
+    } finally {
+      if (previous === undefined) delete process.env['MANIFEST_MODE'];
+      else process.env['MANIFEST_MODE'] = previous;
+    }
+  });
+
+  it('blocks cloud-metadata addresses even in self-hosted mode', async () => {
+    const previous = process.env['MANIFEST_MODE'];
+    process.env['MANIFEST_MODE'] = 'selfhosted';
+    try {
       lookup.mockResolvedValue([{ address: '169.254.169.254', family: 4 }]);
       await expect(fetchClientMetadataResource('https://lan.local/meta')).rejects.toThrow(
-        /link-local/,
+        /cloud metadata/,
       );
     } finally {
       if (previous === undefined) delete process.env['MANIFEST_MODE'];
@@ -211,6 +225,29 @@ describe('fetchClientMetadataResource', () => {
       await expect(fetchClientMetadataResource('https://lan.local/meta')).rejects.toThrow(
         /public-routable/,
       );
+    } finally {
+      if (previous === undefined) delete process.env['MANIFEST_MODE'];
+      else process.env['MANIFEST_MODE'] = previous;
+    }
+  });
+
+  it('rejects a direct IP literal', async () => {
+    await expect(fetchClientMetadataResource('https://127.0.0.1/meta')).rejects.toThrow(
+      /IP literal/,
+    );
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it('lets a self-hosted lookup failure fall through to the request resolver', async () => {
+    const previous = process.env['MANIFEST_MODE'];
+    process.env['MANIFEST_MODE'] = 'selfhosted';
+    try {
+      lookup.mockRejectedValue(new Error('ENOTFOUND'));
+      request.mockImplementation((_url, opts, cb) => {
+        expect((opts as { lookup?: unknown }).lookup).toBeUndefined();
+        return fakeRequest(cb);
+      });
+      expect((await fetchClientMetadataResource('https://lan.local/meta')).status).toBe(200);
     } finally {
       if (previous === undefined) delete process.env['MANIFEST_MODE'];
       else process.env['MANIFEST_MODE'] = previous;

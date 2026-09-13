@@ -23,31 +23,21 @@ function responseHeaders(headers: IncomingHttpHeaders): Headers {
 }
 
 /**
- * Link-local addresses (169.254.0.0/16, fe80::/10) host cloud instance metadata
- * services. They stay blocked even in self-hosted mode so a client-supplied
- * CIMD URL cannot be used to reach the cloud metadata endpoint.
+ * Positively identified cloud instance-metadata addresses (AWS/GCP/Azure
+ * 169.254.169.254, AWS IMDSv6 fd00:ec2::254). These stay blocked even in
+ * self-hosted mode; other link-local addresses are the operator's call.
  */
-function isLinkLocalAddress(address: string): boolean {
-  if (address.startsWith('169.254.')) return true;
-  const lower = address.toLowerCase();
-  return (
-    lower.startsWith('fe8') ||
-    lower.startsWith('fe9') ||
-    lower.startsWith('fea') ||
-    lower.startsWith('feb')
-  );
+function isCloudMetadataAddress(address: string): boolean {
+  return address === '169.254.169.254' || address.toLowerCase() === 'fd00:ec2::254';
 }
 
-function selectPinnedAddress(addresses: LookupAddress[]): LookupAddress {
+function selectPinnedAddress(addresses: LookupAddress[], allowPrivate: boolean): LookupAddress {
   if (addresses.length === 0) {
     throw new TypeError('metadata hostname returned no DNS addresses');
   }
-  // Self-hosted operators control their network, so a CIMD document on a private
-  // or loopback host is legitimate there. Cloud installs keep the strict gate.
-  const allowPrivate = isSelfHosted();
   for (const result of addresses) {
-    if (isLinkLocalAddress(result.address)) {
-      throw new TypeError('metadata hostname must not resolve to a link-local address');
+    if (isCloudMetadataAddress(result.address)) {
+      throw new TypeError('metadata hostname must not resolve to a cloud metadata address');
     }
     if (!allowPrivate && !isPublicRoutableHost(result.address)) {
       throw new TypeError('metadata hostname must resolve only to public-routable addresses');
@@ -86,8 +76,26 @@ export const fetchClientMetadataResource: ClientMetadataResourceFetch = async (i
   }
 
   const hostname = url.hostname.replace(/^\[|\]$/g, '');
-  const addresses = await lookup(hostname, { all: true, verbatim: true });
-  const pinnedAddress = selectPinnedAddress(addresses);
+  // A literal address bypasses DNS pinning, and in self-hosted mode the
+  // private-host allowance would let a client reach an arbitrary local service.
+  // Require a hostname.
+  if (isIP(hostname) !== 0) {
+    throw new TypeError('CIMD Node transport requires a hostname, not an IP literal');
+  }
+  // Self-hosted operators control their network, so a CIMD document on a private
+  // or loopback host is legitimate there. Cloud installs keep the strict gate.
+  const allowPrivate = isSelfHosted();
+  let addresses: LookupAddress[] | undefined;
+  try {
+    addresses = await lookup(hostname, { all: true, verbatim: true });
+  } catch (error) {
+    // A self-hosted operator may use a LAN name its own resolver handles; let
+    // the request try to resolve it rather than failing before the fetch.
+    if (!allowPrivate) throw error;
+  }
+  // Address validation always runs, even when the local-mode lookup failed: a
+  // cloud-metadata answer must never be reached.
+  const pinnedAddress = addresses ? selectPinnedAddress(addresses, allowPrivate) : undefined;
   const headers = Object.fromEntries(webRequest.headers.entries());
   headers.host = url.host;
   const signal = init?.signal ?? (input instanceof Request ? input.signal : webRequest.signal);
@@ -98,9 +106,9 @@ export const fetchClientMetadataResource: ClientMetadataResourceFetch = async (i
       autoSelectFamily: false,
       headers,
       method: webRequest.method,
-      servername: isIP(hostname) === 0 ? hostname : undefined,
+      servername: hostname,
       signal,
-      lookup: createPinnedLookup(pinnedAddress),
+      ...(pinnedAddress ? { lookup: createPinnedLookup(pinnedAddress) } : {}),
       // A metadata server that accepts the connection then stalls must not wedge
       // the whole authorization flow. Node does not destroy the request on its
       // own when the socket timeout fires.

@@ -59,6 +59,12 @@ export function mountMcpDiscovery(app: INestApplication): void {
       void serveAuthMetadata(req, res);
     },
   );
+  // Answer the bare root form explicitly: without this, the request would fall
+  // through to the SPA fallback and a client would get the dashboard HTML.
+  expressApp.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
+    cors(res);
+    res.status(404).json({ statusCode: 404, message: 'OAuth metadata unavailable' });
+  });
 
   const resourceMetadata = {
     resource: mcpResource,
