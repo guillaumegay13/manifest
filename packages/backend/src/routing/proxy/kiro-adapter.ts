@@ -889,7 +889,15 @@ function kiroCompletionText(state: KiroCollectState): string {
 }
 
 /** Envelope fields that are not prompt content and would inflate the estimate. */
-const KIRO_NON_PROMPT_KEYS = new Set(['conversationid', 'modelid', 'chattriggertype', 'agentmode']);
+const KIRO_NON_PROMPT_KEYS = new Set([
+  'conversationid',
+  'modelid',
+  'chattriggertype',
+  'agentmode',
+  'origin',
+  'status',
+  'tooluseid',
+]);
 
 /** Every prompt-bearing string in the built Kiro conversation, i.e. text + tools. */
 function collectKiroStrings(value: unknown, out: string[]): void {

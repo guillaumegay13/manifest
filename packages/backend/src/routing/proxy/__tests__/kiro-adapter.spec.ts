@@ -609,12 +609,12 @@ describe('kiro-adapter', () => {
       eventFrame('contextUsageEvent', { contextUsagePercentage: 50 }),
     ]);
 
-    const response = new Response(createKiroOpenAiStream(source, 'auto', undefined, 50));
+    const response = new Response(createKiroOpenAiStream(source, 'auto', undefined, 17));
 
     expect(finalSseUsage(await response.text())).toEqual({
-      prompt_tokens: 50,
+      prompt_tokens: 17,
       completion_tokens: 2,
-      total_tokens: 52,
+      total_tokens: 19,
       estimated: true,
     });
   });
