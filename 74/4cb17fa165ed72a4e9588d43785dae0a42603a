@@ -1,0 +1,41 @@
+packages/backend/src/common/guards/api-key.guard.spec.ts
+  s_c03dc0ae96aac3::t_f0b90f0d6df04c 514-515
+packages/cli/src/secrets.ts
+  s_c03dc0ae96aac3::t_6a50fc8aece9bf 20-27
+packages/cli/src/commands/agent.ts
+  s_c03dc0ae96aac3::t_7bb22643a30407 241-250
+packages/frontend/src/components/AuthGuard.tsx
+  s_c03dc0ae96aac3::t_04fc77d4967e77 23-29
+packages/cli/src/commands/routing.ts
+  s_c03dc0ae96aac3::t_69a209823bb397 417,419,422
+  s_c03dc0ae96aac3::t_22b0ef3913adf1 297-305
+  s_28d53427986818::t_e264c45c668dbe 296
+packages/cli/src/commands/configure.ts
+  s_c03dc0ae96aac3::t_4c7ca2e3e25b99 43-47
+packages/backend/src/common/guards/api-key.guard.ts
+  s_c03dc0ae96aac3::t_746ac04f5c3c97 91-92,94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "744cb17fa165ed72a4e9588d43785dae0a42603a",
+  "prompts": {},
+  "sessions": {
+    "s_28d53427986818": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f68c6be65ffehRion2ZnxWovzQ",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    },
+    "s_c03dc0ae96aac3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f68d31b96ffeZq8O7BCNwR3dk1",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
