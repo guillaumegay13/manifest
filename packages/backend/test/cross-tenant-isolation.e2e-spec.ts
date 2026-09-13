@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import request from 'supertest';
-import { createTestApp, TEST_API_KEY, TEST_TENANT_ID } from './helpers';
+import { createTestApp, TEST_AGENT_ID, TEST_API_KEY, TEST_TENANT_ID } from './helpers';
 
 const TENANT_B = 'tenant-b';
 const USER_B = 'user-b';
@@ -9,10 +9,15 @@ const USER_B = 'user-b';
 /**
  * Cross-tenant isolation guard.
  *
- * The management surface must scope every read and write to the tenant bound to
- * the credential, resolving the agent through that tenant first. A second
- * tenant (same key, different owner) must not be able to see, mutate, or even
- * learn about the first tenant's harnesses through any agent-scoped route.
+ * The management surface must scope every read and write to the caller's
+ * tenant. This suite drives the per-request tenant context the dashboard and
+ * the CLI consent flow use (impersonated through the test session header) and
+ * asserts a second tenant cannot see, mutate, or learn about the first
+ * tenant's harnesses through any agent-scoped route, nor read its request log.
+ *
+ * Credential -> tenant binding itself (the tenant coming off the `api_keys`
+ * row) is covered by `api-key.guard.spec.ts`; this suite covers everything
+ * downstream of that resolution.
  */
 describe('cross-tenant isolation (e2e)', () => {
   let app: INestApplication;
@@ -25,6 +30,11 @@ describe('cross-tenant isolation (e2e)', () => {
     await ds.query(
       `INSERT INTO tenants (id, name, owner_user_id, organization_name, is_active, created_at, updated_at) VALUES ($1,$2,$3,$4,true,$5,$6)`,
       [TENANT_B, 'Tenant B', USER_B, 'Org B', now, now],
+    );
+    // One real request-log row for tenant A, so the isolation check is not vacuous.
+    await ds.query(
+      `INSERT INTO agent_messages (id, tenant_id, agent_id, agent_name, status, timestamp) VALUES ($1,$2,$3,$4,$5,$6)`,
+      ['msg-a', TEST_TENANT_ID, TEST_AGENT_ID, 'test-agent', 'success', now],
     );
   });
 
@@ -82,11 +92,20 @@ describe('cross-tenant isolation (e2e)', () => {
     await asB(request(app.getHttpServer()).delete('/api/v1/agents/test-agent')).expect(404);
   });
 
+  it('the owning tenant sees its request-log row', async () => {
+    const res = await asA(
+      request(app.getHttpServer()).get('/api/v1/messages?agent_name=test-agent'),
+    ).expect(200);
+    const items = Array.isArray(res.body.items) ? res.body.items : [];
+    expect(items.length).toBeGreaterThan(0);
+  });
+
   it('a foreign tenant request log is empty for the other harness', async () => {
     const res = await asB(
       request(app.getHttpServer()).get('/api/v1/messages?agent_name=test-agent'),
     ).expect(200);
-    // Nothing in the payload may name the other tenant's harness.
+    const items = Array.isArray(res.body.items) ? res.body.items : [];
+    expect(items).toHaveLength(0);
     expect(JSON.stringify(res.body)).not.toContain('test-agent');
   });
 
