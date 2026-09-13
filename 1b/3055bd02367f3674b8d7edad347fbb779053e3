@@ -1,0 +1,28 @@
+packages/backend/src/routing/proxy/proxy-message-recorder.ts
+  s_ca95b1bd29e84c::t_e2c041e76815c7 1235-1238,1240-1242
+  s_ca95b1bd29e84c::t_3fa6a9c23c37df 1173
+  s_ca95b1bd29e84c::t_815b84df2ffd9f 248-253
+packages/backend/src/routing/proxy/__tests__/proxy-message-recorder.spec.ts
+  s_ca95b1bd29e84c::t_3f464b0f080545 330,356-378
+  s_ca95b1bd29e84c::t_f015d8acbe2d01 379-380
+packages/backend/src/routing/proxy/proxy-response-handler.ts
+  s_ca95b1bd29e84c::t_611c7ac4999372 934-938
+packages/backend/src/routing/proxy/__tests__/proxy-response-handler.spec.ts
+  s_ca95b1bd29e84c::t_3d1ca3026c1d0e 2818-2856
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1b3055bd02367f3674b8d7edad347fbb779053e3",
+  "prompts": {},
+  "sessions": {
+    "s_ca95b1bd29e84c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f660d06e3ffexIoTmVDJOYvFIs",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
