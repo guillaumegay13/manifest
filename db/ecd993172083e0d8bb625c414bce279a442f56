@@ -1,0 +1,54 @@
+packages/backend/src/auth/cimd-client-metadata-fetch.spec.ts
+  s_b2b5a4b0535460::t_3df82afff169c7 144-167
+packages/backend/src/mcp/tools/requests.tools.ts
+  s_b2b5a4b0535460::t_42566dc5b02042 7
+  s_b2b5a4b0535460::t_af6983fde05503 28
+packages/backend/src/auth/cimd-client-metadata-fetch.ts
+  s_b2b5a4b0535460::t_e82a12d9db02ae 88-94,101-111
+packages/backend/src/mcp/tools/identity.tools.ts
+  s_b2b5a4b0535460::t_1dd2e6fbc755cc 70-72
+packages/backend/src/mcp/mcp.controller.ts
+  s_b2b5a4b0535460::t_9db584bc85b4c3 142-147,152,156
+  s_b2b5a4b0535460::t_c514ceddefa781 1
+  s_b2b5a4b0535460::t_02a89cdd5d13ff 54-55
+packages/backend/src/mcp/tool-result.ts
+  s_b2b5a4b0535460::t_a8639481573fe0 8-10
+packages/backend/src/mcp/tools/routing.tools.ts
+  s_b2b5a4b0535460::t_f50021be1c5d8f 473-494
+  s_b2b5a4b0535460::t_6087405b91005f 208,211-212
+  s_b2b5a4b0535460::t_7c852b45e1ac87 495-500,519,522,568-572
+packages/backend/src/mcp/tools/tools.spec.ts
+  s_b2b5a4b0535460::t_c7d29cecd2cafc 755-757
+  s_b2b5a4b0535460::t_8b36d0a776bdf5 517-530
+  s_b2b5a4b0535460::t_bd6326c7484fed 310-322
+packages/frontend/tests/pages/Consent.test.tsx
+  s_b2b5a4b0535460::t_fd75f9fd6832d7 103,112
+packages/backend/src/mcp/tools/agents.tools.ts
+  s_b2b5a4b0535460::t_e4810345ce2994 186-189
+  s_b2b5a4b0535460::t_c6e2f9d1996944 216
+packages/backend/src/mcp/tool-result.spec.ts
+  s_b2b5a4b0535460::t_e3e90b7b053b0a 19,27-28
+  s_b2b5a4b0535460::t_1a6d43b46d0525 29-30
+packages/backend/src/mcp/mcp.controller.spec.ts
+  s_b2b5a4b0535460::t_e8260b55e40a2a 102-103
+  s_b2b5a4b0535460::t_fa6f2071ce7d4b 66-69
+packages/backend/src/mcp/tools/providers.tools.ts
+  s_b2b5a4b0535460::t_21c6399c46eba1 419-425
+  s_b2b5a4b0535460::t_cb11b23491adcf 149-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dbecd993172083e0d8bb625c414bce279a442f56",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
