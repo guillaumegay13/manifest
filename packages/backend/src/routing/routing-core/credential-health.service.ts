@@ -17,8 +17,6 @@ import { parseOAuthTokenBlob } from '../oauth/core';
  * restart simply re-learns the failure on the next attempted call.
  */
 
-/** Longest connection label echoed into a log-safe string (kept in sync with ProviderKeyService). */
-const MAX_FINGERPRINT_MATERIAL = 512;
 const MAX_TRACKED_CREDENTIALS = 5_000;
 
 export type CredentialAuthFailureReason = 'subscription_token_rejected' | 'api_key_rejected';
@@ -53,7 +51,6 @@ interface RejectedEntry {
 export function credentialFingerprint(rawValue: string): string {
   const blob = parseOAuthTokenBlob(rawValue);
   const material = blob ? blob.r || blob.t : rawValue;
-  const input = material.slice(0, MAX_FINGERPRINT_MATERIAL);
   // An in-memory equality tag for a credential that failed upstream, not
   // password storage: the tag is never persisted and never verifies a secret.
   // Four FNV-1a-style 32-bit mixes make a 128-bit tag cheap enough for the
@@ -62,8 +59,8 @@ export function credentialFingerprint(rawValue: string): string {
   let h2 = 0x9e3779b1;
   let h3 = 0x85ebca77;
   let h4 = 0xc2b2ae3d;
-  for (let i = 0; i < input.length; i++) {
-    const c = input.charCodeAt(i);
+  for (let i = 0; i < material.length; i++) {
+    const c = material.charCodeAt(i);
     h1 = Math.imul(h1 ^ c, 0x01000193);
     h2 = Math.imul(h2 ^ (c + i), 0x85ebca6b);
     h3 = Math.imul(h3 + c, 0x27d4eb2f);
@@ -157,5 +154,10 @@ export class CredentialHealthService {
   /** Test hook: drop all tracked failures. */
   clear(): void {
     this.rejected.clear();
+  }
+
+  /** Drop the tracked failure for one connection, e.g. after it is reconnected. */
+  clearConnection(tenantProviderId: string | null | undefined): void {
+    if (tenantProviderId) this.rejected.delete(tenantProviderId);
   }
 }

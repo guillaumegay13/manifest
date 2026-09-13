@@ -113,6 +113,29 @@ describe('CredentialHealthService', () => {
     expect(service.getSnapshot('up-1').requires_reauth).toBe(false);
   });
 
+  it('clears one connection without touching another', () => {
+    service.markRejected('up-1', blob(), {
+      statusCode: 401,
+      reason: 'subscription_token_rejected',
+    });
+    service.markRejected('up-2', blob(), {
+      statusCode: 401,
+      reason: 'subscription_token_rejected',
+    });
+    service.clearConnection('up-1');
+    expect(service.getSnapshot('up-1').requires_reauth).toBe(false);
+    expect(service.getSnapshot('up-2').requires_reauth).toBe(true);
+  });
+
+  it('ignores a missing connection id when clearing', () => {
+    service.markRejected('up-1', blob(), {
+      statusCode: 401,
+      reason: 'subscription_token_rejected',
+    });
+    service.clearConnection(null);
+    expect(service.getSnapshot('up-1').requires_reauth).toBe(true);
+  });
+
   it('bounds the tracked set so a flood of dead connections cannot grow unbounded', () => {
     for (let i = 0; i < 5_001; i++) {
       service.markRejected(`up-${i}`, blob({ r: `r-${i}` }), {
