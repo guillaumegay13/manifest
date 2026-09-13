@@ -1,0 +1,25 @@
+packages/backend/src/main.ts
+  s_b2b5a4b0535460::t_2a46c55947b6ab 4
+  s_b2b5a4b0535460::t_90a67a5353a703 9-10
+packages/backend/src/mcp/mcp-discovery.spec.ts
+  s_b2b5a4b0535460::t_da4f8620a2be55 1-74
+packages/backend/src/mcp/mcp-discovery.ts
+  s_b2b5a4b0535460::t_16b5240816f202 1-73
+  s_b2b5a4b0535460::t_2034fbfe2d5a1b 74-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "83f3ab2a0ab132f30e530696e644cb0469f3c69b",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
