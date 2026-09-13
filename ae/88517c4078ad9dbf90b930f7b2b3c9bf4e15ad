@@ -1,0 +1,23 @@
+.changeset/refresh-gemini-subscription-models.md
+  s_f727e1dc494a91::t_1a6ad92cb80b8e 5
+packages/frontend/src/services/providers.ts
+  s_f727e1dc494a91::t_572ab27042c9b6 271
+README.md
+  s_f727e1dc494a91::t_33ca3d99f5d150 102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ae88517c4078ad9dbf90b930f7b2b3c9bf4e15ad",
+  "prompts": {},
+  "sessions": {
+    "s_f727e1dc494a91": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f661acf29ffeqgoDibpxP0V41N",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
