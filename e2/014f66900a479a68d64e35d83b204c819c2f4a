@@ -1,0 +1,21 @@
+package.json
+  s_b2b5a4b0535460::t_44af3da08118f3 65
+package-lock.json
+  s_b2b5a4b0535460::t_338ad4705dc198 13212-13214
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e2014f66900a479a68d64e35d83b204c819c2f4a",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
