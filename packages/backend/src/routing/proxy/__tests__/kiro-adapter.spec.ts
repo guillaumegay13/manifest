@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { Logger } from '@nestjs/common';
 import {
   buildKiroChatRequest,
   buildKiroHeaders,
@@ -670,6 +671,39 @@ describe('kiro-adapter', () => {
       total_tokens: 3000,
       estimated: true,
     });
+  });
+
+  it('includes emitted tool input in the estimated completion tokens', async () => {
+    const source = streamFrom([
+      eventFrame('assistantResponseEvent', { content: 'x'.repeat(40) }),
+      eventFrame('toolUseEvent', { toolUseId: 'call_1', name: 'fn', input: 'abcd', stop: true }),
+      eventFrame('contextUsageEvent', { contextUsagePercentage: 1.5 }),
+    ]);
+
+    const response = new Response(createKiroOpenAiStream(source, 'claude-sonnet-4.5'));
+
+    expect(finalSseUsage(await response.text())).toEqual({
+      prompt_tokens: 2988,
+      completion_tokens: 12,
+      total_tokens: 3000,
+      estimated: true,
+    });
+  });
+
+  it('logs an unhandled Kiro event type at debug', async () => {
+    const debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    try {
+      const source = streamFrom([
+        eventFrame('assistantResponseEvent', { content: 'hello' }),
+        eventFrame('someFutureEvent', { detail: 'x' }),
+      ]);
+
+      await new Response(createKiroOpenAiStream(source, 'auto')).text();
+
+      expect(debug).toHaveBeenCalledWith('Unhandled Kiro event type: someFutureEvent');
+    } finally {
+      debug.mockRestore();
+    }
   });
 
   it('converts Kiro toolUseEvent frames into OpenAI tool_calls', async () => {
