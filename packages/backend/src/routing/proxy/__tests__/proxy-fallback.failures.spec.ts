@@ -226,6 +226,41 @@ describe('ProxyFallbackService.tryFallbacks — failure chain by status code', (
     expect(line).toContain('invalid api key');
   });
 
+  it('logs an unknown key label and truncates a long provider error', async () => {
+    // No label resolves for the selected row, and the upstream body is longer
+    // than the log cap: the line must still name the connection and stay short.
+    (providerKeyService.selectProviderKey as jest.Mock).mockResolvedValue({
+      apiKey: 'sk-x',
+      id: 'up-x',
+      region: null,
+      label: undefined,
+      priority: 0,
+    });
+    const longError = 'upstream boom '.repeat(40);
+    providerClient.forward.mockResolvedValueOnce({
+      response: new Response(longError, { status: 500 }),
+      isGoogle: false,
+      isAnthropic: false,
+      isChatGpt: false,
+    });
+    const warn = jest
+      .spyOn(service['logger'], 'warn')
+      .mockImplementation(() => undefined as unknown as void);
+
+    const routes: ModelRoute[] = [
+      { provider: 'openai', authType: 'api_key', model: 'gpt-4o-mini' },
+    ];
+    const result = await runFallbacks(['gpt-4o-mini'], routes);
+
+    expect(result.failures).toHaveLength(1);
+    const line = warn.mock.calls
+      .map((call) => call[0] as string)
+      .find((entry) => entry.includes('Fallback 0: failed'));
+    expect(line).toContain('key=Unknown');
+    expect(line).toContain('…');
+    expect(line).not.toContain(longError);
+  });
+
   it('advances after a fallback returns HTTP 200 with an empty completion', async () => {
     const realClient = new ProviderClient();
     const originalFetch = global.fetch;

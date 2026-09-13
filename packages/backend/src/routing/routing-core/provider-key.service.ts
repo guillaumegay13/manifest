@@ -148,7 +148,6 @@ export class ProviderKeyService {
         this.warnSkippedUnhealthyKey(tenantId, provider, authType, pinned, pool[0], agentId);
         return pool[0];
       }
-      if (pinned) return pinned;
       // A pin that names no connection is a stale route (the key was renamed
       // or deleted). Serving the default keeps traffic flowing, but it silently
       // bills a connection the operator did not choose. Throttle identical
@@ -204,8 +203,11 @@ export class ProviderKeyService {
     if (warnedAt !== undefined && now - warnedAt < STALE_PIN_WARN_WINDOW_MS) return;
     this.stalePinWarnings.set(warningKey, now);
     if (this.stalePinWarnings.size > MAX_STALE_PIN_WARNING_KEYS) {
-      const oldest = this.stalePinWarnings.keys().next().value as string | undefined;
-      if (oldest !== undefined) this.stalePinWarnings.delete(oldest);
+      // Evict the oldest entry; the map is non-empty here (size > max).
+      for (const oldest of this.stalePinWarnings.keys()) {
+        this.stalePinWarnings.delete(oldest);
+        break;
+      }
     }
     this.logger.warn(
       `Skipping unhealthy ${provider} connection "${forLog(skipped.label)}" for tenant=${tenantId} ` +

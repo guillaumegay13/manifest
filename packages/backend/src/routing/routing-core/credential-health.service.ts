@@ -88,8 +88,12 @@ export class CredentialHealthService {
   ): void {
     if (!tenantProviderId || !rawValue) return;
     if (this.rejected.size >= MAX_TRACKED_CREDENTIALS && !this.rejected.has(tenantProviderId)) {
-      const oldest = this.rejected.keys().next().value as string | undefined;
-      if (oldest !== undefined) this.rejected.delete(oldest);
+      // Evict the oldest entry. The map is non-empty here (size >= max), so the
+      // loop always deletes exactly one key on its first iteration.
+      for (const oldest of this.rejected.keys()) {
+        this.rejected.delete(oldest);
+        break;
+      }
     }
     this.rejected.set(tenantProviderId, {
       fingerprint: credentialFingerprint(rawValue),

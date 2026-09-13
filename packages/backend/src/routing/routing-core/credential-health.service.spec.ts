@@ -102,6 +102,19 @@ describe('CredentialHealthService', () => {
     expect(credentialFingerprint('sk-dead')).not.toBe(credentialFingerprint('sk-live'));
   });
 
+  it('falls back to the access token when the refresh token is blank', () => {
+    expect(credentialFingerprint(serialize({ t: 'access-only', r: '', e: 1 }))).toBeTruthy();
+  });
+
+  it('tolerates a missing connection id', () => {
+    expect(service.getFailure(null)).toBeNull();
+    expect(service.getFailure(undefined)).toBeNull();
+    expect(service.getSnapshot(undefined)).toEqual({
+      requires_reauth: false,
+      last_auth_failure: null,
+    });
+  });
+
   it('clears every tracked failure', () => {
     service.markRejected('up-1', blob(), {
       statusCode: 401,

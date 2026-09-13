@@ -233,6 +233,54 @@ describe('ProviderKeyService — selection projections', () => {
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('re-authenticated'));
       });
 
+      it('warns with "any" auth type when the request omits it', async () => {
+        const health = withHealth();
+        jest
+          .spyOn(svc, 'getProviderKeys')
+          .mockResolvedValue([
+            key({ id: 'up-dead', label: 'Work', apiKey: 'sk-dead' }),
+            key({ id: 'up-live', label: 'Personal', apiKey: 'sk-live' }),
+          ]);
+        health.markRejected('up-dead', 'sk-dead', { statusCode: 401, reason: 'api_key_rejected' });
+        const warn = jest
+          .spyOn(svc['logger'], 'warn')
+          .mockImplementation(() => undefined as unknown as void);
+
+        expect((await svc.selectProviderKey('u', 'openai', undefined, 'Work'))?.id).toBe('up-live');
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('authType=any'));
+      });
+
+      it('throttles the skipped warning within the window and warns again after it', async () => {
+        const health = withHealth();
+        jest
+          .spyOn(svc, 'getProviderKeys')
+          .mockResolvedValue([
+            key({ id: 'up-dead', label: 'Work', apiKey: 'sk-dead' }),
+            key({ id: 'up-live', label: 'Personal', apiKey: 'sk-live' }),
+          ]);
+        health.markRejected('up-dead', 'sk-dead', {
+          statusCode: 401,
+          reason: 'api_key_rejected',
+          at: 1,
+        });
+        const warn = jest
+          .spyOn(svc['logger'], 'warn')
+          .mockImplementation(() => undefined as unknown as void);
+        const now = jest
+          .spyOn(Date, 'now')
+          .mockReturnValueOnce(1_000)
+          .mockReturnValueOnce(2_000)
+          .mockReturnValueOnce(90_000);
+
+        await svc.selectProviderKey('u', 'openai', 'api_key', 'Work');
+        await svc.selectProviderKey('u', 'openai', 'api_key', 'Work');
+        await svc.selectProviderKey('u', 'openai', 'api_key', 'Work');
+
+        // Warned on the first and third call; the middle call is throttled.
+        expect(warn).toHaveBeenCalledTimes(2);
+        now.mockRestore();
+      });
+
       it('still returns the rejected key when every key is rejected', async () => {
         const health = withHealth();
         jest

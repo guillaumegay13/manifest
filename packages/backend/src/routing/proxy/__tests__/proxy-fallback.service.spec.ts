@@ -563,6 +563,43 @@ describe('ProxyFallbackService', () => {
         // The replaced credential is not the rejected one, so it is tried.
         expect(providerClient.forward).toHaveBeenCalledTimes(2);
       });
+
+      it('records the skipped attempt and omits the label when none was pinned', async () => {
+        const completeFailure = jest.fn().mockResolvedValue(undefined);
+        const attempt = {
+          id: 'attempt-skip',
+          attemptNumber: 1,
+          startedAtMs: Date.now(),
+          startedAt: new Date().toISOString(),
+          pendingWrite: Promise.resolve(true),
+          completeFailure,
+        };
+        openaiOauth.unwrapToken.mockResolvedValue(null);
+        providerClient.forward.mockResolvedValue({
+          response: new Response('unauthorized', { status: 401 }),
+          isGoogle: false,
+          isAnthropic: false,
+          isChatGpt: true,
+        });
+        // First call marks the credential rejected.
+        await service.tryForwardToProvider(forwardOpts());
+
+        const startProviderAttempt = jest.fn(() => attempt);
+        const result = await service.tryForwardToProvider({
+          ...forwardOpts(),
+          providerKeyLabel: undefined,
+          startProviderAttempt,
+        });
+
+        await expect(result.response.text()).resolves.toContain(
+          'Subscription credential for openai',
+        );
+        expect(startProviderAttempt).toHaveBeenCalledWith(
+          expect.objectContaining({ providerCallStarted: false }),
+        );
+        expect(attempt).toEqual(expect.objectContaining({ completedAtMs: expect.any(Number) }));
+        expect(result.providerCallStarted).toBe(false);
+      });
     });
 
     it('catches transport errors and returns synthetic response', async () => {
