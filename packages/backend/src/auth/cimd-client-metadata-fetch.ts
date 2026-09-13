@@ -1,0 +1,114 @@
+import { isPublicRoutableHost } from '@better-auth/core/utils/host';
+import type { ClientMetadataResourceFetch } from '@better-auth/oauth-provider';
+import type { LookupAddress } from 'node:dns';
+import { lookup } from 'node:dns/promises';
+import type { IncomingHttpHeaders } from 'node:http';
+import { request, type RequestOptions } from 'node:https';
+import { isIP, type LookupFunction } from 'node:net';
+import { Readable } from 'node:stream';
+
+const BODY_FORBIDDEN_RESPONSE_STATUSES = new Set([204, 205, 304]);
+
+function responseHeaders(headers: IncomingHttpHeaders): Headers {
+  const result = new Headers();
+  for (const [name, value] of Object.entries(headers)) {
+    if (Array.isArray(value)) {
+      for (const item of value) result.append(name, item);
+    } else if (value !== undefined) {
+      result.append(name, value);
+    }
+  }
+  return result;
+}
+
+function selectPinnedAddress(addresses: LookupAddress[]): LookupAddress {
+  if (addresses.length === 0) {
+    throw new TypeError('metadata hostname returned no DNS addresses');
+  }
+  for (const result of addresses) {
+    if (!isPublicRoutableHost(result.address)) {
+      throw new TypeError('metadata hostname must resolve only to public-routable addresses');
+    }
+  }
+  return addresses.find(({ family }) => family === 4) ?? addresses[0]!;
+}
+
+function createPinnedLookup(pinnedAddress: LookupAddress): LookupFunction {
+  return (_hostname, options, callback) => {
+    if (options.all) {
+      callback(null, [pinnedAddress]);
+      return;
+    }
+    callback(null, pinnedAddress.address, pinnedAddress.family);
+  };
+}
+
+/**
+ * Better Auth's resolve-once CIMD transport for Node.
+ *
+ * A Client ID Metadata Document is fetched from a URL the client controls, so
+ * the request is at the mercy of DNS. Resolve once, reject any answer that is
+ * not a public-routable address, then pin that address for the connection so a
+ * rebinding between the check and the request cannot redirect it. GET/HEAD
+ * only, HTTPS only, redirects never followed.
+ */
+export const fetchClientMetadataResource: ClientMetadataResourceFetch = async (input, init) => {
+  const webRequest = new Request(input, init);
+  const url = new URL(webRequest.url);
+  if (url.protocol !== 'https:') {
+    throw new TypeError('CIMD Node transport requires an HTTPS URL');
+  }
+  if (webRequest.method !== 'GET' && webRequest.method !== 'HEAD') {
+    throw new TypeError('CIMD Node transport supports only GET and HEAD');
+  }
+
+  const hostname = url.hostname.replace(/^\[|\]$/g, '');
+  const addresses = await lookup(hostname, { all: true, verbatim: true });
+  const pinnedAddress = selectPinnedAddress(addresses);
+  const headers = Object.fromEntries(webRequest.headers.entries());
+  headers.host = url.host;
+  const signal = init?.signal ?? (input instanceof Request ? input.signal : webRequest.signal);
+
+  return new Promise((resolve, reject) => {
+    const options: RequestOptions & { autoSelectFamily: boolean } = {
+      agent: false,
+      autoSelectFamily: false,
+      headers,
+      method: webRequest.method,
+      servername: isIP(hostname) === 0 ? hostname : undefined,
+      signal,
+      lookup: createPinnedLookup(pinnedAddress),
+      // A metadata server that accepts the connection then stalls must not wedge
+      // the whole authorization flow. Node does not destroy the request on its
+      // own when the socket timeout fires.
+      timeout: 10_000,
+    };
+    const clientRequest = request(url, options, (response) => {
+      const status = response.statusCode ?? 500;
+      const hasNoBody =
+        webRequest.method === 'HEAD' || BODY_FORBIDDEN_RESPONSE_STATUSES.has(status);
+      // Drain the response when we are discarding it, or a 205 with a body keeps
+      // the socket alive until the peer times out.
+      if (hasNoBody) response.resume();
+      const body = hasNoBody ? null : (Readable.toWeb(response) as unknown as BodyInit);
+      resolve(
+        new Response(body, {
+          headers: responseHeaders(response.headers),
+          status,
+          statusText: response.statusMessage,
+        }),
+      );
+    });
+    clientRequest.once('timeout', () =>
+      clientRequest.destroy(new Error('CIMD metadata request timed out')),
+    );
+    // A 101 moves the connection to an upgraded protocol, so the response
+    // callback never fires and the promise would never settle.
+    clientRequest.once('upgrade', (_response, socket) => {
+      socket.destroy();
+      reject(new Error('CIMD metadata request returned an unsupported protocol upgrade'));
+    });
+    clientRequest.once('error', reject);
+    clientRequest.end();
+  });
+};
