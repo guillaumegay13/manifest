@@ -1,0 +1,49 @@
+packages/backend/src/routing/proxy/proxy.controller.ts
+  s_ca95b1bd29e84c::t_af7974394cd94d 397-413
+  s_ca95b1bd29e84c::t_8e29ad3627a9cf 395-396
+  s_ca95b1bd29e84c::t_c3743a7ebd8b0f 566
+packages/backend/src/routing/proxy/proxy-fallback.service.ts
+  s_ca95b1bd29e84c::t_d0045d4c69e4d5 675-679
+  s_ca95b1bd29e84c::t_ce4298c0205f97 724-730
+  s_ca95b1bd29e84c::t_adf2e5cfb8133d 226-227
+  s_ca95b1bd29e84c::t_92aee8f8381a9e 138-139
+  s_ca95b1bd29e84c::t_b1cd27074c2355 571,592-604
+  s_ca95b1bd29e84c::t_7d3570a131ceeb 507
+  s_ca95b1bd29e84c::t_244679cd5be3b8 133-137
+  s_ca95b1bd29e84c::t_2778a73d8ee8f6 383-404,409,421-423,431-433,447-449
+  s_ca95b1bd29e84c::t_9ee812ff169f71 9
+packages/backend/src/routing/proxy/proxy.service.ts
+  s_ca95b1bd29e84c::t_5859b9659cdb28 750
+  s_ca95b1bd29e84c::t_cbdf38a29bc48a 181-186
+  s_ca95b1bd29e84c::t_2fdd355450647a 1298
+packages/backend/src/routing/proxy/__tests__/proxy-fallback.service.spec.ts
+  s_ca95b1bd29e84c::t_64c42dd549de91 2114-2121
+  s_ca95b1bd29e84c::t_2450ba573f54cc 1501-1511
+  s_ca95b1bd29e84c::t_c7bb609b8a910f 2229-2265
+  s_ca95b1bd29e84c::t_a2632101557fe7 1482-1500,1512-1530
+  s_ca95b1bd29e84c::t_8de8e00dfc0bbb 2153-2161,2164,2172-2173,2178
+packages/backend/src/routing/proxy/__tests__/proxy-message-recorder.routes.spec.ts
+  s_ca95b1bd29e84c::t_a13868d064a7c8 181
+  s_ca95b1bd29e84c::t_2e9ebfef447f9e 159-180,182-197
+packages/backend/src/routing/proxy/proxy-response-handler.ts
+  s_ca95b1bd29e84c::t_b227afcbe0551e 903-908
+  s_ca95b1bd29e84c::t_6748399b969e4a 934
+packages/backend/src/routing/proxy/proxy-message-recorder.ts
+  s_ca95b1bd29e84c::t_b9fc3e0f085a5b 1024-1026
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "729c9737a31242d24af8ce2eff00115e41d7d3c0",
+  "prompts": {},
+  "sessions": {
+    "s_ca95b1bd29e84c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f660d06e3ffexIoTmVDJOYvFIs",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
