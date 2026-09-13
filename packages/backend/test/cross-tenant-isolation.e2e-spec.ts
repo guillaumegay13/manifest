@@ -31,10 +31,15 @@ describe('cross-tenant isolation (e2e)', () => {
       `INSERT INTO tenants (id, name, owner_user_id, organization_name, is_active, created_at, updated_at) VALUES ($1,$2,$3,$4,true,$5,$6)`,
       [TENANT_B, 'Tenant B', USER_B, 'Org B', now, now],
     );
-    // One real request-log row for tenant A, so the isolation check is not vacuous.
+    // One real request-log row for tenant A: the list reads `requests`, with
+    // the attempt linked via request_id, so the isolation check is not vacuous.
     await ds.query(
-      `INSERT INTO agent_messages (id, tenant_id, agent_id, agent_name, status, timestamp) VALUES ($1,$2,$3,$4,$5,$6)`,
-      ['msg-a', TEST_TENANT_ID, TEST_AGENT_ID, 'test-agent', 'success', now],
+      `INSERT INTO requests (id, tenant_id, agent_id, agent_name, status, timestamp) VALUES ($1,$2,$3,$4,$5,$6)`,
+      ['req-a', TEST_TENANT_ID, TEST_AGENT_ID, 'test-agent', 'success', now],
+    );
+    await ds.query(
+      `INSERT INTO agent_messages (id, request_id, tenant_id, agent_id, agent_name, status, timestamp) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      ['msg-a', 'req-a', TEST_TENANT_ID, TEST_AGENT_ID, 'test-agent', 'success', now],
     );
   });
 
@@ -97,7 +102,8 @@ describe('cross-tenant isolation (e2e)', () => {
       request(app.getHttpServer()).get('/api/v1/messages?agent_name=test-agent'),
     ).expect(200);
     const items = Array.isArray(res.body.items) ? res.body.items : [];
-    expect(items.length).toBeGreaterThan(0);
+    // Pin to the seeded row: a length check alone would pass on any row.
+    expect(items.map((i: { id?: string }) => i.id)).toContain('req-a');
   });
 
   it('a foreign tenant request log is empty for the other harness', async () => {
