@@ -2387,7 +2387,27 @@ describe('routing commands', () => {
         'api_key',
       ]),
     ).toBe(1);
-    expect(mismatched.io.lastJson()).toMatchObject({ error: 'unknown_model' });
+    expect(mismatched.io.lastJson()).toMatchObject({ error: 'auth_type_mismatch' });
+
+    // A custom provider resolves no catalog id, but the auth-type gate still
+    // applies to the primary.
+    const custom = authedIo([
+      { status: 200, body: [{ model_name: 'm', provider: 'custom:abc', auth_type: 'subscription' }] },
+    ]);
+    expect(
+      await run(custom.io, [
+        'agent',
+        'configure',
+        'john',
+        '--models',
+        'm',
+        '--provider',
+        'custom:abc',
+        '--auth-type',
+        'api_key',
+      ]),
+    ).toBe(1);
+    expect(custom.io.lastJson()).toMatchObject({ error: 'auth_type_mismatch' });
 
     const matched = authedIo([
       { status: 200, body: rows },

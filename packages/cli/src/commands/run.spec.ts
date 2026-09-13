@@ -106,6 +106,16 @@ describe('runCmd', () => {
     );
   });
 
+  it('rejects a reserved --env name', async () => {
+    const { io } = authedIo([]);
+    saveAgentKey(io.env, HOST, 'my-bot', 'k');
+    for (const name of ['MANIFEST_API_KEY', 'manifest_agent_key', 'MANIFEST_AGENT_URL']) {
+      await expect(
+        runCmd(io, ['--agent', 'my-bot', '--env', name, '--', 'tool']),
+      ).rejects.toThrow(expect.objectContaining({ code: 'invalid_env_name' }));
+    }
+  });
+
   it('rejects an invalid --env variable name', async () => {
     const { io } = authedIo([]);
     saveAgentKey(io.env, HOST, 'my-bot', 'k');

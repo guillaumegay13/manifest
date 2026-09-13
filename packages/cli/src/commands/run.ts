@@ -57,12 +57,22 @@ export async function runCmd(io: CliIo, argv: string[]): Promise<number> {
     maxPositionals: 0,
   });
   const agentName = slugifyAgentName(requireString(args, 'agent'));
-  const envVar = args.strings['env'] ?? 'MANIFEST_AGENT_KEY';
-  if (!ENV_NAME_RE.test(envVar) || envVar === 'MANIFEST_AGENT_URL') {
+  const explicitEnv = args.strings['env'];
+  const envVar = explicitEnv ?? 'MANIFEST_AGENT_KEY';
+  const upperEnvVar = envVar.toUpperCase();
+  // The default target is MANIFEST_AGENT_KEY; only an explicit `--env` naming a
+  // reserved credential is rejected. Writing the agent key under
+  // MANIFEST_API_KEY would make a child trust a scoped key as a full-workspace
+  // credential.
+  if (
+    !ENV_NAME_RE.test(envVar) ||
+    upperEnvVar === 'MANIFEST_AGENT_URL' ||
+    (explicitEnv !== undefined && RESERVED_CREDENTIAL_VARS.has(upperEnvVar))
+  ) {
     throw new CliError(
       'invalid_env_name',
       `Not a valid --env name: ${envVar}`,
-      'MANIFEST_AGENT_URL is reserved for the proxy URL',
+      'MANIFEST_AGENT_URL, MANIFEST_AGENT_KEY, and MANIFEST_API_KEY are reserved',
     );
   }
 

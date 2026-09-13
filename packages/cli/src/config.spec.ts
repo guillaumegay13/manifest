@@ -75,9 +75,15 @@ describe('loadConfig / saveConfig', () => {
     expect(() => loadConfig(file)).toThrow('Could not parse');
     fs.writeFileSync(file, 'null');
     expect(loadConfig(file)).toEqual({});
-    // A JSON array is an object typeof-wise but cannot hold config keys.
+    // A JSON array cannot hold config keys: it is reported, not silently dropped.
     fs.writeFileSync(file, '[]');
-    expect(loadConfig(file)).toEqual({});
+    let error: unknown;
+    try {
+      loadConfig(file);
+    } catch (e) {
+      error = e;
+    }
+    expect((error as CliError).code).toBe('config_corrupt');
   });
 });
 
