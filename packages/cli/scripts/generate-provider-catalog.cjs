@@ -58,9 +58,10 @@ async function main() {
   let shared;
   try {
     shared = require('manifest-shared');
-  } catch {
+  } catch (err) {
+    if (err && err.code !== 'MODULE_NOT_FOUND') throw err;
     // A clean checkout has no built workspace dependency; fail with the fix
-    // instead of a bare MODULE_NOT_FOUND.
+    // instead of a bare MODULE_NOT_FOUND. Genuine load errors rethrow above.
     console.error(
       'manifest-shared is not built. Build it first:\n  npm run build --workspace=packages/shared',
     );

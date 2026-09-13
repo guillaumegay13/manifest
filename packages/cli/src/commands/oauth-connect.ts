@@ -51,15 +51,14 @@ function deviceSleepMs(suggestedMs: number | undefined): number {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * A fingerprint of the provider's subscription connections: `id` plus active
- * flag. Detect completion by any transition — a new connection, or an
- * inactive one reactivated — instead of a tenant-wide count that reactivating
- * the same row leaves unchanged.
+ * The provider's ACTIVE subscription connection ids. Completion is a newly
+ * added or reactivated active connection — not any fingerprint change, which
+ * removal or deactivation would also produce.
  */
-function subscriptionConnectionSignature(payload: unknown, providerId: string): string {
+function activeSubscriptionConnectionIds(payload: unknown, providerId: string): Set<string> {
   const providers = (payload as { providers?: unknown })?.providers;
-  if (!Array.isArray(providers)) return '';
-  const parts: string[] = [];
+  const ids = new Set<string>();
+  if (!Array.isArray(providers)) return ids;
   for (const p of providers) {
     if (typeof p !== 'object' || p === null) continue;
     const group = p as { provider?: string; auth_type?: string; connections?: unknown };
@@ -67,10 +66,10 @@ function subscriptionConnectionSignature(payload: unknown, providerId: string): 
     for (const c of Array.isArray(group.connections) ? group.connections : []) {
       if (typeof c !== 'object' || c === null) continue;
       const conn = c as { id?: unknown; is_active?: unknown };
-      if (typeof conn.id === 'string') parts.push(`${conn.id}:${conn.is_active === true ? 1 : 0}`);
+      if (typeof conn.id === 'string' && conn.is_active === true) ids.add(conn.id);
     }
   }
-  return parts.sort().join(',');
+  return ids;
 }
 
 export async function subscriptionConnect(
@@ -166,8 +165,8 @@ export async function subscriptionConnect(
     return;
   }
 
-  // redirect flow: completion is server-side; watch the connection appear.
-  const before = subscriptionConnectionSignature(
+  // redirect flow: completion is server-side; watch a new active connection appear.
+  const beforeActive = activeSubscriptionConnectionIds(
     await client.request('GET', '/providers'),
     providerId,
   );
@@ -185,11 +184,11 @@ export async function subscriptionConnect(
   const deadline = Date.now() + OAUTH_POLL.timeoutMs;
   while (Date.now() < deadline) {
     await sleep(OAUTH_POLL.intervalMs);
-    const now = subscriptionConnectionSignature(
+    const afterActive = activeSubscriptionConnectionIds(
       await client.request('GET', '/providers'),
       providerId,
     );
-    if (now !== before) {
+    if ([...afterActive].some((id) => !beforeActive.has(id))) {
       printJson(io, { connected: providerId, auth_type: 'subscription', agent });
       return;
     }

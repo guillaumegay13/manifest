@@ -62,10 +62,13 @@ export async function assertModelsDiscovered(
   const names = new Set(rows.map((r) => r.model));
   const enforceProvider = providerId !== null && rowsCarryProvider;
 
-  const missing = models.filter((m) => {
-    if (!enforceProvider || providerId === null) return !names.has(m);
+  const missing = models.filter((m, index) => {
+    // Only the route (first) model is pinned to this provider. Fallbacks are
+    // stored provider-agnostic and resolved at runtime, so they can belong to
+    // another provider and are checked by name only.
+    if (!enforceProvider || providerId === null || index > 0) return !names.has(m);
     const qualified = m.startsWith(`${providerId}/`) ? m.slice(providerId.length + 1) : m;
-    return !rows.some((r) => r.model === qualified && r.provider === providerId);
+    return !rows.some((r) => r.provider === providerId && (r.model === m || r.model === qualified));
   });
   if (missing.length === 0) return;
   throw new CliError(

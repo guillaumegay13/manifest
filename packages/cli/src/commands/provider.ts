@@ -14,13 +14,12 @@ import { subscriptionConnect, supportsSubscription } from './oauth-connect';
  */
 export async function providerCatalog(io: CliIo, argv: string[]): Promise<void> {
   parseArgs(argv, { maxPositionals: 0 });
-  printJson(io, {
-    providers: PROVIDER_CATALOG.map(({ id, displayName, authTypes }) => ({
-      id,
-      displayName,
-      authTypes: authTypes.filter((t) => t !== 'subscription' || supportsSubscription(id)),
-    })),
-  });
+  const providers = PROVIDER_CATALOG.map(({ id, displayName, authTypes }) => ({
+    id,
+    displayName,
+    authTypes: authTypes.filter((t) => t !== 'subscription' || supportsSubscription(id)),
+  })).filter((p) => p.authTypes.length > 0);
+  printJson(io, { providers });
 }
 
 /**

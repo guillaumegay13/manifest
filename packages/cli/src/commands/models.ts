@@ -36,7 +36,7 @@ export async function modelsList(io: CliIo, argv: string[]): Promise<void> {
   const providerInput = args.strings['provider'];
   const providerFilter = providerInput
     ? /^custom:/i.test(providerInput.trim())
-      ? providerInput.trim()
+      ? `custom:${providerInput.trim().slice('custom:'.length)}`
       : resolveProviderId(providerInput)
     : null;
   const includeCost = Boolean(args.booleans['cost']);

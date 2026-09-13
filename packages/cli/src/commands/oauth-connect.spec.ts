@@ -229,6 +229,33 @@ describe('subscriptionConnect edge paths', () => {
     expect(io.lastJson()).toEqual({ connected: 'xai', auth_type: 'subscription', agent: 'a' });
   });
 
+  it('does not report success when a connection is removed mid-poll', async () => {
+    OAUTH_POLL.intervalMs = 1;
+    OAUTH_POLL.timeoutMs = 20;
+    const io = makeIo({ isTTY: true });
+    io.openBrowser = () => true;
+    await expect(
+      subscriptionConnect(
+        io,
+        fakeClient([
+          {
+            providers: [
+              {
+                provider: 'xai',
+                auth_type: 'subscription',
+                connections: [{ id: 'c1', is_active: true }],
+              },
+            ],
+          },
+          { url: 'https://xai/auth' },
+          { providers: [] }, // the connection disappeared
+        ]),
+        'xai',
+        'a',
+      ),
+    ).rejects.toThrow(expect.objectContaining({ code: 'oauth_timeout' }));
+  });
+
   it('detects a reactivated connection (same id, inactive to active)', async () => {
     OAUTH_POLL.intervalMs = 1;
     OAUTH_POLL.timeoutMs = 500;
