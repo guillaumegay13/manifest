@@ -1,0 +1,21 @@
+packages/backend/src/mcp/tools/tools.spec.ts
+  s_b2b5a4b0535460::t_04675842b3b9c7 861-874
+  s_b2b5a4b0535460::t_0294b0ce4075ce 780-783
+  s_b2b5a4b0535460::t_da4702e7660df9 817-825
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d98358410ce426806dd26815fd8781e8dd33af24",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
