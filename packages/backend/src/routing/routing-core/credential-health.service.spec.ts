@@ -102,6 +102,15 @@ describe('CredentialHealthService', () => {
     expect(credentialFingerprint('sk-dead')).not.toBe(credentialFingerprint('sk-live'));
   });
 
+  it('clears every tracked failure', () => {
+    service.markRejected('up-1', blob(), {
+      statusCode: 401,
+      reason: 'subscription_token_rejected',
+    });
+    service.clear();
+    expect(service.getSnapshot('up-1').requires_reauth).toBe(false);
+  });
+
   it('bounds the tracked set so a flood of dead connections cannot grow unbounded', () => {
     for (let i = 0; i < 5_001; i++) {
       service.markRejected(`up-${i}`, blob({ r: `r-${i}` }), {

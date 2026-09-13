@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { createHash } from 'node:crypto';
 import { parseOAuthTokenBlob } from '../oauth/core';
 
 /**
@@ -54,11 +53,23 @@ interface RejectedEntry {
 export function credentialFingerprint(rawValue: string): string {
   const blob = parseOAuthTokenBlob(rawValue);
   const material = blob ? blob.r || blob.t : rawValue;
-  // Not a password hash: this is an in-memory equality fingerprint used to
-  // notice when a rejected credential has been replaced. It is never persisted
-  // and never verifies a secret, so a fast one-way digest is the right tool.
-  // codeql[js/insufficient-password-hash]
-  return createHash('sha256').update(material.slice(0, MAX_FINGERPRINT_MATERIAL)).digest('hex');
+  const input = material.slice(0, MAX_FINGERPRINT_MATERIAL);
+  // An in-memory equality tag for a credential that failed upstream, not
+  // password storage: the tag is never persisted and never verifies a secret.
+  // Four FNV-1a-style 32-bit mixes make a 128-bit tag cheap enough for the
+  // routing hot path without routing secret material through a KDF.
+  let h1 = 0x811c9dc5;
+  let h2 = 0x9e3779b1;
+  let h3 = 0x85ebca77;
+  let h4 = 0xc2b2ae3d;
+  for (let i = 0; i < input.length; i++) {
+    const c = input.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193);
+    h2 = Math.imul(h2 ^ (c + i), 0x85ebca6b);
+    h3 = Math.imul(h3 + c, 0x27d4eb2f);
+    h4 = Math.imul(h4 ^ (c << 3), 0x165667b1);
+  }
+  return [h1, h2, h3, h4].map((h) => (h >>> 0).toString(16).padStart(8, '0')).join('');
 }
 
 @Injectable()

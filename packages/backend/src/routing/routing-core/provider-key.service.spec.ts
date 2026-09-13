@@ -267,6 +267,27 @@ describe('ProviderKeyService — selection projections', () => {
 
         expect((await svc.selectProviderKey('u', 'openai', 'subscription'))?.id).toBe('up-work');
       });
+
+      it('bounds the skipped-unhealthy warning keys', async () => {
+        const health = withHealth();
+        jest.spyOn(svc['logger'], 'warn').mockImplementation(() => undefined as unknown as void);
+
+        for (let i = 0; i < 257; i++) {
+          jest
+            .spyOn(svc, 'getProviderKeys')
+            .mockResolvedValue([
+              key({ id: `up-${i}`, label: `Dead-${i}`, apiKey: `sk-${i}` }),
+              key({ id: 'up-live', label: 'Live', apiKey: 'sk-live' }),
+            ]);
+          health.markRejected(`up-${i}`, `sk-${i}`, {
+            statusCode: 401,
+            reason: 'api_key_rejected',
+          });
+          await svc.selectProviderKey('u', 'openai', 'api_key', `Dead-${i}`, 'agent-1');
+        }
+
+        expect(svc['stalePinWarnings'].size).toBe(256);
+      });
     });
   });
 
