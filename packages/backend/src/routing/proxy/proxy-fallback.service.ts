@@ -356,23 +356,26 @@ export class ProxyFallbackService {
       // hop. Consent is enforced inside maybeHeal, exactly like the primary.
       let autofixAttempt: AutofixAttempt | null = null;
       let preHealErrorBody: string | null = null;
+      const fallbackApiMode = forward.wireApiMode ?? apiMode;
       if (
         !forward.response.ok &&
         this.autofixService.isRepairable(forward.response.status) &&
         forward.wireRequestBody &&
-        forward.retryWireBody
+        forward.retryWireBody &&
+        fallbackApiMode
       ) {
         // Keep the failed body readable for the audit row if the patch heals —
         // maybeHeal consumes the live response.
         preHealErrorBody = await forward.response.clone().text();
         autofixAttempt = await this.maybeHealFallback({
           forward,
+          requestBody: forward.wireRequestBody,
+          apiMode: fallbackApiMode,
           agentId,
           tenantId,
           provider,
           model,
           authType,
-          apiMode,
           tenantProviderId,
           providerKeyLabel,
           signal,
@@ -391,7 +394,7 @@ export class ProxyFallbackService {
         provider,
         fallbackIndex: i,
         status: forward.response.status,
-        errorBody: preHealErrorBody ?? '',
+        errorBody: preHealErrorBody!,
         authType,
         tenantProviderId,
         // Selected-row label (credentials.keyLabel already folded in above),
@@ -454,7 +457,7 @@ export class ProxyFallbackService {
       updated.add(authType);
       failedAuthByProvider.set(provider.toLowerCase(), updated);
 
-      if (!shouldTriggerFallback(finalForward.response.status)) break;
+      if (!shouldTriggerFallback(forward.response.status)) break;
     }
     return { success: null, failures };
   }
@@ -468,39 +471,35 @@ export class ProxyFallbackService {
    * deliberate alternative route, and hopping back to the primary here would
    * undo that.
    *
-   * Returns null when there is nothing to retry (no wire body / retry hook) or
-   * Autofix declines (off for the agent, non-repairable status, no patch) —
-   * callers then keep the original failure.
+   * Returns null when Autofix declines (off for the agent, non-repairable status,
+   * no patch) — callers then keep the original failure. The caller has already
+   * established that the forward carries a wire body and a retry hook.
    */
   private async maybeHealFallback(input: {
     forward: ForwardResult;
+    requestBody: Record<string, unknown>;
+    apiMode: ProxyApiMode;
     agentId: string;
     tenantId: string;
     provider: string;
     model: string;
     authType: AuthType;
-    apiMode?: ProxyApiMode;
     tenantProviderId: string | null;
     providerKeyLabel?: string;
     signal?: AbortSignal;
     startProviderAttempt?: StartProviderAttempt;
   }): Promise<AutofixAttempt | null> {
-    const { forward } = input;
-    const wireRequestBody = forward.wireRequestBody;
-    if (!wireRequestBody || !forward.retryWireBody) return null;
-    const apiMode = forward.wireApiMode ?? input.apiMode;
-    if (!apiMode) return null;
     return this.autofixService.maybeHeal({
-      forward,
+      forward: input.forward,
       agentId: input.agentId,
       tenantId: input.tenantId,
       provider: input.provider,
       model: input.model,
       authType: input.authType,
-      apiMode,
-      requestBody: wireRequestBody,
+      apiMode: input.apiMode,
+      requestBody: input.requestBody,
       reforward: (healedBody) =>
-        this.retryWireBody(forward, healedBody, {
+        this.retryWireBody(input.forward, healedBody, {
           provider: input.provider,
           model: input.model,
           authType: input.authType,

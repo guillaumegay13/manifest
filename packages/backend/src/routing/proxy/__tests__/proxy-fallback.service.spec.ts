@@ -2263,6 +2263,76 @@ describe('ProxyFallbackService', () => {
         expect(result.failures[0].errorBody).toContain('response_format');
         expect(result.failures[1].errorBody).toBe('still broken');
       });
+
+      it('skips Autofix when the fallback has no resolvable api mode', async () => {
+        providerKeyService.getProviderApiKey.mockResolvedValue('sk-ant');
+        const failedForward = failedForwardWithWire(400);
+        delete failedForward.wireApiMode;
+        providerClient.forward.mockResolvedValue(failedForward as never);
+        autofixService.isRepairable.mockReturnValue(true);
+
+        const result = await service.tryFallbacks(
+          'agent-1',
+          'tenant-1',
+          ['deepseek-flash'],
+          body,
+          false,
+          'sess-1',
+          'gpt-4o',
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined, // apiMode
+          undefined,
+          [{ provider: 'opencode-go', authType: 'api_key', model: 'deepseek-flash' }],
+        );
+
+        expect(result.success).toBeNull();
+        expect(result.failures).toHaveLength(1);
+        expect(autofixService.maybeHeal).not.toHaveBeenCalled();
+      });
+
+      it('stamps the Phoenix decision on an unfixable fallback hop', async () => {
+        providerKeyService.getProviderApiKey.mockResolvedValue('sk-ant');
+        providerClient.forward.mockResolvedValue(failedForwardWithWire(400) as never);
+        autofixService.isRepairable.mockReturnValue(true);
+        const record = {
+          groupId: 'g',
+          outcome: 'unfixable' as const,
+          original_http_status: 400,
+          chain: [
+            {
+              attempt: 0,
+              origin: 'original' as const,
+              request: {},
+              http_status: 400,
+              issue_id: 'issue-1',
+              operations: [{ type: 'drop_param' }],
+            },
+          ],
+        };
+        autofixService.maybeHeal.mockResolvedValue({
+          forward: {
+            response: new Response('still broken', { status: 400 }),
+            isGoogle: false,
+            isAnthropic: false,
+            isChatGpt: false,
+            providerCallStarted: true,
+          } as never,
+          record,
+        });
+
+        const result = await runFallback();
+
+        expect(result.success).toBeNull();
+        // No retry was sent, so this is the original hop and it still carries
+        // Phoenix's decision for the audit trail.
+        expect(result.failures).toHaveLength(1);
+        expect(result.failures[0]).toMatchObject({ status: 400, autofixRole: 'original' });
+        expect(result.failures[0].autofix).toBe(record);
+      });
     });
   });
 
