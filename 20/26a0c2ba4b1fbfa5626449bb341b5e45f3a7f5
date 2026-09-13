@@ -1,0 +1,28 @@
+packages/backend/package.json
+  s_b2b5a4b0535460::t_d9c9570068f603 32
+  s_b2b5a4b0535460::t_5b5f5d3eb94622 45
+  s_b2b5a4b0535460::t_fcacb97ac4f3b8 64
+  s_b2b5a4b0535460::t_02a145e0a972f2 28-31
+  s_b2b5a4b0535460::t_0573ee0606cea3 63
+packages/frontend/package.json
+  s_b2b5a4b0535460::t_bab29f90d2a544 15
+  s_b2b5a4b0535460::t_c959536ff4ce2b 18
+package-lock.json
+  s_b2b5a4b0535460::t_5c78861bda1d7b 3275,3385-3409,5717,5756,5803,7098,7681,9626,9661,10015,10131,10313,13215,13373,13871,13878,13943,14437,14862,14934,15031,15047,15618,15628,16493,16867,17086-17090,17103,17121-17122,17148-17468,17480-17488,18724,18727,18749-18882,18916,18922-19055,19060,19066-19071,19076,19100,19183,19207-19215
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2026a0c2ba4b1fbfa5626449bb341b5e45f3a7f5",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
