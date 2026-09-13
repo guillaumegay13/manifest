@@ -78,13 +78,19 @@ export const fetchClientMetadataResource: ClientMetadataResourceFetch = async (i
       servername: isIP(hostname) === 0 ? hostname : undefined,
       signal,
       lookup: createPinnedLookup(pinnedAddress),
+      // A metadata server that accepts the connection then stalls must not wedge
+      // the whole authorization flow. Node does not destroy the request on its
+      // own when the socket timeout fires.
+      timeout: 10_000,
     };
     const clientRequest = request(url, options, (response) => {
       const status = response.statusCode ?? 500;
-      const body =
-        webRequest.method === 'HEAD' || BODY_FORBIDDEN_RESPONSE_STATUSES.has(status)
-          ? null
-          : (Readable.toWeb(response) as unknown as BodyInit);
+      const hasNoBody =
+        webRequest.method === 'HEAD' || BODY_FORBIDDEN_RESPONSE_STATUSES.has(status);
+      // Drain the response when we are discarding it, or a 205 with a body keeps
+      // the socket alive until the peer times out.
+      if (hasNoBody) response.resume();
+      const body = hasNoBody ? null : (Readable.toWeb(response) as unknown as BodyInit);
       resolve(
         new Response(body, {
           headers: responseHeaders(response.headers),
@@ -92,6 +98,15 @@ export const fetchClientMetadataResource: ClientMetadataResourceFetch = async (i
           statusText: response.statusMessage,
         }),
       );
+    });
+    clientRequest.once('timeout', () =>
+      clientRequest.destroy(new Error('CIMD metadata request timed out')),
+    );
+    // A 101 moves the connection to an upgraded protocol, so the response
+    // callback never fires and the promise would never settle.
+    clientRequest.once('upgrade', (_response, socket) => {
+      socket.destroy();
+      reject(new Error('CIMD metadata request returned an unsupported protocol upgrade'));
     });
     clientRequest.once('error', reject);
     clientRequest.end();

@@ -3,11 +3,7 @@ import { z } from 'zod';
 import { authIssuer, authOrigin, mcpResource } from '../../auth/auth.instance';
 import { McpOperator } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
-import { err, ok } from '../tool-result';
-
-function result(promise: Promise<unknown>) {
-  return promise.then(ok).catch((e: unknown) => err(e instanceof Error ? e.message : String(e)));
-}
+import { ok, result } from '../tool-result';
 
 interface Check {
   name: string;
@@ -71,7 +67,9 @@ export function registerIdentityTools(
             .map((c) => `${c.provider}/${c.auth_type}${c.label ? `/${c.label}` : ''}`);
           checks.push({
             name: 'providers',
-            status: connections.length === 0 ? 'warn' : 'ok',
+            // No connections means nothing can route at all, so this is a real
+            // failure, not a warning — and it makes the verdict able to be false.
+            status: connections.length === 0 ? 'fail' : hollow.length > 0 ? 'warn' : 'ok',
             detail: {
               connections: connections.length,
               // An active connection with zero cached models is unusable by

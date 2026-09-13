@@ -14,3 +14,11 @@ export function err(message: string) {
     isError: true as const,
   };
 }
+
+/**
+ * Await a tool's payload and wrap it. A thrown Error becomes an `isError`
+ * result with the message, so one bad call cannot tear down the session.
+ */
+export function result(promise: Promise<unknown>) {
+  return promise.then(ok).catch((e: unknown) => err(e instanceof Error ? e.message : String(e)));
+}

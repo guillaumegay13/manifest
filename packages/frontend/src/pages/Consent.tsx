@@ -30,7 +30,7 @@ const Consent: Component = () => {
 
   const clientId = () => String(params.client_id ?? '');
   const scopes = () =>
-    (new URLSearchParams(window.location.search).get('scope') ?? '')
+    String(params.scope ?? '')
       .split(' ')
       .map((s) => s.trim())
       .filter(Boolean);
@@ -79,9 +79,23 @@ const Consent: Component = () => {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ accept, oauth_query: oauthQuery }),
       });
-      const body = (await response.json().catch(() => null)) as { url?: string } | null;
-      if (!response.ok) throw new Error('Authorization request failed');
-      if (typeof body?.url === 'string') window.location.assign(body.url);
+      const body = (await response.json().catch(() => null)) as {
+        url?: string;
+        error?: string;
+        error_description?: string;
+        message?: string;
+      } | null;
+      if (!response.ok) {
+        throw new Error(
+          body?.message || body?.error_description || body?.error || 'Authorization request failed',
+        );
+      }
+      if (typeof body?.url === 'string') {
+        window.location.assign(body.url);
+      } else {
+        setSubmitError('The authorization server returned no redirect.');
+        setBusy(null);
+      }
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : String(error));
       setBusy(null);
@@ -115,6 +129,9 @@ const Consent: Component = () => {
               <strong>{client()?.client_name || clientId()}</strong> wants to connect to your
               Manifest workspace.
             </p>
+            <Show when={client()?.client_uri}>
+              <p class="auth-header__subtitle">{client()?.client_uri}</p>
+            </Show>
           </div>
           <ul style="text-align: left; margin: 0 auto 1rem; max-width: 320px;">
             {scopes().map((scope) => (

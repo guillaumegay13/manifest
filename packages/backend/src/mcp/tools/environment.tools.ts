@@ -4,15 +4,13 @@ import { PLATFORM_SETUP_SNIPPETS } from 'manifest-shared';
 import { authOrigin } from '../../auth/auth.instance';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
-import { err, ok } from '../tool-result';
-
-function result(promise: Promise<unknown>) {
-  return promise.then(ok).catch((e: unknown) => err(e instanceof Error ? e.message : String(e)));
-}
+import { ok, result } from '../tool-result';
 
 /** The masked stand-in for an agent key in setup text — never a shell substitution. */
 function maskedKeyRef(slug: string): string {
-  return `<MNFST_AGENT_KEY — run: mnfst agent key show ${slug} --raw>`;
+  // Pin the origin so the command targets the server that produced the setup,
+  // not whatever host the CLI is configured for.
+  return `<MNFST_AGENT_KEY — run: mnfst agent key show ${slug} --raw --url ${authOrigin}>`;
 }
 
 /**
@@ -21,17 +19,19 @@ function maskedKeyRef(slug: string): string {
  * drift between surfaces. Platforms with no first-class snippet get generic
  * OpenAI-compatible guidance.
  */
-function renderSetup(platform: string | null, keyRef: string): string {
+function renderSetup(platform: string | null, keyRef: string, canWrite: boolean): string {
   const template = platform ? PLATFORM_SETUP_SNIPPETS[platform] : undefined;
   if (template) {
     return template(`${authOrigin}/v1`, keyRef);
   }
-  return [
+  const lines = [
     "Point your tool's OpenAI-compatible client at Manifest:",
     `  base URL: ${authOrigin}/v1`,
     `  API key:  ${keyRef}`,
-    'Or wire it via env: use manifest_agent_env to get the export lines.',
-  ].join('\n');
+  ];
+  // `manifest_agent_env` is a write tool, so only name it when it is available.
+  if (canWrite) lines.push('Or wire it via env: use manifest_agent_env to get the export lines.');
+  return lines.join('\n');
 }
 
 /**
@@ -70,8 +70,8 @@ export function registerEnvironmentTools(
           return {
             agent: info.agent_name,
             platform: info.agent_platform ?? null,
-            setup: renderSetup(info.agent_platform ?? null, keyRef),
-            ...(reveal ? {} : { hint: 'Pass reveal:true to embed the real key' }),
+            setup: renderSetup(info.agent_platform ?? null, keyRef, canWrite),
+            ...(!reveal && canWrite ? { hint: 'Pass reveal:true to embed the real key' } : {}),
           };
         })(),
       ),

@@ -4,11 +4,7 @@ import { PLATFORM_API_SURFACES } from 'manifest-shared';
 import { authOrigin } from '../../auth/auth.instance';
 import { McpOperator, MCP_WRITE_SCOPE } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
-import { err, ok } from '../tool-result';
-
-function result(promise: Promise<unknown>) {
-  return promise.then(ok).catch((e: unknown) => err(e instanceof Error ? e.message : String(e)));
-}
+import { result } from '../tool-result';
 
 const AUTH_TYPES = ['api_key', 'subscription', 'local'] as const;
 const ROUTE_TEST_TIMEOUT_MS = 120_000;
@@ -78,9 +74,10 @@ function parseResponsesSurface(parsed: Record<string, unknown>): SurfaceResult {
 }
 
 function hasSurfacePayload(surface: string, parsed: Record<string, unknown>): boolean {
-  if (surface === 'messages') return Array.isArray(parsed['content']);
-  if (surface === 'responses') return Array.isArray(parsed['output']);
-  return Array.isArray(parsed['choices']);
+  const nonEmpty = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
+  if (surface === 'messages') return nonEmpty(parsed['content']);
+  if (surface === 'responses') return nonEmpty(parsed['output']);
+  return nonEmpty(parsed['choices']);
 }
 
 /**
@@ -290,7 +287,7 @@ export function registerRoutingTools(
             if (!info) throw new Error(`Agent "${agentName}" not found`);
             if (
               platformOverride !== undefined &&
-              !(platformOverride in (PLATFORM_API_SURFACES as Record<string, string>))
+              !Object.prototype.hasOwnProperty.call(PLATFORM_API_SURFACES, platformOverride)
             ) {
               throw new Error(`Unknown platform: ${platformOverride}`);
             }
@@ -396,10 +393,10 @@ export function registerRoutingTools(
           'Set the default route and fallback chain (or a custom header tier), and/or toggle Autofix and recording. `models` is the full chain: first is the route, the rest are fallbacks.',
         inputSchema: z.object({
           agent: z.string().min(1),
-          models: z.array(z.string().min(1)).min(1).optional(),
+          models: z.array(z.string().min(1)).min(1).max(6).optional(),
           provider: z.string().min(1).optional(),
           auth_type: z.enum(AUTH_TYPES).optional(),
-          key_label: z.string().min(1).optional(),
+          key_label: z.string().min(1).max(50).optional(),
           tier: z
             .string()
             .min(1)
@@ -557,18 +554,26 @@ export function registerRoutingTools(
               header_value,
               badge_color: badge_color as never,
             });
-            if (model) {
-              await deps.headerTiers.setOverride(
-                agent.id,
-                agent.tenant_id,
-                tier.id,
-                model,
-                provider,
-                auth_type,
-              );
-            }
-            if (fallbacks && fallbacks.length > 0) {
-              await deps.headerTiers.setFallbacks(agent.id, agent.tenant_id, tier.id, fallbacks);
+            // The tier create, its override, and its fallbacks are separate
+            // writes. If a later step fails, delete the tier so a rejected
+            // custom tier is not left behind.
+            try {
+              if (model) {
+                await deps.headerTiers.setOverride(
+                  agent.id,
+                  agent.tenant_id,
+                  tier.id,
+                  model,
+                  provider,
+                  auth_type,
+                );
+              }
+              if (fallbacks && fallbacks.length > 0) {
+                await deps.headerTiers.setFallbacks(agent.id, agent.tenant_id, tier.id, fallbacks);
+              }
+            } catch (error) {
+              await deps.headerTiers.delete(agent.id, tier.id).catch(() => undefined);
+              throw error;
             }
             return {
               tier: await deps.headerTiers

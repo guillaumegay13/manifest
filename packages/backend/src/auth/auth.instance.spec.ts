@@ -498,6 +498,15 @@ describe('auth.instance', () => {
       );
       expect(config.resources[0].identifier).toBe('https://manifest.example.com/api/v1/mcp');
       expect(config.allowUnauthenticatedClientRegistration).toBe(false);
+      expect(config.allowDynamicClientRegistration).toBe(true);
+      expect(config.clientRegistrationRequirePKCE).toBe(true);
+      expect(config.clientRegistrationDefaultScopes).toEqual(['mcp:read']);
+      expect(config.clientRegistrationAllowedScopes).toEqual(['mcp:write', 'offline_access']);
+      expect(config.resourceSeedMode).toBe('overwrite');
+      expect(config.resources[0].accessTokenTtl).toBe(15 * 60);
+      expect(config.resources[0].allowedScopes).toEqual(
+        expect.arrayContaining(['mcp:read', 'mcp:write', 'offline_access']),
+      );
     });
 
     it('registers the MCP/OAuth plugins but not stripe when billing is disabled', () => {

@@ -1,12 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import { SHARED_PROVIDERS } from 'manifest-shared';
 import { McpOperator } from '../mcp-auth';
 import { McpToolDeps } from '../tool-deps';
-import { err, ok } from '../tool-result';
-
-function result(promise: Promise<unknown>) {
-  return promise.then(ok).catch((e: unknown) => err(e instanceof Error ? e.message : String(e)));
-}
+import { result } from '../tool-result';
 
 /** Model discovery and pricing readouts. */
 export function registerModelTools(
@@ -52,8 +49,23 @@ export function registerModelTools(
       result(
         (async () => {
           const { models, lastSyncedAt } = deps.modelPrices.getAll();
+          const lookup = provider?.trim().toLowerCase();
+          // Pricing rows carry the provider's display label ("OpenAI"), while
+          // callers pass the id ("openai"). Accept either, plus aliases.
+          const entry = lookup
+            ? SHARED_PROVIDERS.find(
+                (p) =>
+                  p.id.toLowerCase() === lookup ||
+                  p.aliases.some((alias) => alias.toLowerCase() === lookup),
+              )
+            : undefined;
+          const labels = new Set(
+            [lookup, entry?.id.toLowerCase(), entry?.displayName.toLowerCase()].filter(
+              (value): value is string => typeof value === 'string',
+            ),
+          );
           return {
-            models: models.filter((row) => provider === undefined || row.provider === provider),
+            models: models.filter((row) => !lookup || labels.has(row.provider.toLowerCase())),
             lastSyncedAt,
           };
         })(),
