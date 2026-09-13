@@ -1,0 +1,27 @@
+packages/backend/src/routing/proxy/kiro-adapter.ts
+  s_34f39b4966ebb7::t_d476e83aafa62d 924-927,929
+  s_34f39b4966ebb7::t_073ac20bb33641 1091
+  s_34f39b4966ebb7::t_f953920167ec6d 1137
+  s_34f39b4966ebb7::t_3269637299272e 998-1002
+packages/backend/src/routing/proxy/__tests__/kiro-adapter.spec.ts
+  s_34f39b4966ebb7::t_96b33030ca0001 606,608-609,612,615-617
+  s_34f39b4966ebb7::t_fa7a70d845303a 689-691,694,696
+.changeset/kiro-usage-tracking.md
+  s_34f39b4966ebb7::t_17a1e9838d6ea7 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1288af535d5131f72c3a382b6987e707bb50f144",
+  "prompts": {},
+  "sessions": {
+    "s_34f39b4966ebb7": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f63d8f12effe0jLpMIl32M4hog",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
