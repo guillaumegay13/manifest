@@ -1,0 +1,44 @@
+packages/cli/src/commands/provider.ts
+  s_c03dc0ae96aac3::t_ec0c08e40638ef 7,10,12-13,21
+  s_c03dc0ae96aac3::t_330850c7a51c8e 319
+packages/cli/scripts/generate-provider-catalog.cjs
+  s_c03dc0ae96aac3::t_a0bbd1162576f4 58-69
+packages/cli/src/commands/routing.ts
+  s_c03dc0ae96aac3::t_123cfbd6af5230 193-194,196-197,199-200,202-215,220
+  s_c03dc0ae96aac3::t_6ad32b2dec0f65 310-313
+packages/cli/src/commands/oauth-connect.spec.ts
+  s_c03dc0ae96aac3::t_0dabd018e08027 205,215-258
+  s_c03dc0ae96aac3::t_34d840f3582979 120-137
+packages/cli/src/commands/commands.spec.ts
+  s_c03dc0ae96aac3::t_776a4179347a0c 1189-1195
+  s_c03dc0ae96aac3::t_4de005b0cc2096 1009-1012
+  s_c03dc0ae96aac3::t_d25ffd1fb9ceb9 1932-1967
+packages/cli/src/commands/oauth-connect.ts
+  s_c03dc0ae96aac3::t_5de9f3e334a660 26-30
+  s_c03dc0ae96aac3::t_b729a3cdedf5e0 104-105,108
+  s_c03dc0ae96aac3::t_a43ab95313e50b 188-192
+  s_c03dc0ae96aac3::t_fbf698434d25f5 81
+  s_c03dc0ae96aac3::t_3947be34bfd9cc 170-173
+  s_c03dc0ae96aac3::t_db4e238895ec68 53-59,61-73
+packages/cli/src/commands/skill.ts
+  s_c03dc0ae96aac3::t_f001b62bfeeb06 96-97,101,104
+  s_c03dc0ae96aac3::t_5443e0757817cb 102-103
+packages/cli/src/commands/models.ts
+  s_c03dc0ae96aac3::t_f17d9d80ed5e0b 33-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4d4d7cfe55ba7f34b02eded476c94a0468e35f61",
+  "prompts": {},
+  "sessions": {
+    "s_c03dc0ae96aac3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f68d31b96ffeZq8O7BCNwR3dk1",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
