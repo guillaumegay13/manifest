@@ -57,9 +57,11 @@ function validateCategory(args: ParsedArgs): string | undefined {
  * shell command substitution: the snippets embed it in JSON and single-quoted
  * contexts where no shell would expand it, so a literal placeholder that names
  * the command to run is the honest rendering — a human or agent substitutes it.
+ * The origin is pinned so the key command resolves THIS host, even when setup
+ * was generated with `--url` against a non-active login.
  */
-function maskedKeyRef(slug: string): string {
-  return `<MNFST_AGENT_KEY — run: mnfst agent key show ${slug} --raw>`;
+function maskedKeyRef(slug: string, origin: string): string {
+  return `<MNFST_AGENT_KEY — run: mnfst agent key show ${slug} --raw --url ${origin}>`;
 }
 
 /**
@@ -78,7 +80,7 @@ function renderSetup(platform: string | undefined, origin: string, keyRef: strin
     `Point your tool's OpenAI-compatible client at Manifest:`,
     `  base URL: ${origin}/v1`,
     `  API key:  ${keyRef}`,
-    `Or wire it via env: mnfst agent env <name> >> .env`,
+    `Or wire it via env: mnfst agent env <name> --url ${origin} >> .env`,
   ].join('\n');
 }
 
@@ -95,7 +97,7 @@ export async function agentSetup(io: CliIo, argv: string[]): Promise<void> {
   }
   const keyRef = args.booleans['reveal']
     ? (await resolveAgentKey(io, args, slug)).key
-    : maskedKeyRef(slug);
+    : maskedKeyRef(slug, target.origin);
   printJson(io, {
     agent: slug,
     platform: info.agent.agent_platform ?? null,
@@ -184,7 +186,7 @@ export async function agentCreate(io: CliIo, argv: string[]): Promise<void> {
         setup: renderSetup(
           existing.agent?.agent_platform ?? platform,
           target.origin,
-          maskedKeyRef(slug),
+          maskedKeyRef(slug, target.origin),
         ),
       });
       return;
@@ -204,7 +206,11 @@ export async function agentCreate(io: CliIo, argv: string[]): Promise<void> {
     agent: result.agent,
     keyPrefix: keyPrefixOf(result.apiKey),
     keyPath,
-    setup: renderSetup(platform, target.origin, maskedKeyRef(slugifyAgentName(name))),
+    setup: renderSetup(
+      platform,
+      target.origin,
+      maskedKeyRef(slugifyAgentName(name), target.origin),
+    ),
   });
 }
 

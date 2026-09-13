@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { ApiKey } from '../entities/api-key.entity';
 import { CliAuthCode } from '../entities/cli-auth-code.entity';
@@ -45,6 +45,7 @@ export class CliAuthService {
     @InjectRepository(ApiKey)
     private readonly apiKeyRepo: Repository<ApiKey>,
     private readonly configService: ConfigService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async createAuthorization(
@@ -97,10 +98,6 @@ export class CliAuthService {
     if (!secureEquals(deriveCodeChallenge(codeVerifier), row.code_challenge)) {
       throw new BadRequestException(INVALID_CODE);
     }
-    // Delete before minting: whoever loses this race gets nothing.
-    const deleted = await this.codeRepo.delete({ id: row.id });
-    if (!deleted.affected) throw new BadRequestException(INVALID_CODE);
-
     const ttlDays = this.configService.get<number>('app.cliTokenTtlDays', 30);
     const absoluteDays = this.configService.get<number>('app.cliTokenAbsoluteTtlDays', 90);
     const token = PAT_PREFIX + randomBytes(32).toString('base64url');
@@ -111,16 +108,23 @@ export class CliAuthService {
     const slidingDate = new Date(Date.now() + ttlDays * 86_400_000);
     const absoluteDate = new Date(Date.now() + absoluteDays * 86_400_000);
     const expiresDate = absoluteDate < slidingDate ? absoluteDate : slidingDate;
-    await this.apiKeyRepo.insert({
-      id: randomUUID(),
-      key: null,
-      key_hash: hashKey(token),
-      key_prefix: keyPrefix(token),
-      tenant_id: row.tenant_id,
-      created_by_user_id: row.user_id,
-      name: CLI_KEY_NAME,
-      expires_at: toLocalSqlTimestamp(expiresDate),
-      absolute_expires_at: toLocalSqlTimestamp(absoluteDate),
+    // Consume the code and mint the PAT in one transaction. Deleting first
+    // still makes a concurrent double-use lose the race, and a failed insert
+    // now rolls the delete back so the code stays redeemable.
+    await this.dataSource.transaction(async (manager) => {
+      const deleted = await manager.delete(CliAuthCode, { id: row.id });
+      if (!deleted.affected) throw new BadRequestException(INVALID_CODE);
+      await manager.insert(ApiKey, {
+        id: randomUUID(),
+        key: null,
+        key_hash: hashKey(token),
+        key_prefix: keyPrefix(token),
+        tenant_id: row.tenant_id,
+        created_by_user_id: row.user_id,
+        name: CLI_KEY_NAME,
+        expires_at: toLocalSqlTimestamp(expiresDate),
+        absolute_expires_at: toLocalSqlTimestamp(absoluteDate),
+      });
     });
     return { token, expiresAt: expiresDate.toISOString() };
   }

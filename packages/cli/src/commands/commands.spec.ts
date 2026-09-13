@@ -674,7 +674,9 @@ describe('agent commands', () => {
     // same wiring instructions the create path prints
     const setup = (io.lastJson() as { setup: string }).setup;
     expect(setup).toContain('base URL');
-    expect(setup).toContain('<MNFST_AGENT_KEY — run: mnfst agent key show kept --raw>');
+    expect(setup).toContain(
+      `<MNFST_AGENT_KEY — run: mnfst agent key show kept --raw --url ${HOST}>`,
+    );
     expect(setup).not.toContain('mnfst_recovered_key');
   });
 
@@ -722,7 +724,9 @@ describe('agent commands', () => {
     expect(setup).toContain(HOST);
     // A literal placeholder, not a command substitution: the snippets embed it
     // in JSON / single-quoted contexts where no shell would expand it.
-    expect(setup).toContain('<MNFST_AGENT_KEY — run: mnfst agent key show kept --raw>');
+    expect(setup).toContain(
+      `<MNFST_AGENT_KEY — run: mnfst agent key show kept --raw --url ${HOST}>`,
+    );
     expect(setup).not.toContain('$(');
     expect(setup).not.toContain('mnfst_kept_secret');
     expect(io.lines.join('\n')).not.toContain('mnfst_kept_secret');
@@ -778,7 +782,9 @@ describe('agent commands', () => {
     const out = io.lastJson() as { setup: string; hint?: string };
     expect(out.setup).toContain('openclaw config set models.providers.manifest');
     expect(out.setup).toContain(`${HOST}/v1`);
-    expect(out.setup).toContain('<MNFST_AGENT_KEY — run: mnfst agent key show bot --raw>');
+    expect(out.setup).toContain(
+      `<MNFST_AGENT_KEY — run: mnfst agent key show bot --raw --url ${HOST}>`,
+    );
     expect(out.hint).toContain('--reveal');
 
     const { io: io2 } = authedIo([

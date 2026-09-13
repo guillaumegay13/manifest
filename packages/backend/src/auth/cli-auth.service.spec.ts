@@ -25,7 +25,18 @@ function makeService() {
   const config = {
     get: jest.fn((key: string) => (key === 'app.cliTokenAbsoluteTtlDays' ? 90 : 30)),
   } as unknown as ConfigService;
-  const service = new CliAuthService(codeRepo as never, apiKeyRepo as never, config);
+  // The service consumes the code and mints the PAT in one transaction; route
+  // the transaction's manager back onto the repo mocks so assertions hold.
+  const dataSource = {
+    transaction: async (fn: (manager: unknown) => Promise<unknown>) =>
+      fn({ delete: codeRepo.delete, insert: apiKeyRepo.insert }),
+  };
+  const service = new CliAuthService(
+    codeRepo as never,
+    apiKeyRepo as never,
+    config,
+    dataSource as never,
+  );
   return { service, codeRepo, apiKeyRepo, config };
 }
 
@@ -105,8 +116,8 @@ describe('CliAuthService', () => {
     codeRepo.findOne.mockResolvedValue(storedRow());
     const { token, expiresAt } = await service.exchange('rawcode', 's1-abcdef1234567890', VERIFIER);
     expect(token).toMatch(/^mnfst_pat_/);
-    expect(codeRepo.delete).toHaveBeenCalledWith({ id: 'row1' });
-    const key = apiKeyRepo.insert.mock.calls[0][0];
+    expect(codeRepo.delete).toHaveBeenCalledWith(expect.anything(), { id: 'row1' });
+    const key = apiKeyRepo.insert.mock.calls[0][1];
     expect(key.name).toBe('cli');
     expect(key.tenant_id).toBe('t1');
     expect(key.created_by_user_id).toBe('u1');
@@ -132,7 +143,16 @@ describe('CliAuthService', () => {
     const config = {
       get: jest.fn((key: string) => (key === 'app.cliTokenAbsoluteTtlDays' ? 7 : 30)),
     } as unknown as ConfigService;
-    const service = new CliAuthService(codeRepo as never, apiKeyRepo as never, config);
+    const dataSource = {
+      transaction: async (fn: (manager: unknown) => Promise<unknown>) =>
+        fn({ delete: codeRepo.delete, insert: apiKeyRepo.insert }),
+    };
+    const service = new CliAuthService(
+      codeRepo as never,
+      apiKeyRepo as never,
+      config,
+      dataSource as never,
+    );
     codeRepo.findOne.mockResolvedValue(storedRow());
     const { expiresAt } = await service.exchange('rawcode', 's1-abcdef1234567890', VERIFIER);
     expect(new Date(expiresAt).getTime()).toBeLessThanOrEqual(Date.now() + 7 * 86_400_000 + 1000);
