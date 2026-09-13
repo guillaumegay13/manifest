@@ -1,0 +1,20 @@
+packages/backend/test/cross-tenant-isolation.e2e-spec.ts
+  s_c03dc0ae96aac3::t_0fe08ca7f3fd27 1-49,59-64,66-99
+  s_c03dc0ae96aac3::t_f2a8a688650075 50-58,65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3cb4e659c700288e653f6fc4078ed38ef7e280eb",
+  "prompts": {},
+  "sessions": {
+    "s_c03dc0ae96aac3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f68d31b96ffeZq8O7BCNwR3dk1",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
