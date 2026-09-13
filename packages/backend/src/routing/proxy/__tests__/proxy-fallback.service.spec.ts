@@ -537,6 +537,38 @@ describe('ProxyFallbackService', () => {
         expect(credentialHealth.isRejected('up-work', deadBlob)).toBe(false);
       });
 
+      it('tracks a still-rejected retry against the refreshed credential', async () => {
+        const refreshedBlob = JSON.stringify({
+          t: 'refreshed-access',
+          r: 'refreshed-refresh',
+          e: Date.now() + 3_600_000,
+        });
+        openaiOauth.unwrapToken.mockResolvedValue('refreshed-access');
+        providerClient.forward
+          .mockResolvedValueOnce({
+            response: new Response('unauthorized', { status: 401 }),
+            isGoogle: false,
+            isAnthropic: false,
+            isChatGpt: true,
+          })
+          .mockResolvedValueOnce({
+            response: new Response('still unauthorized', { status: 401 }),
+            isGoogle: false,
+            isAnthropic: false,
+            isChatGpt: true,
+          });
+        // The forced refresh persisted a rotated token; the proxy re-reads it
+        // so the next request resolves the same fingerprint that was marked.
+        providerKeyService.getProviderApiKey.mockResolvedValue(refreshedBlob);
+
+        const result = await service.tryForwardToProvider(forwardOpts());
+
+        expect(result.response.status).toBe(401);
+        expect(providerClient.forward).toHaveBeenCalledTimes(2);
+        expect(credentialHealth.isRejected('up-work', refreshedBlob)).toBe(true);
+        expect(credentialHealth.isRejected('up-work', deadBlob)).toBe(false);
+      });
+
       it('resumes forwarding once the credential is replaced (re-auth)', async () => {
         openaiOauth.unwrapToken.mockResolvedValue(null);
         providerClient.forward.mockResolvedValue({
@@ -1963,6 +1995,7 @@ describe('ProxyFallbackService', () => {
       });
       providerKeyService.getProviderApiKey
         .mockResolvedValueOnce(staleBlob)
+        .mockResolvedValueOnce(refreshedBlob)
         .mockResolvedValueOnce(refreshedBlob);
       openaiOauth.unwrapToken
         .mockResolvedValueOnce('fresh-access')
@@ -2006,7 +2039,8 @@ describe('ProxyFallbackService', () => {
       );
 
       expect(result.success).not.toBeNull();
-      expect(providerKeyService.getProviderApiKey).toHaveBeenCalledTimes(2);
+      // Resolve, the post-refresh re-read, and the post-retry health re-read.
+      expect(providerKeyService.getProviderApiKey).toHaveBeenCalledTimes(3);
       expect(providerClient.forward).toHaveBeenCalledTimes(2);
       expect(providerClient.forward.mock.calls[0][0].apiKey).toBe('fresh-access');
       expect(providerClient.forward.mock.calls[1][0].apiKey).toBe('recovered-access');

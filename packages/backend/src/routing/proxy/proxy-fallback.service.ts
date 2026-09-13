@@ -581,9 +581,15 @@ export class ProxyFallbackService {
 
     try {
       const forward = await this.forwardToProvider(opts);
-      const result = await this.retryOAuthSubscriptionAfterRejectedToken(opts, forward);
+      const { forward: result, rawApiKey } = await this.retryOAuthSubscriptionAfterRejectedToken(
+        opts,
+        forward,
+      );
       this.recordRateLimitCooldown(opts, result.response);
-      this.recordCredentialHealth(opts, result.response);
+      // Record against the credential the retry actually used: a forced OAuth
+      // refresh rotates it, and marking the pre-refresh value would leave the
+      // live credential unskipped on the next request.
+      this.recordCredentialHealth({ ...opts, rawApiKey }, result.response);
       return result;
     } catch (error) {
       if (opts.signal?.aborted) throw error;
@@ -884,7 +890,7 @@ export class ProxyFallbackService {
   private async retryOAuthSubscriptionAfterRejectedToken(
     opts: ForwardProviderOptions,
     forward: ForwardResult,
-  ): Promise<ForwardResult> {
+  ): Promise<{ forward: ForwardResult; rawApiKey: string | undefined }> {
     if (
       opts.authType !== 'subscription' ||
       forward.response.status !== 401 ||
@@ -892,7 +898,7 @@ export class ProxyFallbackService {
       !opts.agentId ||
       !opts.tenantId
     ) {
-      return forward;
+      return { forward, rawApiKey: opts.rawApiKey };
     }
 
     // Make the refresh decision visible: "no refresh attempt in the logs" was
@@ -920,11 +926,23 @@ export class ProxyFallbackService {
         xaiOauth: this.xaiOauth,
       },
     );
-    if (!refreshed?.apiKey || refreshed.apiKey === opts.apiKey) return forward;
+    if (!refreshed?.apiKey || refreshed.apiKey === opts.apiKey) {
+      return { forward, rawApiKey: opts.rawApiKey };
+    }
 
     this.logger.log(
       `OAuth token rejected upstream; refreshed provider=${opts.provider} agent=${opts.agentId}`,
     );
+    // The forced refresh persisted a possibly rotated token. Re-read it so a
+    // still-rejected retry marks the credential routing will actually resolve.
+    const refreshedRawApiKey =
+      (await this.providerKeyService.getProviderApiKey(
+        opts.tenantId,
+        opts.provider,
+        opts.authType,
+        opts.providerKeyLabel,
+        opts.agentId,
+      )) ?? opts.rawApiKey;
     const rejectedBody = await forward.response
       .clone()
       .text()
@@ -941,16 +959,22 @@ export class ProxyFallbackService {
       resourceUrl: refreshed.resourceUrl ?? opts.resourceUrl,
     };
     try {
-      return await this.forwardToProvider(retryOpts);
+      return {
+        forward: await this.forwardToProvider(retryOpts),
+        rawApiKey: refreshedRawApiKey,
+      };
     } catch (error) {
       if (opts.signal?.aborted || !isTransportError(error)) throw error;
       return {
-        response: buildTransportErrorResponse(error),
-        attempt: attemptFromError(error),
-        providerCallStarted: true,
-        isGoogle: false,
-        isAnthropic: false,
-        isChatGpt: false,
+        forward: {
+          response: buildTransportErrorResponse(error),
+          attempt: attemptFromError(error),
+          providerCallStarted: true,
+          isGoogle: false,
+          isAnthropic: false,
+          isChatGpt: false,
+        },
+        rawApiKey: refreshedRawApiKey,
       };
     }
   }
