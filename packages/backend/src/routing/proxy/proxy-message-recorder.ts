@@ -1223,6 +1223,10 @@ export class ProxyMessageRecorder implements OnModuleDestroy {
       header_tier_id: headerTierId ?? null,
       header_tier_name: headerTierName ?? null,
       header_tier_color: headerTierColor ?? null,
+      // A healed fallback's winning attempt is the Autofix retry: stamp the
+      // group, role, operations, and Phoenix decision so it links to the
+      // original hop recorded in recordFailedFallbacks.
+      ...autofixColumns(autofix, 'retry'),
     });
     await this.persistRequest(ctx, requestId, row, true, autofix, apiMode);
     await this.persistAttempt(row, attempt);
