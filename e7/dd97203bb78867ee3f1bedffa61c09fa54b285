@@ -1,0 +1,41 @@
+packages/backend/src/routing/routing-core/credential-health.service.ts
+  s_dac9b30fc8fc02::t_3d87f4e77127cf 146-148,150,152-154
+packages/backend/src/routing/proxy/__tests__/route-credentials.spec.ts
+  s_dac9b30fc8fc02::t_bdb141c9ff7416 226-264
+packages/backend/src/routing/proxy/proxy-fallback.service.ts
+  s_dac9b30fc8fc02::t_02ac4136fbdf1f 524-525
+  s_dac9b30fc8fc02::t_8d9d9e3beea8b6 546-547
+  s_dac9b30fc8fc02::t_82c6afb98818a3 793-795,798-799
+  s_dac9b30fc8fc02::t_643e8452738194 405-406
+  s_dac9b30fc8fc02::t_4b098b04cf6b2c 796-797
+  s_dac9b30fc8fc02::t_4af90d38fb9fba 652-666
+  s_dac9b30fc8fc02::t_bf6b9788e22f5c 347,466
+  s_dac9b30fc8fc02::t_fd53a39b44598f 816,904
+  s_dac9b30fc8fc02::t_b8a858a0f0395e 101
+  s_dac9b30fc8fc02::t_37a6a5443fe753 623
+packages/backend/src/routing/routing-core/provider-key.service.ts
+  s_dac9b30fc8fc02::t_fc31de1c5d85ea 17
+  s_dac9b30fc8fc02::t_6210c915b01287 152-153,196-197
+packages/backend/src/common/utils/log-sanitize.ts
+  s_dac9b30fc8fc02::t_758dea5f873864 1-19
+packages/backend/src/routing/proxy/route-credentials.ts
+  s_dac9b30fc8fc02::t_ef96f4cc3babc0 218,226,237-241
+packages/backend/src/routing/tenant-providers.controller.ts
+  s_dac9b30fc8fc02::t_b5eaa99c8593d3 72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e7dd97203bb78867ee3f1bedffa61c09fa54b285",
+  "prompts": {},
+  "sessions": {
+    "s_dac9b30fc8fc02": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f63d8bfb1ffewWOt35107DVUfd",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
