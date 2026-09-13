@@ -98,6 +98,7 @@ import {
 } from './route-credentials';
 import { recordingResponseFromText } from './attempt-recording-capture';
 import { scrubSecrets } from '../../common/utils/secret-scrub';
+import { forLogLabel } from '../../common/utils/log-sanitize';
 
 // Fallback cooldown applied when an upstream 429 carries no usable Retry-After.
 // Kept short (15s) on purpose: many providers rate-limit on brief RPM/burst
@@ -343,7 +344,7 @@ export class ProxyFallbackService {
 
       this.logger.log(
         `Fallback ${i}: trying model=${model} provider=${provider} auth_type=${authType} ` +
-          `key=${providerKeyLabel ?? 'Unknown'} (primary=${primaryModel})`,
+          `key=${forLogLabel(providerKeyLabel ?? 'Unknown')} (primary=${primaryModel})`,
       );
 
       const forward = await this.tryForwardToProvider({
@@ -401,6 +402,8 @@ export class ProxyFallbackService {
           authType,
           tenantProviderId,
           providerKeyLabel,
+          apiKey: credentials.apiKey,
+          rawApiKey: credentials.rawApiKey,
           signal,
           startProviderAttempt,
         });
@@ -460,7 +463,7 @@ export class ProxyFallbackService {
       // (secret-scrubbed) reason so a multi-account fan-out is diagnosable.
       this.logger.warn(
         `Fallback ${i}: failed model=${model} provider=${provider} auth_type=${authType} ` +
-          `key=${providerKeyLabel ?? 'Unknown'} status=${finalForward.response.status} ` +
+          `key=${forLogLabel(providerKeyLabel ?? 'Unknown')} status=${finalForward.response.status} ` +
           `error=${summarizeProviderError(errorBody)}`,
       );
       // A failed patched retry is a second provider attempt: record the original
@@ -518,6 +521,8 @@ export class ProxyFallbackService {
     authType: AuthType;
     tenantProviderId: string | null;
     providerKeyLabel?: string;
+    apiKey?: string;
+    rawApiKey?: string;
     signal?: AbortSignal;
     startProviderAttempt?: StartProviderAttempt;
   }): Promise<AutofixAttempt | null> {
@@ -538,6 +543,8 @@ export class ProxyFallbackService {
           agentId: input.agentId,
           tenantProviderId: input.tenantProviderId,
           providerKeyLabel: input.providerKeyLabel,
+          apiKey: input.apiKey,
+          rawApiKey: input.rawApiKey,
           startProviderAttempt: input.startProviderAttempt,
           signal: input.signal,
         }),
@@ -613,7 +620,7 @@ export class ProxyFallbackService {
       | 'providerKeyLabel'
       | 'startProviderAttempt'
       | 'signal'
-    >,
+    > & { apiKey?: string; rawApiKey?: string },
   ): Promise<ForwardResult> {
     if (!forward.retryWireBody) {
       throw new Error('Provider forward does not support wire-body retry');
@@ -640,6 +647,21 @@ export class ProxyFallbackService {
           providerKeyLabel: opts.providerKeyLabel,
           model: opts.model,
         }),
+        retried.response,
+      );
+      // An Autofix retry is a real upstream call for the same credential, so a
+      // 401 here must mark the connection dead exactly like a first attempt.
+      // Otherwise the next request re-forwards the rejected subscription.
+      this.recordCredentialHealth(
+        {
+          provider: opts.provider,
+          model: opts.model,
+          apiKey: opts.apiKey,
+          rawApiKey: opts.rawApiKey,
+          authType: opts.authType,
+          tenantProviderId: opts.tenantProviderId,
+          providerKeyLabel: opts.providerKeyLabel,
+        },
         retried.response,
       );
       return { ...retried, attempt, providerCallStarted: true };
@@ -768,7 +790,13 @@ export class ProxyFallbackService {
    * the next request short-circuits it. Runs after the forced refresh retry, so
    * a credential that refreshed successfully is left healthy.
    */
-  private recordCredentialHealth(opts: ForwardProviderOptions, response: Response): void {
+  private recordCredentialHealth(
+    opts: Pick<
+      ForwardProviderOptions,
+      'provider' | 'model' | 'rawApiKey' | 'authType' | 'tenantProviderId' | 'providerKeyLabel'
+    > & { apiKey?: string },
+    response: Response,
+  ): void {
     const health = this.credentialHealth;
     if (!health) return;
     const raw = opts.rawApiKey ?? opts.apiKey;
@@ -785,7 +813,7 @@ export class ProxyFallbackService {
     });
     this.logger.warn(
       `Credential needs re-authentication: provider=${opts.provider} ` +
-        `key=${opts.providerKeyLabel ?? 'Unknown'} model=${opts.model} status=${response.status} — ` +
+        `key=${forLogLabel(opts.providerKeyLabel ?? 'Unknown')} model=${opts.model} status=${response.status} — ` +
         `skipping this connection until it is reconnected`,
     );
   }
@@ -873,7 +901,7 @@ export class ProxyFallbackService {
     if (!isRefreshableOAuthCredential(opts.rawApiKey)) {
       this.logger.warn(
         `OAuth token rejected upstream and cannot be refreshed: provider=${opts.provider} ` +
-          `key=${opts.providerKeyLabel ?? 'Unknown'} agent=${opts.agentId} — credential needs re-authentication`,
+          `key=${forLogLabel(opts.providerKeyLabel ?? 'Unknown')} agent=${opts.agentId} — credential needs re-authentication`,
       );
     }
 

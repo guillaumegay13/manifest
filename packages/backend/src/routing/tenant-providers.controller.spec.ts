@@ -119,34 +119,6 @@ describe('TenantProvidersController', () => {
     expect(connection.last_auth_failure).toMatchObject({ statusCode: 401, keyLabel: 'Work' });
   });
 
-  // `updated_at` is a zone-less Postgres timestamp; it can also arrive as a
-  // Date (TypeORM) or be missing/invalid. Every stored form must normalize
-  // without throwing so the health comparison never misfires.
-  it('normalizes connection timestamps in every stored form', async () => {
-    const withUpdatedAt = (updatedAt: unknown): TenantProvider =>
-      ({ ...makeProvider('p1', 'Default'), updated_at: updatedAt }) as TenantProvider;
-    const providerRepo = {
-      find: jest
-        .fn()
-        .mockResolvedValue([
-          withUpdatedAt(null),
-          withUpdatedAt(new Date('2026-01-01T00:00:00Z')),
-          withUpdatedAt('2026-01-01 00:00:00'),
-          withUpdatedAt('not-a-date'),
-        ]),
-    };
-    const controller = new TenantProvidersController(
-      providerRepo as never,
-      { getAll: jest.fn().mockReturnValue([]) } as never,
-      { list: jest.fn().mockResolvedValue([]) } as never,
-    );
-
-    const result = await controller.listProviders(ctx);
-
-    expect(result.providers[0].connections).toHaveLength(4);
-    expect(result.providers[0].connections[0]).toMatchObject({ requires_reauth: false });
-  });
-
   it('returns empty providers when tenant has none', async () => {
     const providerRepo = {
       find: jest.fn().mockResolvedValue([]),

@@ -143,25 +143,15 @@ export class CredentialHealthService {
   }
 
   /**
-   * Health for the providers API. `credentialUpdatedAtMs` is the connection
-   * row's `updated_at`; a row updated after the failure was recorded was
-   * re-authenticated (or otherwise edited) and is reported healthy without
-   * needing the plaintext credential.
+   * Health for the providers API. The failure stays until the credential
+   * itself is replaced or a later upstream call succeeds, matching what
+   * routing does: a metadata edit (rename, reorder) must never hide a skip.
    */
-  getSnapshot(
-    tenantProviderId: string | null | undefined,
-    credentialUpdatedAtMs?: number,
-  ): CredentialHealthSnapshot {
+  getSnapshot(tenantProviderId: string | null | undefined): CredentialHealthSnapshot {
     const failure = this.getFailure(tenantProviderId);
-    if (!failure) return { requires_reauth: false, last_auth_failure: null };
-    if (
-      credentialUpdatedAtMs !== undefined &&
-      Number.isFinite(credentialUpdatedAtMs) &&
-      credentialUpdatedAtMs > failure.at
-    ) {
-      return { requires_reauth: false, last_auth_failure: null };
-    }
-    return { requires_reauth: true, last_auth_failure: failure };
+    return failure
+      ? { requires_reauth: true, last_auth_failure: failure }
+      : { requires_reauth: false, last_auth_failure: null };
   }
 
   /** Test hook: drop all tracked failures. */

@@ -74,17 +74,6 @@ describe('CredentialHealthService', () => {
     expect(service.getSnapshot('up-1').requires_reauth).toBe(false);
   });
 
-  it('reports healthy when the connection row was updated after the failure', () => {
-    service.markRejected('up-1', blob(), {
-      statusCode: 401,
-      reason: 'subscription_token_rejected',
-      at: 1_000,
-    });
-
-    expect(service.getSnapshot('up-1', 999).requires_reauth).toBe(true);
-    expect(service.getSnapshot('up-1', 1_001).requires_reauth).toBe(false);
-  });
-
   it('ignores a missing connection id or credential value', () => {
     service.markRejected(null, blob(), { statusCode: 401, reason: 'subscription_token_rejected' });
     service.markRejected('up-1', null, { statusCode: 401, reason: 'subscription_token_rejected' });

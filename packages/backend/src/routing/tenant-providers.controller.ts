@@ -10,19 +10,6 @@ import type { CredentialAuthFailure } from './routing-core/credential-health.ser
 import { filterProvidersForDeployment } from '../common/utils/provider-availability';
 
 /**
- * Postgres `timestamp` columns carry no zone; the app writes UTC. Normalize a
- * row's `updated_at` to epoch ms so it can be compared against the in-memory
- * auth-failure timestamp regardless of the server's local timezone.
- */
-function toEpochMs(value: string | Date | null | undefined): number | undefined {
-  if (!value) return undefined;
-  if (value instanceof Date) return value.getTime();
-  const hasZone = /[zZ]|[+-]\d{2}:?\d{2}$/.test(value);
-  const ms = Date.parse(hasZone ? value : `${value.replace(' ', 'T')}Z`);
-  return Number.isFinite(ms) ? ms : undefined;
-}
-
-/**
  * Tenant-level provider management endpoints.
  * Returns all providers for the tenant (not scoped to a specific agent).
  *
@@ -82,8 +69,7 @@ export class TenantProvidersController {
     >();
 
     const buildConnection = (p: TenantProvider) => {
-      const updatedAtMs = toEpochMs(p.updated_at);
-      const health = this.credentialHealth?.getSnapshot(p.id, updatedAtMs) ?? {
+      const health = this.credentialHealth?.getSnapshot(p.id) ?? {
         requires_reauth: false,
         last_auth_failure: null,
       };

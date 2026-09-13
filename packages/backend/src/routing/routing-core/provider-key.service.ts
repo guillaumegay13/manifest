@@ -14,6 +14,7 @@ import {
   inferProviderFromModelName,
 } from '../../common/utils/provider-aliases';
 import { isManifestUsableProvider } from '../../common/utils/subscription-support';
+import { forLogLabel } from '../../common/utils/log-sanitize';
 import { CredentialHealthService } from './credential-health.service';
 
 /**
@@ -24,26 +25,8 @@ import { CredentialHealthService } from './credential-health.service';
  */
 export const SYNTHETIC_OLLAMA_PROVIDER_ID = 'ollama';
 
-/** Longest connection label echoed into a log line. */
-const MAX_LOGGED_LABEL_LENGTH = 64;
 const STALE_PIN_WARN_WINDOW_MS = 60_000;
 const MAX_STALE_PIN_WARNING_KEYS = 256;
-/**
- * Connection labels are user-authored text. Strip control characters (a
- * newline would let a label forge extra log lines) and cap the length before
- * interpolating one into a log message.
- */
-function forLog(label: string): string {
-  const cleaned = [...label]
-    .map((c) => {
-      const code = c.codePointAt(0) ?? 0;
-      return code < 0x20 || code === 0x7f ? ' ' : c;
-    })
-    .join('');
-  return cleaned.length > MAX_LOGGED_LABEL_LENGTH
-    ? `${cleaned.slice(0, MAX_LOGGED_LABEL_LENGTH)}…`
-    : cleaned;
-}
 
 @Injectable()
 export class ProviderKeyService {
@@ -166,8 +149,8 @@ export class ProviderKeyService {
           if (oldest !== undefined) this.stalePinWarnings.delete(oldest);
         }
         this.logger.warn(
-          `Key label "${forLog(label)}" matches no ${provider} connection for tenant=${tenantId} ` +
-            `authType=${authType ?? 'any'} — falling back to "${forLog(pool[0].label)}"`,
+          `Key label "${forLogLabel(label)}" matches no ${provider} connection for tenant=${tenantId} ` +
+            `authType=${authType ?? 'any'} — falling back to "${forLogLabel(pool[0].label)}"`,
         );
       }
     }
@@ -210,8 +193,8 @@ export class ProviderKeyService {
       }
     }
     this.logger.warn(
-      `Skipping unhealthy ${provider} connection "${forLog(skipped.label)}" for tenant=${tenantId} ` +
-        `authType=${authType ?? 'any'} — using "${forLog(selected.label)}" until it is re-authenticated`,
+      `Skipping unhealthy ${provider} connection "${forLogLabel(skipped.label)}" for tenant=${tenantId} ` +
+        `authType=${authType ?? 'any'} — using "${forLogLabel(selected.label)}" until it is re-authenticated`,
     );
   }
 
