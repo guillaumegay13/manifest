@@ -90,7 +90,7 @@ services:
       # Message recordings use this mounted Docker volume automatically when
       # S3-compatible bucket credentials are not present.
       - REQUEST_RECORDING_STORAGE=${REQUEST_RECORDING_STORAGE:-auto}
-      - REQUEST_RECORDING_FILESYSTEM_PATH=/data
+      - REQUEST_RECORDING_FILESYSTEM_PATH=/data/request-recordings
       - REQUEST_RECORDING_RETENTION_DAYS=${REQUEST_RECORDING_RETENTION_DAYS:-}
       - REQUEST_RECORDING_S3_BUCKET=${REQUEST_RECORDING_S3_BUCKET:-}
       - REQUEST_RECORDING_S3_ENDPOINT=${REQUEST_RECORDING_S3_ENDPOINT:-}
