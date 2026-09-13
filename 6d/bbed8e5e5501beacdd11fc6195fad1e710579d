@@ -1,0 +1,23 @@
+packages/backend/src/routing/proxy/__tests__/codex-session-affinity.spec.ts
+  s_ecb14082755f0f::t_2b12832dc4cab0 236-265
+packages/backend/src/routing/proxy/codex-session-affinity.ts
+  s_ecb14082755f0f::t_ddb4302a12e858 32-33,41-42,88-89,114,121,127-130,158,170,178
+packages/backend/src/routing/proxy/provider-client.ts
+  s_ecb14082755f0f::t_654c4ce6e7bb22 492-498
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6dbbed8e5e5501beacdd11fc6195fad1e710579d",
+  "prompts": {},
+  "sessions": {
+    "s_ecb14082755f0f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1ef63d93-7173-40c5-81f4-5500a8c27a9a",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
