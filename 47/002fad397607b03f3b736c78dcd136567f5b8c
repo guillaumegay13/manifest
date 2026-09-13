@@ -1,0 +1,40 @@
+.changeset/kiro-usage-tracking.md
+  s_34f39b4966ebb7::t_90c2cd08a11a75 5
+packages/backend/src/routing/proxy/kiro-adapter.ts
+  s_34f39b4966ebb7::t_05220df673530d 1119-1121
+  s_34f39b4966ebb7::t_b6f0ada9fb2351 1166
+  s_34f39b4966ebb7::t_d1172587da713b 1079
+  s_34f39b4966ebb7::t_8a111c3e99ca6c 1136
+  s_34f39b4966ebb7::t_8db1bccf4fe7d3 29
+  s_34f39b4966ebb7::t_7e595663900de4 899,901-902,913-914
+  s_34f39b4966ebb7::t_428788772fdf93 1200-1202
+  s_34f39b4966ebb7::t_d003c468a54397 1213-1219
+  s_34f39b4966ebb7::t_bca5974b7672ed 903-912,915-928,930-935,937-941,943,945-954,956,958-960
+  s_34f39b4966ebb7::t_f3400e4d40b240 900
+  s_34f39b4966ebb7::t_f252dd244bfd0a 1222-1227
+packages/backend/test/kiro-usage.e2e-spec.ts
+  s_34f39b4966ebb7::t_1a9a4e29f59db8 187-196,198,200,212,218-243,246
+  s_34f39b4966ebb7::t_c0c6f1cfc6f58f 7-11,14-15
+packages/backend/src/routing/proxy/__tests__/kiro-adapter.spec.ts
+  s_34f39b4966ebb7::t_ab695cd617c0f6 711-716
+  s_34f39b4966ebb7::t_5f5c8ab8323247 691-710,717-721,723-724
+  s_34f39b4966ebb7::t_f252dd244bfd0a 722
+  s_34f39b4966ebb7::t_d7b74200e7d1fe 636,638-640,643-656
+  s_34f39b4966ebb7::t_4ba76deb1fbd8d 657
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "47002fad397607b03f3b736c78dcd136567f5b8c",
+  "prompts": {},
+  "sessions": {
+    "s_34f39b4966ebb7": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f63d8f12effe0jLpMIl32M4hog",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
