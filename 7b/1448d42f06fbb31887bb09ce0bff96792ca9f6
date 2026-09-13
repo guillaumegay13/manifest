@@ -1,0 +1,35 @@
+packages/cli/src/commands/commands.spec.ts
+  s_c03dc0ae96aac3::t_ee76b1f84ab8c2 677
+  s_c03dc0ae96aac3::t_753ddd0e747f33 678-679,727-729,785-787
+packages/backend/src/auth/cli-auth.service.ts
+  s_c03dc0ae96aac3::t_b57767939f91da 111-127
+  s_c03dc0ae96aac3::t_6a02d25923ae8e 4
+  s_c03dc0ae96aac3::t_f0fbf885ecf59a 48
+packages/cli/src/commands/agent.ts
+  s_c03dc0ae96aac3::t_0237f985d178f1 100
+  s_c03dc0ae96aac3::t_1ae5223c99f4d6 83
+  s_c03dc0ae96aac3::t_b1aa3f38f31235 60-61,63-64
+  s_c03dc0ae96aac3::t_ba895e6dc5e92b 209
+  s_c03dc0ae96aac3::t_35d2ba2d5fa269 189
+  s_c03dc0ae96aac3::t_02cea445a63aec 210-213
+packages/backend/src/auth/cli-auth.service.spec.ts
+  s_c03dc0ae96aac3::t_4841908213cad0 28-39
+  s_c03dc0ae96aac3::t_9ef2e69e8e8236 119-120
+  s_c03dc0ae96aac3::t_3af90dbe59f284 146-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7b1448d42f06fbb31887bb09ce0bff96792ca9f6",
+  "prompts": {},
+  "sessions": {
+    "s_c03dc0ae96aac3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f68d31b96ffeZq8O7BCNwR3dk1",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
