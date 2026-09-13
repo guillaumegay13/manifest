@@ -1,0 +1,32 @@
+packages/backend/src/routing/proxy/anthropic-messages-adapter.ts
+  s_37474ec20209bd::t_c72f3c3da92843 273-311
+  s_37474ec20209bd::t_a8d2c8feab1be4 28-56
+packages/backend/src/routing/proxy/provider-client.ts
+  s_37474ec20209bd::t_11a495496c3dfa 41
+  s_37474ec20209bd::t_f271b2b3488810 382-389,393
+  s_37474ec20209bd::t_c648d8284ebef7 429
+packages/backend/src/routing/proxy/__tests__/provider-client.spec.ts
+  s_37474ec20209bd::t_01064e3e817479 1352-1430
+  s_37474ec20209bd::t_bcb32016678e9e 1431
+packages/backend/src/routing/proxy/__tests__/anthropic-messages-adapter.spec.ts
+  s_37474ec20209bd::t_0cc35a51dd765c 4,6
+  s_37474ec20209bd::t_d233a93d3055fc 674-738
+.changeset/drop-anthropic-server-tools-cross-protocol.md
+  s_37474ec20209bd::t_9978cd591bee10 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9898e7c171a2e9559cd8ef5ec0925ba8a347cc7b",
+  "prompts": {},
+  "sessions": {
+    "s_37474ec20209bd": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f65679e2cffevsHK7eTSmiB626",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
