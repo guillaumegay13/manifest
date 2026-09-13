@@ -603,6 +603,26 @@ describe('kiro-adapter', () => {
     expect(text).toContain('"cache_write_tokens":20');
   });
 
+  it('derives the total from prompt and completion when tokenUsage omits it', async () => {
+    const source = streamFrom([
+      eventFrame('assistantResponseEvent', { content: 'hello' }),
+      eventFrame('metadataEvent', {
+        tokenUsage: {
+          uncachedInputTokens: 10,
+          outputTokens: 5,
+        },
+      }),
+    ]);
+
+    const response = new Response(createKiroOpenAiStream(source, 'auto'));
+
+    expect(finalSseUsage(await response.text())).toMatchObject({
+      prompt_tokens: 10,
+      completion_tokens: 5,
+      total_tokens: 15,
+    });
+  });
+
   it('ignores contextUsagePercentage and estimates from the text instead', async () => {
     const source = streamFrom([
       eventFrame('assistantResponseEvent', { content: 'hello' }),

@@ -882,8 +882,9 @@ function estimateTokensFromText(text: string): number {
 function kiroCompletionText(state: KiroCollectState): string {
   const parts = [state.content, state.reasoning];
   for (const id of state.toolOrder) {
-    const tool = state.toolCalls.get(id);
-    if (tool) parts.push(tool.name, tool.input);
+    // toolOrder only ever holds ids registered in toolCalls alongside a tool.
+    const tool = state.toolCalls.get(id) as KiroToolCallState;
+    parts.push(tool.name, tool.input);
   }
   return parts.filter(Boolean).join('\n');
 }
@@ -1111,8 +1112,8 @@ export function createKiroOpenAiStream(
 async function collectKiroCompletion(
   source: ReadableStream<Uint8Array>,
   model: string,
+  promptTokens: number,
   toolNameMap?: Map<string, string>,
-  promptTokens = 0,
 ): Promise<Record<string, unknown>> {
   const parser = new KiroEventStreamParser();
   const state = createKiroCollectState();
@@ -1155,7 +1156,7 @@ async function collectKiroCompletion(
         finish_reason: toolCalls.length > 0 ? 'tool_calls' : 'stop',
       },
     ],
-    ...(usage ? { usage } : {}),
+    usage,
   };
 }
 
@@ -1201,8 +1202,8 @@ export async function forwardKiroChat(opts: {
   const completion = await collectKiroCompletion(
     upstream.body,
     opts.model,
-    toolNameMap,
     promptTokens,
+    toolNameMap,
   );
   return new Response(JSON.stringify(completion), {
     status: 200,
