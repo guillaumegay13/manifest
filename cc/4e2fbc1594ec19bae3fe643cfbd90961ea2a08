@@ -1,0 +1,39 @@
+packages/backend/src/auth/cimd-client-metadata-fetch.spec.ts
+  s_b2b5a4b0535460::t_05ff3dd7a97e3c 1-109,113-115,125-126,130-131
+  s_b2b5a4b0535460::t_49abf6c1e3d16a 110-112,116-124,127-129
+packages/backend/src/mcp/mcp-server.factory.spec.ts
+  s_b2b5a4b0535460::t_300f7187ab70a0 7-12,15,19-21,30-34,47
+  s_b2b5a4b0535460::t_7dbeb87ef7d6c5 1-6,13-14,16-18,22-29,35-46,48-52
+  s_b2b5a4b0535460::t_2346284114110c 53-56
+packages/backend/src/mcp/tool-result.spec.ts
+  s_b2b5a4b0535460::t_43bf65946cee6d 1,16-32
+packages/frontend/tests/pages/Consent.test.tsx
+  s_b2b5a4b0535460::t_08db3c8ba0f78b 152,155-160
+  s_b2b5a4b0535460::t_e4051b1b881c5f 1-151,153-154,161-166
+packages/backend/src/mcp/mcp.controller.spec.ts
+  s_b2b5a4b0535460::t_cb59a38d730ad4 77,81-82,84
+  s_b2b5a4b0535460::t_258bea11e170d6 1-76,78,80,85-110
+  s_b2b5a4b0535460::t_406abad8cb4d87 79,83
+packages/backend/src/mcp/tools/tools.spec.ts
+  s_b2b5a4b0535460::t_2673c84a95f72c 583-585,591-593,602-604
+  s_b2b5a4b0535460::t_67dbdb4576fff5 556-560
+  s_b2b5a4b0535460::t_1210c74b756fae 1-11,16-555,561-582,586-590,594-601,605-717
+  s_b2b5a4b0535460::t_919c1b762105ca 12-15
+  s_b2b5a4b0535460::t_2fc9863e48590d 718-750
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "cc4e2fbc1594ec19bae3fe643cfbd90961ea2a08",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
