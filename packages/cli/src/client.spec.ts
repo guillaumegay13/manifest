@@ -44,6 +44,17 @@ describe('ApiClient', () => {
     expect(await client.request('GET', '/x')).toBeNull();
   });
 
+  it('refuses to follow redirects so the API key cannot leak cross-origin', async () => {
+    let seen: RequestInit | undefined;
+    const impl = (async (_url: string | URL | Request, init?: RequestInit) => {
+      seen = init;
+      return new Response('{}', { status: 200 });
+    }) as typeof fetch;
+    const client = new ApiClient({ origin: 'https://app.manifest.build', apiKey: 'k', fetchImpl: impl });
+    await client.request('GET', '/me');
+    expect(seen?.redirect).toBe('error');
+  });
+
   it('maps Nest error bodies onto the stable CliError shape', async () => {
     const { client } = makeClient([
       {

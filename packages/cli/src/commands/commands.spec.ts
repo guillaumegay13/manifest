@@ -2370,6 +2370,45 @@ describe('routing commands', () => {
     expect(io3.lastJson()).toMatchObject({ error: 'unknown_model' });
   });
 
+  it('agent configure requires the requested auth type on the primary model', async () => {
+    const rows = [{ model_name: 'grok-4', provider: 'xai', auth_type: 'subscription' }];
+
+    const mismatched = authedIo([{ status: 200, body: rows }]);
+    expect(
+      await run(mismatched.io, [
+        'agent',
+        'configure',
+        'john',
+        '--models',
+        'grok-4',
+        '--provider',
+        'xai',
+        '--auth-type',
+        'api_key',
+      ]),
+    ).toBe(1);
+    expect(mismatched.io.lastJson()).toMatchObject({ error: 'unknown_model' });
+
+    const matched = authedIo([
+      { status: 200, body: rows },
+      { status: 200, body: {} },
+      { status: 200, body: {} },
+    ]);
+    expect(
+      await run(matched.io, [
+        'agent',
+        'configure',
+        'john',
+        '--models',
+        'grok-4',
+        '--provider',
+        'xai',
+        '--auth-type',
+        'subscription',
+      ]),
+    ).toBe(0);
+  });
+
   it('agent configure --force skips the model check entirely', async () => {
     const { io, calls } = authedIo([
       { status: 200, body: { ok: true } },

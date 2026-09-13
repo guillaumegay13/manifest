@@ -50,7 +50,7 @@ export function loadConfig(filePath: string): CliConfig {
   }
   try {
     const parsed = JSON.parse(raw) as CliConfig;
-    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed : {};
   } catch {
     throw new CliError(
       'config_corrupt',

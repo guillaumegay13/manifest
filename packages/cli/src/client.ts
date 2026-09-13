@@ -35,6 +35,10 @@ export class ApiClient {
     try {
       const response = await this.opts.fetchImpl(url.toString(), {
         method,
+        // A redirect to another origin would forward the X-API-Key header (the
+        // Fetch spec strips Authorization/Cookie, not custom headers), leaking
+        // the workspace credential. Fail instead of following.
+        redirect: 'error',
         headers: {
           'X-API-Key': this.opts.apiKey,
           'User-Agent': `mnfst-cli/${VERSION}`,

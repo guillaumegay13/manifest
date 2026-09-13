@@ -47,6 +47,7 @@ export async function assertModelsDiscovered(
   models: readonly string[],
   force: boolean,
   provider?: string,
+  authType?: string,
 ): Promise<string[]> {
   if (force || models.length === 0) return [...models];
   const rows = await discoveredModels(client, agent);
@@ -60,6 +61,7 @@ export async function assertModelsDiscovered(
     }
   }
   const rowsCarryProvider = rows.some((r) => r.provider !== undefined);
+  const rowsCarryAuthType = rows.some((r) => r.authType !== undefined);
   const enforceProvider = providerId !== null && rowsCarryProvider;
   const names = new Set(rows.map((r) => r.model));
 
@@ -83,7 +85,16 @@ export async function assertModelsDiscovered(
     if (enforceProvider && providerId !== null && index === 0) {
       const pid = providerId;
       const qualified = m.startsWith(`${pid}/`) ? m.slice(pid.length + 1) : m;
-      const hit = rows.find((r) => r.provider === pid && (r.model === m || r.model === qualified));
+      // The requested auth type must be the one that discovered the primary, or
+      // the written (provider, authType, model) route is unroutable.
+      const hit = rows.find(
+        (r) =>
+          r.provider === pid &&
+          (r.model === m || r.model === qualified) &&
+          (authType === undefined ||
+            !rowsCarryAuthType ||
+            (r.authType ?? 'api_key') === authType),
+      );
       if (!hit) {
         missing.push(m);
       } else {
