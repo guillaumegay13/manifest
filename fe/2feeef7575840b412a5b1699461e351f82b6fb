@@ -1,0 +1,38 @@
+packages/backend/src/routing/proxy/__tests__/proxy-fallback.failures.spec.ts
+  s_ca95b1bd29e84c::t_d0b395db0e457d 152-155
+  s_ca95b1bd29e84c::t_9c09d740f56654 18
+docs/autofix-self-healing-poc.md
+  s_ca95b1bd29e84c::t_a762c93e07952e 131-136
+packages/backend/src/routing/proxy/proxy-fallback.service.ts
+  s_ca95b1bd29e84c::t_d56d0448c670b7 436-488
+  s_ca95b1bd29e84c::t_3c503f405cfde5 342-392,395,409-410,415,422-423,431
+  s_ca95b1bd29e84c::t_53cf6492a2d806 155
+  s_ca95b1bd29e84c::t_3b2545ade4246b 8
+.changeset/autofix-fallback-attempts.md
+  s_ca95b1bd29e84c::t_e0537168baf575 1-5
+packages/backend/src/routing/proxy/__tests__/proxy-fallback.service.spec.ts
+  s_ca95b1bd29e84c::t_cba604050fd6cb 18
+  s_ca95b1bd29e84c::t_8471a70f46b748 56
+  s_ca95b1bd29e84c::t_e033fdccde70e5 176-180,196
+  s_ca95b1bd29e84c::t_8a698f5268a103 2040-2122,2124-2162
+  s_ca95b1bd29e84c::t_e89194f7c4c4a4 2123
+packages/backend/src/routing/proxy/__tests__/proxy-fallback.routes.spec.ts
+  s_ca95b1bd29e84c::t_db3ad324a3011f 18
+  s_ca95b1bd29e84c::t_b02790287a9abe 162-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fe2feeef7575840b412a5b1699461e351f82b6fb",
+  "prompts": {},
+  "sessions": {
+    "s_ca95b1bd29e84c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f660d06e3ffexIoTmVDJOYvFIs",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
