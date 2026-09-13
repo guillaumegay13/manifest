@@ -1,0 +1,91 @@
+packages/backend/src/auth/auth.instance.spec.ts
+  s_b2b5a4b0535460::t_3eb22add1a9f37 501-509
+packages/backend/src/mcp/tool-result.ts
+  s_b2b5a4b0535460::t_b075eb153760af 17-24
+packages/backend/src/auth/cimd-client-metadata-fetch.ts
+  s_b2b5a4b0535460::t_2e8bbd50762c0a 81-84,88-93,102-109
+  s_c03dc0ae96aac3::t_c9957aff7482db 110
+packages/backend/src/mcp/tools/agents.tools.ts
+  s_b2b5a4b0535460::t_0eac20ee7e361e 182-184
+  s_b2b5a4b0535460::t_88cfb564eacd41 8,25-28
+  s_b2b5a4b0535460::t_3796d2f5125b91 117-120,134-144,148
+  s_b2b5a4b0535460::t_3c392912fbcb63 68
+  s_f727e1dc494a91::t_82e7fcb94a10dd 29-30
+packages/backend/src/mcp/tools/requests.tools.ts
+  s_b2b5a4b0535460::t_3ff2aab036ec25 9
+  s_b2b5a4b0535460::t_cd0f9db864a781 3-6,26-30,32,43,45,48-49
+packages/backend/src/mcp/tools/routing.tools.ts
+  s_b2b5a4b0535460::t_b7ed564a39d7fa 396,399
+  s_b2b5a4b0535460::t_913f02e78f3b06 557-576
+  s_b2b5a4b0535460::t_3ff2aab036ec25 7
+  s_b2b5a4b0535460::t_f83e2a1478456c 290
+  s_b2b5a4b0535460::t_3f8094189db61e 77-80
+packages/backend/src/mcp/mcp.module.ts
+  s_b2b5a4b0535460::t_c29c24d92bed8b 4
+  s_b2b5a4b0535460::t_5fc99ab77c4774 25
+packages/backend/src/mcp/tool-deps.ts
+  s_b2b5a4b0535460::t_1b59767b95cc8d 34
+  s_b2b5a4b0535460::t_9ce660da839413 2
+packages/backend/src/mcp/tools/identity.tools.ts
+  s_b2b5a4b0535460::t_73708c0ddb3d92 70-72
+  s_b2b5a4b0535460::t_3ff2aab036ec25 6
+packages/backend/src/mcp/tools/models.tools.ts
+  s_b2b5a4b0535460::t_0efdc7770bf6a2 52-66,68
+  s_b2b5a4b0535460::t_3ff2aab036ec25 6
+  s_b2b5a4b0535460::t_4891dc69ca5175 3
+packages/backend/src/main.ts
+  s_b2b5a4b0535460::t_c0ab1d6cca4c47 84-85
+packages/frontend/src/pages/Consent.tsx
+  s_b2b5a4b0535460::t_a102a0ccc3c89f 82-98
+  s_b2b5a4b0535460::t_6d2b0d68395c23 33
+  s_b2b5a4b0535460::t_98fdc317cc568e 132-134
+packages/backend/src/mcp/mcp.controller.ts
+  s_b2b5a4b0535460::t_5afcf08a70bee7 57
+  s_b2b5a4b0535460::t_9bbe0dc7aa2cd7 88
+  s_b2b5a4b0535460::t_b06d6d70a31294 136-143,147-158
+  s_b2b5a4b0535460::t_38c6595f83a1c8 1,5-6
+  s_c03dc0ae96aac3::t_9461868e564972 159-160
+packages/backend/src/mcp/tools/environment.tools.ts
+  s_b2b5a4b0535460::t_6e44e8881ab1b8 11-13,22,27,31-34
+  s_b2b5a4b0535460::t_3ff2aab036ec25 7
+  s_b2b5a4b0535460::t_3d500ac8935af5 73-74
+packages/backend/src/mcp/tools/providers.tools.ts
+  s_b2b5a4b0535460::t_9506b24b7aa88c 3-11,13-17
+  s_b2b5a4b0535460::t_3ff2aab036ec25 20
+  s_b2b5a4b0535460::t_a56d0b999f9657 245-252,255
+  s_b2b5a4b0535460::t_557f68b0b8e373 138-145
+  s_b2b5a4b0535460::t_97e88855382978 362-369
+  s_b2b5a4b0535460::t_88b87c2d62927f 378-425
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e3e36a4a91c9c3673917d4e7e61b08aff0b39a5a",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    },
+    "s_c03dc0ae96aac3": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f68d31b96ffeZq8O7BCNwR3dk1",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    },
+    "s_f727e1dc494a91": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f661acf29ffeqgoDibpxP0V41N",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
