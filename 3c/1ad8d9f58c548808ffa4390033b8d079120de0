@@ -1,0 +1,19 @@
+packages/backend/src/auth/cimd-client-metadata-fetch.ts
+  s_b2b5a4b0535460::t_d7d9fe1b0d009a 91-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3c1ad8d9f58c548808ffa4390033b8d079120de0",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
