@@ -1,0 +1,51 @@
+packages/cli/src/commands/model-check.ts
+  s_b2b5a4b0535460::t_3c379a2bb68350 88-97
+  s_b2b5a4b0535460::t_1c646ce090bca0 50,64
+packages/cli/src/commands/run.spec.ts
+  s_b2b5a4b0535460::t_dec80382f0d6c5 86-100
+packages/cli/src/commands/commands.spec.ts
+  s_b2b5a4b0535460::t_d775ae9e2c0aa9 2373-2411
+packages/cli/src/commands/configure.ts
+  s_b2b5a4b0535460::t_e1a7cb74d93979 78,85,90
+packages/cli/src/config.ts
+  s_b2b5a4b0535460::t_40ffb8d912a8d3 53
+packages/cli/src/client.ts
+  s_b2b5a4b0535460::t_6ad2c297dd62c3 38-41
+packages/cli/src/oauth-login.ts
+  s_b2b5a4b0535460::t_737ad206f2d83e 159-161
+packages/cli/src/commands/routing.ts
+  s_b2b5a4b0535460::t_57e1ec3471321f 184
+packages/cli/src/secrets.ts
+  s_b2b5a4b0535460::t_5cff602643f1a8 41-44,48-55
+  s_b2b5a4b0535460::t_a0f83c86952484 45-47
+packages/cli/src/secrets.spec.ts
+  s_b2b5a4b0535460::t_2f9ea0bbbb28c5 41-48
+  s_b2b5a4b0535460::t_bf6e2a14ecea48 5
+.changeset/cli-auth-hardening.md
+  s_b2b5a4b0535460::t_1a267d6816cb14 1-5
+packages/cli/src/oauth-login.spec.ts
+  s_b2b5a4b0535460::t_1a9bf87f352958 136-153
+packages/cli/src/config.spec.ts
+  s_b2b5a4b0535460::t_b76bd6056f6d5f 78-80
+packages/cli/src/commands/run.ts
+  s_b2b5a4b0535460::t_a8ece28c8338b0 10-12
+  s_b2b5a4b0535460::t_50052e07d4e493 71-73,75-79
+packages/cli/src/client.spec.ts
+  s_b2b5a4b0535460::t_bebe5ca2cb33e7 47-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "234230ab16c89127d7ae0f39d5e03adfaf5460e9",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
