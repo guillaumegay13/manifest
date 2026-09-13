@@ -2743,8 +2743,8 @@ describe('routing commands', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('custom create accepts a provider-qualified fallback', async () => {
-    const { io } = authedIo([
+  it('custom create normalizes a provider-qualified fallback to its bare id', async () => {
+    const { io, calls } = authedIo([
       {
         status: 200,
         body: [
@@ -2772,6 +2772,8 @@ describe('routing commands', () => {
         'anthropic/claude-sonnet-4',
       ]),
     ).toBe(0);
+    // The backend matches fallbacks by exact model id, so the bare id is written.
+    expect(JSON.parse(calls[3].body!)).toEqual({ models: ['claude-sonnet-4'] });
   });
 
   it('custom create accepts a native model id that already carries its provider prefix', async () => {

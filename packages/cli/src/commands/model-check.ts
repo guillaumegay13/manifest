@@ -47,8 +47,8 @@ export async function assertModelsDiscovered(
   models: readonly string[],
   force: boolean,
   provider?: string,
-): Promise<void> {
-  if (force || models.length === 0) return;
+): Promise<string[]> {
+  if (force || models.length === 0) return [...models];
   const rows = await discoveredModels(client, agent);
 
   let providerId: string | null = null;
@@ -74,13 +74,20 @@ export async function assertModelsDiscovered(
 
   const missing: string[] = [];
   const ambiguous: string[] = [];
+  // The discovered spelling to write for each model (bare id normally, or the
+  // provider-qualified form when that is what discovery actually exposes), so
+  // the backend's exact-id fallback matching accepts it.
+  const normalized: string[] = [...models];
 
   models.forEach((m, index) => {
     if (enforceProvider && providerId !== null && index === 0) {
       const pid = providerId;
       const qualified = m.startsWith(`${pid}/`) ? m.slice(pid.length + 1) : m;
-      if (!rows.some((r) => r.provider === pid && (r.model === m || r.model === qualified))) {
+      const hit = rows.find((r) => r.provider === pid && (r.model === m || r.model === qualified));
+      if (!hit) {
         missing.push(m);
+      } else {
+        normalized[index] = hit.model;
       }
       return;
     }
@@ -94,7 +101,8 @@ export async function assertModelsDiscovered(
       return;
     }
     // Accept a provider-qualified fallback (`provider/model`) whose bare id is
-    // discovered, as long as that provider resolves to one connection.
+    // discovered, as long as that provider resolves to one connection. Write
+    // the BARE id back: the backend matches fallbacks by exact model id.
     const bare = bareOf(m);
     if (bare !== m && names.has(bare)) {
       const prefix = m.slice(0, m.indexOf('/'));
@@ -105,6 +113,7 @@ export async function assertModelsDiscovered(
       }
       const ids = new Set(prefixRows.map((r) => `${r.provider}|${r.authType ?? ''}`));
       if (ids.size > 1) ambiguous.push(m);
+      else normalized[index] = bare;
       return;
     }
     missing.push(m);
@@ -117,12 +126,14 @@ export async function assertModelsDiscovered(
       'Qualify the fallback with its provider (provider/model), or pass --force',
     );
   }
-  if (missing.length === 0) return;
-  throw new CliError(
-    'unknown_model',
-    `Not in the models discovered for "${agent}"${
-      enforceProvider ? ` under ${providerId}` : ''
-    }: ${missing.join(', ')}`,
-    `The catalog may be stale or empty — rediscover with mnfst provider refresh (and check mnfst models ${agent}); or pass --force to write the route anyway (the backend supports provider-qualified passthrough for uncatalogued models)`,
-  );
+  if (missing.length > 0) {
+    throw new CliError(
+      'unknown_model',
+      `Not in the models discovered for "${agent}"${
+        enforceProvider ? ` under ${providerId}` : ''
+      }: ${missing.join(', ')}`,
+      `The catalog may be stale or empty — rediscover with mnfst provider refresh (and check mnfst models ${agent}); or pass --force to write the route anyway (the backend supports provider-qualified passthrough for uncatalogued models)`,
+    );
+  }
+  return normalized;
 }

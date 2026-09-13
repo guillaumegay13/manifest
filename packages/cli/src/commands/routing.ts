@@ -175,13 +175,15 @@ export const routingCustom = {
       ? parseModelsList(args.strings['fallbacks'])
       : [];
     const { client } = clientFromFlags(io, args);
-    await assertModelsDiscovered(
+    const normalized = await assertModelsDiscovered(
       client,
       agent,
       [model, ...fallbackModels],
       Boolean(args.booleans['force']),
       provider,
     );
+    const routeModel = normalized[0];
+    const normalizedFallbacks = normalized.slice(1);
 
     const tier = (await client.request('POST', agentPath(agent, '/header-tiers'), {
       body: {
@@ -192,7 +194,7 @@ export const routingCustom = {
       },
     })) as { id: string };
 
-    const route = { model, provider, authType: args.strings['auth-type'] ?? 'api_key' };
+    const route = { model: routeModel, provider, authType: args.strings['auth-type'] ?? 'api_key' };
     let routeResult: unknown;
     let fallbacks: unknown;
     try {
@@ -201,11 +203,11 @@ export const routingCustom = {
         agentPath(agent, `/header-tiers/${encodeURIComponent(tier.id)}/override`),
         { body: route },
       );
-      if (fallbackModels.length > 0) {
+      if (normalizedFallbacks.length > 0) {
         fallbacks = await client.request(
           'PUT',
           agentPath(agent, `/header-tiers/${encodeURIComponent(tier.id)}/fallbacks`),
-          { body: { models: fallbackModels } },
+          { body: { models: normalizedFallbacks } },
         );
       }
     } catch (error) {
