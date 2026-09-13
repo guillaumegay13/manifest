@@ -1,0 +1,25 @@
+packages/cli/src/commands/commands.spec.ts
+  s_b2b5a4b0535460::t_8c43467b428351 2412-2432
+packages/cli/src/commands/model-check.ts
+  s_b2b5a4b0535460::t_f51acc0eaebf4b 122-132
+packages/cli/src/client.ts
+  s_b2b5a4b0535460::t_fab7221c491b96 56
+packages/cli/src/client.spec.ts
+  s_b2b5a4b0535460::t_f979bfb93bbaa8 56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "04c8b703a62c348bd37e01b3350134f7e2d74ac3",
+  "prompts": {},
+  "sessions": {
+    "s_b2b5a4b0535460": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f66b0dafbffeDB7RS9O1okShA7",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
