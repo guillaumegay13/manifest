@@ -603,34 +603,20 @@ describe('kiro-adapter', () => {
     expect(text).toContain('"cache_write_tokens":20');
   });
 
-  it('estimates usage from a contextUsageEvent when no token block is sent', async () => {
-    const source = streamFrom([
-      eventFrame('assistantResponseEvent', { content: 'x'.repeat(40) }),
-      eventFrame('contextUsageEvent', { contextUsagePercentage: 1.5 }),
-    ]);
-
-    const response = new Response(createKiroOpenAiStream(source, 'claude-sonnet-4.5'));
-
-    expect(finalSseUsage(await response.text())).toEqual({
-      prompt_tokens: 2990,
-      completion_tokens: 10,
-      total_tokens: 3000,
-      estimated: true,
-    });
-  });
-
-  it('falls back to a contextUsagePercentage carried on metadataEvent', async () => {
+  it('ignores contextUsagePercentage and estimates from the text instead', async () => {
     const source = streamFrom([
       eventFrame('assistantResponseEvent', { content: 'hello' }),
-      eventFrame('metadataEvent', { contextUsagePercentage: 50 }),
+      eventFrame('contextUsageEvent', { contextUsagePercentage: 50 }),
     ]);
 
-    const response = new Response(createKiroOpenAiStream(source, 'auto'));
-    const usage = finalSseUsage(await response.text());
+    const response = new Response(createKiroOpenAiStream(source, 'auto', undefined, 50));
 
-    expect(usage?.total_tokens).toBe(500000);
-    expect((usage?.prompt_tokens ?? 0) + (usage?.completion_tokens ?? 0)).toBe(500000);
-    expect(usage?.estimated).toBe(true);
+    expect(finalSseUsage(await response.text())).toEqual({
+      prompt_tokens: 50,
+      completion_tokens: 2,
+      total_tokens: 52,
+      estimated: true,
+    });
   });
 
   it('estimates usage from the prompt and response for the real Kiro event shape', async () => {
@@ -658,34 +644,6 @@ describe('kiro-adapter', () => {
     const response = new Response(createKiroOpenAiStream(source, 'auto'));
 
     expect(finalSseUsage(await response.text())).toBeUndefined();
-  });
-
-  it('reports estimated usage in the non-streaming completion', async () => {
-    mockFetch.mockResolvedValue(
-      new Response(
-        streamFrom([
-          eventFrame('assistantResponseEvent', { content: 'x'.repeat(40) }),
-          eventFrame('contextUsageEvent', { contextUsagePercentage: 1.5 }),
-        ]),
-        { status: 200 },
-      ),
-    );
-
-    const response = await forwardKiroChat({
-      apiKey: 'ksk_test',
-      model: 'claude-sonnet-4.5',
-      body: { messages: [{ role: 'user', content: 'Hello' }] },
-      stream: false,
-      timeoutMs: 1000,
-    });
-    const json = (await response.json()) as { usage: Record<string, number> };
-
-    expect(json.usage).toEqual({
-      prompt_tokens: 2990,
-      completion_tokens: 10,
-      total_tokens: 3000,
-      estimated: true,
-    });
   });
 
   it('estimates usage for a real Kiro stream with no usage event (non-streaming)', async () => {
@@ -726,15 +684,16 @@ describe('kiro-adapter', () => {
     const source = streamFrom([
       eventFrame('assistantResponseEvent', { content: 'x'.repeat(40) }),
       eventFrame('toolUseEvent', { toolUseId: 'call_1', name: 'fn', input: 'abcd', stop: true }),
-      eventFrame('contextUsageEvent', { contextUsagePercentage: 1.5 }),
     ]);
 
-    const response = new Response(createKiroOpenAiStream(source, 'claude-sonnet-4.5'));
+    const response = new Response(
+      createKiroOpenAiStream(source, 'claude-sonnet-4.5', undefined, 100),
+    );
 
     expect(finalSseUsage(await response.text())).toEqual({
-      prompt_tokens: 2988,
+      prompt_tokens: 100,
       completion_tokens: 12,
-      total_tokens: 3000,
+      total_tokens: 112,
       estimated: true,
     });
   });

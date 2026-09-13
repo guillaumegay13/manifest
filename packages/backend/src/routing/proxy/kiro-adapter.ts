@@ -805,8 +805,6 @@ interface KiroCollectState {
   content: string;
   reasoning: string;
   usage?: OpenAiUsage;
-  /** Fraction (0-100) of the model context window consumed, from Kiro events. */
-  contextUsagePercentage?: number;
   toolCalls: Map<string, KiroToolCallState>;
   toolOrder: string[];
 }
@@ -890,12 +888,6 @@ function kiroCompletionText(state: KiroCollectState): string {
   return parts.filter(Boolean).join('\n');
 }
 
-function kiroContextWindow(model: string): number {
-  return toKiroModelId(model).toLowerCase() === 'auto'
-    ? AUTO_KIRO_CONTEXT_WINDOW
-    : DEFAULT_KIRO_CONTEXT_WINDOW;
-}
-
 /** Envelope fields that are not prompt content and would inflate the estimate. */
 const KIRO_NON_PROMPT_KEYS = new Set(['conversationid', 'modelid', 'chattriggertype', 'agentmode']);
 
@@ -929,30 +921,14 @@ export function estimateKiroPromptTokens(conversation: Record<string, unknown>):
 /**
  * Kiro's GenerateAssistantResponse does not report per-token counts on the
  * wire captures we have (only `assistantResponseEvent` and `meteringEvent`,
- * which is credits, not tokens). When an explicit `tokenUsage` block or a
- * `contextUsageEvent.contextUsagePercentage` is present it wins; otherwise
- * estimate prompt tokens from the outgoing conversation and completion tokens
- * from the emitted text, and mark the result as estimated.
+ * which is credits, not tokens). When Kiro does send an explicit `tokenUsage`
+ * block it wins; otherwise estimate prompt tokens from the outgoing
+ * conversation and completion tokens from the emitted text, and mark the
+ * result as estimated.
  */
-function resolveKiroUsage(
-  state: KiroCollectState,
-  model: string,
-  promptTokens: number,
-): OpenAiUsage | undefined {
+function resolveKiroUsage(state: KiroCollectState, promptTokens: number): OpenAiUsage | undefined {
   if (state.usage) return state.usage;
   const completionText = estimateTokensFromText(kiroCompletionText(state));
-  const percentage = state.contextUsagePercentage;
-  if (percentage !== undefined && percentage > 0) {
-    const total = Math.max(0, Math.round((percentage / 100) * kiroContextWindow(model)));
-    const completion = Math.min(total, completionText);
-    return {
-      prompt_tokens: Math.max(0, total - completion),
-      completion_tokens: completion,
-      total_tokens: total,
-      estimated: true,
-    };
-  }
-
   if (promptTokens <= 0 && completionText <= 0) return undefined;
   return {
     prompt_tokens: promptTokens,
@@ -1019,18 +995,13 @@ function applyKiroEvent(state: KiroCollectState, event: KiroEvent): Record<strin
     }
     return null;
   }
-  // Kiro emits a dedicated `contextUsageEvent` carrying the authoritative
-  // `contextUsagePercentage`. `metadataEvent` only carries a `stopReason` on
-  // current captures, but accepts the same field (and an explicit `tokenUsage`)
-  // as a fallback so either shape can fill the usage log. A positive value
-  // overwrites an earlier one; absent/zero values leave it untouched.
-  if (eventType.includes('contextusage') || eventType.includes('metadata')) {
+  // `metadataEvent` carries a `tokenUsage` block on some Kiro responses; use it
+  // when present. It also sometimes carries `contextUsagePercentage`, but that
+  // is a fraction of an unknown context window, so it cannot yield absolute
+  // token counts — the text estimate in `resolveKiroUsage` is preferred.
+  if (eventType.includes('metadata') || eventType.includes('contextusage')) {
     const tokenUsage = payload.tokenUsage ?? payload.token_usage;
     if (tokenUsage) state.usage = normalizeUsage(tokenUsage);
-    const percentage = readNumber(
-      payload.contextUsagePercentage ?? payload.context_usage_percentage,
-    );
-    if (percentage !== undefined && percentage > 0) state.contextUsagePercentage = percentage;
     return null;
   }
   if (event.eventType && !IGNORED_KIRO_EVENT_TYPES.has(eventType)) {
@@ -1117,7 +1088,7 @@ export function createKiroOpenAiStream(
         const finishReason = toolCalls.length > 0 ? 'tool_calls' : 'stop';
         controller.enqueue(
           encoder.encode(
-            openAiChunk(model, {}, finishReason, resolveKiroUsage(state, model, promptTokens)),
+            openAiChunk(model, {}, finishReason, resolveKiroUsage(state, promptTokens)),
           ),
         );
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
@@ -1163,7 +1134,7 @@ async function collectKiroCompletion(
     }));
   }
 
-  const usage = resolveKiroUsage(state, model, promptTokens);
+  const usage = resolveKiroUsage(state, promptTokens);
   return {
     id: `chatcmpl-${randomUUID()}`,
     object: 'chat.completion',
