@@ -1,0 +1,23 @@
+AGENTS.md
+  s_8ba84cc3b3d2c6::t_b53e9867c7dac9 9
+CLAUDE.md
+  s_8ba84cc3b3d2c6::t_b53e9867c7dac9 366,375
+  s_8ba84cc3b3d2c6::t_f02325c51d9c3c 3,9,19-20,81,84-87,96,100,119,123,147-149,184-185,201-203,294-295,330-331,334,353-364,367-374,376-378,390,455-459,478,483-487,517,565-568,627-637,737,741,752,795-796,859,867
+  s_8ba84cc3b3d2c6::t_8c62d50a9b75a0 365
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "05878e03c2d4342af21b689dbf3391e2157de355",
+  "prompts": {},
+  "sessions": {
+    "s_8ba84cc3b3d2c6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "61f3b56e-7cb2-4f1b-8529-2bf9ed4054df",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
