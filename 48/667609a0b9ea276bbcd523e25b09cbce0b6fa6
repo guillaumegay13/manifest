@@ -1,0 +1,38 @@
+packages/backend/src/routing/autofix/provider-error-normalizer.ts
+  s_42996106990ed3::t_dafc8f5edb6341 2,27-29,46-51
+packages/backend/src/routing/proxy/__tests__/proxy-response-handler.spec.ts
+  s_42996106990ed3::t_c47e4a2c16fa90 874-1027,1035-1084
+  s_42996106990ed3::t_f46a8cd88299a7 350-352,354,360,454,504,546
+  s_42996106990ed3::t_bbe50882e9d379 355-359,1028-1034
+  s_42996106990ed3::t_d6debf8502a714 459-463
+packages/backend/src/routing/proxy/__tests__/proxy.controller.spec.ts
+  s_42996106990ed3::t_f46a8cd88299a7 1753,2630,3032,4134-4135,4186-4187,4407,4450-4451,4453,4457-4458
+packages/backend/src/routing/proxy/proxy-error-sanitizer.spec.ts
+  s_42996106990ed3::t_30b1afd6878fef 123-147,161-169
+  s_42996106990ed3::t_7e4dd2260a0299 148-160
+packages/backend/src/routing/proxy/proxy-error-sanitizer.ts
+  s_42996106990ed3::t_dafc8f5edb6341 67-96,99-101,133
+packages/backend/src/routing/autofix/__tests__/provider-error-normalizer.spec.ts
+  s_42996106990ed3::t_30b1afd6878fef 30-51
+packages/backend/src/routing/proxy/proxy-response-handler.ts
+  s_42996106990ed3::t_30a70af8ebc132 407-425,428-434,439-490
+  s_42996106990ed3::t_454efb572a58d0 491
+.changeset/fallback-exhausted-provider-error.md
+  s_42996106990ed3::t_543072090a770d 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "48667609a0b9ea276bbcd523e25b09cbce0b6fa6",
+  "prompts": {},
+  "sessions": {
+    "s_42996106990ed3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5cc1a3af-2646-446c-9cbb-4100e8904b0d",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
