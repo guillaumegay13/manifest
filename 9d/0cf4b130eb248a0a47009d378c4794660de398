@@ -1,0 +1,22 @@
+packages/frontend/src/components/MultiSelect.tsx
+  s_613e8ba26f4487::t_a260230047c4e8 48-49,52-61,63
+packages/frontend/tests/components/MultiSelect.test.tsx
+  s_613e8ba26f4487::t_8182a99390a348 2,157-176
+  s_613e8ba26f4487::t_75c70689369229 177-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9d0cf4b130eb248a0a47009d378c4794660de398",
+  "prompts": {},
+  "sessions": {
+    "s_613e8ba26f4487": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c734c22d-b291-4391-9075-afb9302690ff",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
