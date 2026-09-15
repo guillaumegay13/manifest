@@ -1,0 +1,19 @@
+packages/backend/src/analytics/services/messages-query.filter-options.spec.ts
+  s_613e8ba26f4487::t_8a468e91d317ec 2,110-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ccd8098453695da8bf96e06e069dc102c729fe83",
+  "prompts": {},
+  "sessions": {
+    "s_613e8ba26f4487": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c734c22d-b291-4391-9075-afb9302690ff",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
