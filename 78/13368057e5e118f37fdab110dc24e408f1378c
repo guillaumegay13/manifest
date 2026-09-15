@@ -1,0 +1,47 @@
+integrations/n8n-nodes-manifest/dist/nodes/LmChatManifest/LmChatManifest.node.js.map
+  s_41dc40e7967c17::t_ad51c9ca0490df 1
+integrations/n8n-nodes-manifest/dist/nodes/Manifest/Manifest.node.json
+  s_41dc40e7967c17::t_e0298c9480ac77 9,14
+integrations/n8n-nodes-manifest/nodes/Manifest/Manifest.node.json
+  s_41dc40e7967c17::t_e0298c9480ac77 9,14
+integrations/n8n-nodes-manifest/dist/package.json
+  s_41dc40e7967c17::t_e0298c9480ac77 23,27
+  s_41dc40e7967c17::t_052476dba3c3ec 3
+nodes/Manifest/Manifest.node.json
+  s_41dc40e7967c17::t_e0298c9480ac77 9,14
+integrations/n8n-nodes-manifest/dist/nodes/LmChatManifest/LmChatManifest.node.json
+  s_41dc40e7967c17::t_e0298c9480ac77 9,14
+integrations/n8n-nodes-manifest/CHANGELOG.md
+  s_41dc40e7967c17::t_de2b926d0cf2ea 3-6
+integrations/n8n-nodes-manifest/nodes/LmChatManifest/LmChatManifest.node.ts
+  s_41dc40e7967c17::t_e0298c9480ac77 53
+integrations/n8n-nodes-manifest/nodes/LmChatManifest/LmChatManifest.node.json
+  s_41dc40e7967c17::t_e0298c9480ac77 9,14
+nodes/LmChatManifest/LmChatManifest.node.ts
+  s_41dc40e7967c17::t_e0298c9480ac77 53
+integrations/n8n-nodes-manifest/package.json
+  s_41dc40e7967c17::t_052476dba3c3ec 3
+  s_41dc40e7967c17::t_e0298c9480ac77 23,27
+integrations/n8n-nodes-manifest/package-lock.json
+  s_41dc40e7967c17::t_c3d0e92b6031bc 3,9
+integrations/n8n-nodes-manifest/dist/nodes/LmChatManifest/LmChatManifest.node.js
+  s_41dc40e7967c17::t_e0298c9480ac77 65
+nodes/LmChatManifest/LmChatManifest.node.json
+  s_41dc40e7967c17::t_e0298c9480ac77 9,14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7813368057e5e118f37fdab110dc24e408f1378c",
+  "prompts": {},
+  "sessions": {
+    "s_41dc40e7967c17": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "62ad3105-93cf-476f-9a02-7e10725dd758",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
