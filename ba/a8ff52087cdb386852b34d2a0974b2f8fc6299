@@ -1,0 +1,21 @@
+packages/cli/package.json
+  s_344c4c2c7ef6fe::t_6d121d922eb1e2 25,38
+.changeset/cli-publish-access-public.md
+  s_344c4c2c7ef6fe::t_dd103cd1bef663 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "baa8ff52087cdb386852b34d2a0974b2f8fc6299",
+  "prompts": {},
+  "sessions": {
+    "s_344c4c2c7ef6fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd5edc5c-526e-4b3f-88ac-6db754c9dbde",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
