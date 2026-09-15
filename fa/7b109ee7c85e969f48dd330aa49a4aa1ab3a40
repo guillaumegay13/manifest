@@ -1,0 +1,48 @@
+packages/cli/src/client.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 50
+packages/backend/src/billing/subscription-webhook-emails.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 4
+  s_8b4f0d7b7c8a85::t_c192a420330bb2 191-193,217,320
+packages/backend/src/routing/oauth/openai/openai-oauth.service.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 609
+packages/backend/src/common/utils/dashboard-url.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 32-37
+packages/backend/src/notifications/emails/threshold-alert.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 21,40
+.changeset/gateway-dashboard-links.md
+  s_8b4f0d7b7c8a85::t_c078cdf934bb50 7
+packages/cli/src/keystore.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 22
+packages/backend/src/routing/proxy/__tests__/proxy-friendly-response.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 13,20,26,32,37,41-43
+packages/cli/src/config.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 33-34
+packages/shared/__tests__/setup-snippets.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 11,24
+packages/cli/src/telemetry.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 55-57,78
+packages/backend/src/common/utils/dashboard-url.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 6-8
+packages/cli/src/commands/commands.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 3238
+packages/backend/src/routing/proxy/request-headers.spec.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 49,55
+packages/cli/src/config.ts
+  s_8b4f0d7b7c8a85::t_1289a28370d853 6,35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fa7b109ee7c85e969f48dd330aa49a4aa1ab3a40",
+  "prompts": {},
+  "sessions": {
+    "s_8b4f0d7b7c8a85": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0a406-9e94-76f2-a59e-84ca2cc3b6d0",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
