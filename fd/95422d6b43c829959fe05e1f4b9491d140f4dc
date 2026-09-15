@@ -1,0 +1,19 @@
+packages/backend/src/routing/proxy/provider-client.ts
+  s_e4172009b6839c::t_fddf8a1f2db9d6 144-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fd95422d6b43c829959fe05e1f4b9491d140f4dc",
+  "prompts": {},
+  "sessions": {
+    "s_e4172009b6839c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "806dc190-f1a7-4336-a733-5ea0c6896f58",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
