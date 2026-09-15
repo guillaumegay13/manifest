@@ -1,0 +1,19 @@
+packages/frontend/src/pages/integrations/McpServer.tsx
+  s_344c4c2c7ef6fe::t_39cf8f34aa9261 18-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0f69175d44b99ba3e2ac8dc48cea423bf142ef20",
+  "prompts": {},
+  "sessions": {
+    "s_344c4c2c7ef6fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd5edc5c-526e-4b3f-88ac-6db754c9dbde",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
