@@ -1,0 +1,43 @@
+packages/frontend/tests/pages/Cli.test.tsx
+  s_344c4c2c7ef6fe::t_bc1c060c80285b 1-58
+design-system/registry/llms.txt
+  s_344c4c2c7ef6fe::t_e64da346f87597 99,358,448-453,455-457,481-484,498-499,501-503
+packages/frontend/src/services/install-endpoints.ts
+  s_344c4c2c7ef6fe::t_db0f77ec6b5776 1-21
+packages/frontend/tests/pages/McpServer.test.tsx
+  s_344c4c2c7ef6fe::t_bc1c060c80285b 1-47
+packages/frontend/src/index.tsx
+  s_344c4c2c7ef6fe::t_7fb2115442b90a 50-51,102-103
+packages/frontend/src/pages/integrations/McpServer.tsx
+  s_344c4c2c7ef6fe::t_4a33e51ec36000 1-109
+.changeset/integrations-nav-mcp-cli.md
+  s_344c4c2c7ef6fe::t_b88abf3edf5e1b 1-5
+design-system/registry/components.json
+  s_344c4c2c7ef6fe::t_e64da346f87597 3581,4504,4511,4518,4525,4532,4539,4546,4553,4560,4720,4728,4736,4744,4856,4864,4872,4880,4888,5085
+packages/frontend/src/pages/integrations/Cli.tsx
+  s_344c4c2c7ef6fe::t_3a2e719f233197 1-98
+packages/frontend/src/styles/theme.css
+  s_344c4c2c7ef6fe::t_0f92f2b48701f0 844-858
+packages/frontend/src/components/Sidebar.tsx
+  s_344c4c2c7ef6fe::t_5401378b004c01 144-165
+  s_344c4c2c7ef6fe::t_a0b76a7c447bf3 143
+packages/frontend/tests/components/Sidebar.test.tsx
+  s_344c4c2c7ef6fe::t_b38cece8a9e637 166-167,170-181
+  s_344c4c2c7ef6fe::t_2817041f87ca3c 182
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "40c74194f5e08e0c7788fa487f47e7caeb8035c4",
+  "prompts": {},
+  "sessions": {
+    "s_344c4c2c7ef6fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd5edc5c-526e-4b3f-88ac-6db754c9dbde",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
