@@ -1,0 +1,29 @@
+packages/frontend/tests/pages/MessageLog.test.tsx
+  s_613e8ba26f4487::t_dbb85aebc2f755 560-566,570-579,583-587,589-594,596-599
+  s_613e8ba26f4487::t_9f0cf3c17604ea 567-569
+  s_613e8ba26f4487::t_f488de07525723 8,28-30,328,580-582,588,595
+packages/frontend/src/pages/MessageLog.tsx
+  s_613e8ba26f4487::t_dbb85aebc2f755 282-292
+packages/backend/test/messages-model-filter.e2e-spec.ts
+  s_613e8ba26f4487::t_7797c7a99d0552 133-137
+packages/backend/src/analytics/services/messages-query.filter-options.spec.ts
+  s_613e8ba26f4487::t_7797c7a99d0552 107-110
+packages/backend/src/analytics/services/messages-query.service.cost-filter.spec.ts
+  s_613e8ba26f4487::t_7797c7a99d0552 97-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4294dbcfdbc6ac356afc8e6e53d1d74b35630231",
+  "prompts": {},
+  "sessions": {
+    "s_613e8ba26f4487": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c734c22d-b291-4391-9075-afb9302690ff",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
