@@ -1,0 +1,44 @@
+packages/frontend/src/pages/integrations/Cli.tsx
+  s_344c4c2c7ef6fe::t_958e5c96291ebd 60-61
+  s_344c4c2c7ef6fe::t_0c33ad5db48c7f 8
+packages/cli/README.md
+  s_344c4c2c7ef6fe::t_958e5c96291ebd 8-9
+  s_344c4c2c7ef6fe::t_0c33ad5db48c7f 7,12,19
+packages/frontend/tests/pages/Cli.test.tsx
+  s_344c4c2c7ef6fe::t_0c33ad5db48c7f 43
+.changeset/publish-cli-unscoped.md
+  s_344c4c2c7ef6fe::t_f77d65a59cc11a 1-5
+.github/workflows/release.yml
+  s_344c4c2c7ef6fe::t_0c33ad5db48c7f 157,195,200,203
+packages/cli/package.json
+  s_344c4c2c7ef6fe::t_0c33ad5db48c7f 2
+packages/cli/src/version.ts
+  s_344c4c2c7ef6fe::t_0c33ad5db48c7f 12
+CLAUDE.md
+  s_344c4c2c7ef6fe::t_958e5c96291ebd 861
+  s_344c4c2c7ef6fe::t_0c33ad5db48c7f 355
+.changeset/config.json
+  s_344c4c2c7ef6fe::t_0c33ad5db48c7f 10
+packages/cli/scripts/set-version.cjs
+  s_344c4c2c7ef6fe::t_0c33ad5db48c7f 6,103
+scripts/check-changesets.js
+  s_344c4c2c7ef6fe::t_0c33ad5db48c7f 7,66
+package-lock.json
+  s_344c4c2c7ef6fe::t_1a304ba7e8df6a 13063-13066,17490,19220
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f89953eb7c7ee4b0e44e67a25dc0567d4ed90135",
+  "prompts": {},
+  "sessions": {
+    "s_344c4c2c7ef6fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd5edc5c-526e-4b3f-88ac-6db754c9dbde",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
