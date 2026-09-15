@@ -1,0 +1,29 @@
+packages/frontend/src/styles/wizard.css
+  s_344c4c2c7ef6fe::t_dd2f92a1650b36 897-939
+design-system/registry/components.json
+  s_344c4c2c7ef6fe::t_3d625f389f3d5d 1838-1855,5102-5103
+design-system/registry/llms.txt
+  s_344c4c2c7ef6fe::t_3d625f389f3d5d 99,233-234
+packages/frontend/tests/pages/McpServer.test.tsx
+  s_344c4c2c7ef6fe::t_3c94261c64eedd 2,9,29,31-59
+packages/frontend/src/pages/integrations/Cli.tsx
+  s_344c4c2c7ef6fe::t_418a807f7bc706 19-23,29,37-38,40,44-51,54-60,64-75,77-81
+packages/frontend/src/pages/integrations/McpServer.tsx
+  s_344c4c2c7ef6fe::t_a2ed4c0feee79e 1,8-16,19-20,25-26,31-32,50-52,55,63-64,66,70-75,79-96,98-103,105-116,118-121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d3d2ebf4fc40a35089b00eeb455dc61b0a6a540e",
+  "prompts": {},
+  "sessions": {
+    "s_344c4c2c7ef6fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd5edc5c-526e-4b3f-88ac-6db754c9dbde",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
