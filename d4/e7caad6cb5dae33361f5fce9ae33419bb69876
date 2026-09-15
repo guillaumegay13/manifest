@@ -1,0 +1,26 @@
+packages/cli/scripts/set-version.cjs
+  s_344c4c2c7ef6fe::t_d98f711b330e57 3,8-10,18-21,41-43,47-49,52,55-58,60,62-63,66-76,78-80,87-92,95-97
+  s_344c4c2c7ef6fe::t_fec7c9a36b5e46 110
+CLAUDE.md
+  s_344c4c2c7ef6fe::t_5fd7dbef84b43d 861
+packages/cli/package.json
+  s_344c4c2c7ef6fe::t_5fd7dbef84b43d 42-43
+packages/cli/README.md
+  s_344c4c2c7ef6fe::t_5fd7dbef84b43d 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d4e7caad6cb5dae33361f5fce9ae33419bb69876",
+  "prompts": {},
+  "sessions": {
+    "s_344c4c2c7ef6fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd5edc5c-526e-4b3f-88ac-6db754c9dbde",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
