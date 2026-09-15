@@ -1,0 +1,23 @@
+.github/workflows/release.yml
+  s_344c4c2c7ef6fe::t_f7d206bd6aa6cb 185-191,194-198,201,203-207
+packages/cli/package.json
+  s_344c4c2c7ef6fe::t_d9acb30b8d0864 42-43
+package.json
+  s_344c4c2c7ef6fe::t_d9acb30b8d0864 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d97863dcf0487dd88eefa59cba4d7f54e37449d6",
+  "prompts": {},
+  "sessions": {
+    "s_344c4c2c7ef6fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd5edc5c-526e-4b3f-88ac-6db754c9dbde",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
