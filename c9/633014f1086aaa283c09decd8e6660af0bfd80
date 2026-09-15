@@ -1,0 +1,23 @@
+.github/scripts/check-cli-npm-status.sh
+  s_1163afa32befb0::t_3f3e17b2bc0a9e 1-44
+.github/workflows/publish-cli.yml
+  s_1163afa32befb0::t_3f3e17b2bc0a9e 45
+.github/workflows/release.yml
+  s_1163afa32befb0::t_3f3e17b2bc0a9e 186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c9633014f1086aaa283c09decd8e6660af0bfd80",
+  "prompts": {},
+  "sessions": {
+    "s_1163afa32befb0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0a4ff-b63e-7000-bef4-bbba3e7efdb1",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
