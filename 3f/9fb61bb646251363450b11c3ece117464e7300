@@ -39,6 +39,8 @@ packages/backend/src/analytics/services/messages-query.service.ts
   s_613e8ba26f4487::t_dd629ac2d4d04d 358
   s_613e8ba26f4487::t_10a59aaf7657f5 88-93,290,321-324,340-349,356-357,691,750,840,859-860
   s_613e8ba26f4487::t_b4c173730da0f1 1085-1086
+  s_613e8ba26f4487::t_7644aed414fca3 765-770
+  s_613e8ba26f4487::t_d42076a11809e3 189,191
 packages/frontend/src/services/api/messages.ts
   s_613e8ba26f4487::t_558327d0d579fd 137-138
 packages/frontend/tests/pages/MessageLog.test.tsx
