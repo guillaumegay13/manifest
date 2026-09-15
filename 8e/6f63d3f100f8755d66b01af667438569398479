@@ -1,0 +1,85 @@
+packages/backend/src/version/version-check.config.spec.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 126
+packages/backend/test/message-log-completeness.e2e-spec.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 2
+packages/backend/src/routing/proxy/__tests__/proxy-message-recorder.spec.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 1858
+deploy/aws/TUTORIAL.md
+  s_41dc40e7967c17::t_8ed3eb39aab600 20
+packages/backend/src/routing/proxy/codex-session-affinity.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 56
+app.json
+  s_41dc40e7967c17::t_8ed3eb39aab600 4,6
+deploy/heroku/TUTORIAL.md
+  s_41dc40e7967c17::t_8ed3eb39aab600 18
+packages/backend/src/github/github.controller.spec.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 40
+CONTRIBUTING.md
+  s_41dc40e7967c17::t_8ed3eb39aab600 5,259
+docker/install.sh
+  s_41dc40e7967c17::t_8ed3eb39aab600 27,33,42
+packages/backend/src/routing/proxy/provider-client.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 859
+packages/frontend/tests/components/Header.test.tsx
+  s_41dc40e7967c17::t_8ed3eb39aab600 184
+packages/backend/src/github/github.controller.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 4
+packages/backend/src/version/version.controller.spec.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 12
+deploy/gcp/deploystack.json
+  s_41dc40e7967c17::t_8ed3eb39aab600 4
+package.json
+  s_41dc40e7967c17::t_8ed3eb39aab600 8,11
+deploy/easypanel/template/meta.yaml
+  s_41dc40e7967c17::t_8ed3eb39aab600 23
+docker/Dockerfile
+  s_41dc40e7967c17::t_8ed3eb39aab600 71
+packages/frontend/tests/components/ProviderSubscriptionTab.test.tsx
+  s_41dc40e7967c17::t_8ed3eb39aab600 48
+packages/backend/src/routing/proxy/provider-client-converters.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 145,335
+packages/backend/src/analytics/services/request-volume.service.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 15
+README.md
+  s_41dc40e7967c17::t_8ed3eb39aab600 3-5,15,22,28,30,32,71,81,141,143
+SECURITY.md
+  s_41dc40e7967c17::t_8ed3eb39aab600 9
+.changeset/olive-pans-tickle.md
+  s_41dc40e7967c17::t_768273c258d5c9 1-5
+packages/backend/src/routing/proxy/__tests__/provider-client-converters.spec.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 1002
+packages/backend/src/version/version-check.service.spec.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 64
+docker/DOCKER_README.md
+  s_41dc40e7967c17::t_8ed3eb39aab600 3-5,11,13,35,83,92,120-121,252,496,503
+packages/backend/src/routing/proxy/__tests__/provider-client.spec.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 2422,2642
+packages/frontend/tests/services/version-api.test.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 30
+packages/backend/src/version/version-check.config.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 11,101
+packages/backend/src/routing/proxy/stream-warmup.ts
+  s_41dc40e7967c17::t_8ed3eb39aab600 7
+packages/frontend/src/components/ProviderSubscriptionTab.tsx
+  s_41dc40e7967c17::t_8ed3eb39aab600 100
+packages/frontend/src/components/Header.tsx
+  s_41dc40e7967c17::t_8ed3eb39aab600 28
+deploy/digitalocean/TUTORIAL.md
+  s_41dc40e7967c17::t_8ed3eb39aab600 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8e6f63d3f100f8755d66b01af667438569398479",
+  "prompts": {},
+  "sessions": {
+    "s_41dc40e7967c17": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "62ad3105-93cf-476f-9a02-7e10725dd758",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
