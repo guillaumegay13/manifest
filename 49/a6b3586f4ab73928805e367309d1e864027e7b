@@ -1,0 +1,33 @@
+packages/frontend/src/styles/agent-type-select.css
+  s_344c4c2c7ef6fe::t_cc5dbf5cb91ad4 169
+packages/frontend/tests/pages/McpServer.test.tsx
+  s_344c4c2c7ef6fe::t_d4206a52cd1488 56-71
+packages/frontend/src/styles/modals.css
+  s_344c4c2c7ef6fe::t_a7209f131a071a 240
+packages/frontend/src/styles/wizard.css
+  s_344c4c2c7ef6fe::t_cc5dbf5cb91ad4 670-672
+packages/frontend/src/pages/integrations/McpServer.tsx
+  s_344c4c2c7ef6fe::t_cc5dbf5cb91ad4 1,3,12,23,30,37,98-100
+packages/frontend/src/styles/agents.css
+  s_344c4c2c7ef6fe::t_cc5dbf5cb91ad4 861
+packages/frontend/src/styles/platform-icons.css
+  s_344c4c2c7ef6fe::t_cc5dbf5cb91ad4 7
+packages/frontend/src/styles/theme.css
+  s_344c4c2c7ef6fe::t_00e5d918190d4b 851-852
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "49a6b3586f4ab73928805e367309d1e864027e7b",
+  "prompts": {},
+  "sessions": {
+    "s_344c4c2c7ef6fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd5edc5c-526e-4b3f-88ac-6db754c9dbde",
+        "model": "unknown"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
