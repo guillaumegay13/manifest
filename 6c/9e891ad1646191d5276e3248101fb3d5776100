@@ -2,6 +2,7 @@ packages/frontend/tests/pages/Cli.test.tsx
   s_344c4c2c7ef6fe::t_bc1c060c80285b 1-58
 design-system/registry/llms.txt
   s_344c4c2c7ef6fe::t_e64da346f87597 357,447-452,454-456,480-483,497-498,500-502
+  s_344c4c2c7ef6fe::t_72f34b656a7124 99
 packages/frontend/src/services/install-endpoints.ts
   s_344c4c2c7ef6fe::t_db0f77ec6b5776 1-21
 packages/frontend/tests/pages/McpServer.test.tsx
