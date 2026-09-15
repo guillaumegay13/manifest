@@ -1,0 +1,21 @@
+.github/workflows/publish-cli.yml
+  s_1163afa32befb0::t_c5091ff3850135 58-61
+.github/workflows/release.yml
+  s_1163afa32befb0::t_c5091ff3850135 204-214,216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "69efee5c4cd9365956fec959cbb3634952436403",
+  "prompts": {},
+  "sessions": {
+    "s_1163afa32befb0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0a4ff-b63e-7000-bef4-bbba3e7efdb1",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
