@@ -1,0 +1,24 @@
+package.json
+  s_344c4c2c7ef6fe::t_dd22efe6da6fbc 50
+packages/cli/scripts/set-version.cjs
+  s_344c4c2c7ef6fe::t_2f03251a616c8f 7-18
+  s_344c4c2c7ef6fe::t_6b801c3977e1f5 24
+.changeset/fix-release-version-packages.md
+  s_344c4c2c7ef6fe::t_3ffd0ca68d0112 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3a915732ef752dbc6352898d1476e43e6369cbd6",
+  "prompts": {},
+  "sessions": {
+    "s_344c4c2c7ef6fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd5edc5c-526e-4b3f-88ac-6db754c9dbde",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
