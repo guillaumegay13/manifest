@@ -1,0 +1,23 @@
+deploy/aws/TUTORIAL.md
+  s_41dc40e7967c17::t_16df4991989420 21
+README.md
+  s_41dc40e7967c17::t_16df4991989420 18,38
+CONTRIBUTING.md
+  s_41dc40e7967c17::t_16df4991989420 50-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "50ab416ea9a2b329a9fae6cf749c693f428bc491",
+  "prompts": {},
+  "sessions": {
+    "s_41dc40e7967c17": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "62ad3105-93cf-476f-9a02-7e10725dd758",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
