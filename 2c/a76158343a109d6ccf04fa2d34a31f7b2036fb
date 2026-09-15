@@ -1,0 +1,24 @@
+packages/frontend/src/components/Sidebar.tsx
+  s_344c4c2c7ef6fe::t_d057a94f498b69 156-164
+  s_344c4c2c7ef6fe::t_993ca9893ec374 165
+packages/frontend/src/styles/wizard.css
+  s_344c4c2c7ef6fe::t_d057a94f498b69 928-940,953-961
+packages/frontend/tests/components/Sidebar.test.tsx
+  s_344c4c2c7ef6fe::t_02c07013bf6b3c 167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2ca76158343a109d6ccf04fa2d34a31f7b2036fb",
+  "prompts": {},
+  "sessions": {
+    "s_344c4c2c7ef6fe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cd5edc5c-526e-4b3f-88ac-6db754c9dbde",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
