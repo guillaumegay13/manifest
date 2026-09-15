@@ -18,6 +18,7 @@ packages/frontend/src/pages/integrations/McpServer.tsx
 design-system/registry/components.json
   s_344c4c2c7ef6fe::t_e64da346f87597 3589,4512,4519,4526,4533,4540,4547,4554,4561,4568,4728,4736,4744,4752,4864,4872,4880,4888,4896
   s_344c4c2c7ef6fe::t_3d625f389f3d5d 1828-1845
+  s_344c4c2c7ef6fe::t_72f34b656a7124 5092
 packages/frontend/src/pages/integrations/Cli.tsx
   s_344c4c2c7ef6fe::t_3a2e719f233197 1-18,24-28,30-36,39,41-43,52,53,61,62-63,76,82-87
   s_344c4c2c7ef6fe::t_418a807f7bc706 19-23,29,37-38,40,44-51,54-60,64-75,77-81
