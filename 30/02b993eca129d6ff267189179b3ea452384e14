@@ -1,0 +1,23 @@
+.changeset/mcp-consent-allow-first.md
+  s_749b8ab5c7a750::t_4dd5649dd9e2ae 1-5
+packages/frontend/src/styles/auth.css
+  s_749b8ab5c7a750::t_2c3511a6f621c3 151-161
+packages/frontend/src/pages/Consent.tsx
+  s_749b8ab5c7a750::t_a24ee875c1c867 151,153,156,159,161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3002b993eca129d6ff267189179b3ea452384e14",
+  "prompts": {},
+  "sessions": {
+    "s_749b8ab5c7a750": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f542da56effep6nBRgJRBxSxv2",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
