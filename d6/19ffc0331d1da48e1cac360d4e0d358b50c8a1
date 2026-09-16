@@ -1,0 +1,22 @@
+packages/frontend/tests/pages/Login.test.tsx
+  s_2fef775deb0812::t_af32807643e69e 201,219,222,298,301
+  s_2fef775deb0812::t_9ce07567d11bb2 382,385,399,460,463,486,489
+packages/frontend/src/pages/Login.tsx
+  s_2fef775deb0812::t_af32807643e69e 193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d619ffc0331d1da48e1cac360d4e0d358b50c8a1",
+  "prompts": {},
+  "sessions": {
+    "s_2fef775deb0812": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0a956-843e-7db1-b2c9-206bf75844d8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
