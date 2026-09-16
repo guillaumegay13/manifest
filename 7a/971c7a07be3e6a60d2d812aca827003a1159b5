@@ -1,0 +1,25 @@
+packages/frontend/tests/services/auth-redirects.test.ts
+  s_880fb7bcd8b9d3::t_41c39bb5454918 48
+  s_880fb7bcd8b9d3::t_15d0c7135bf829 42-44
+  s_880fb7bcd8b9d3::t_d5fa06b4b30e7d 40
+packages/backend/src/main.ts
+  s_880fb7bcd8b9d3::t_41c39bb5454918 218-219,222-223
+packages/frontend/src/services/auth-redirects.ts
+  s_880fb7bcd8b9d3::t_15d0c7135bf829 30-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7a971c7a07be3e6a60d2d812aca827003a1159b5",
+  "prompts": {},
+  "sessions": {
+    "s_880fb7bcd8b9d3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0aa39-c03d-72b2-a17c-a2ef61231989",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
