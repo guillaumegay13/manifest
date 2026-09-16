@@ -1,0 +1,23 @@
+packages/backend/src/auth/auth.instance.ts
+  s_880fb7bcd8b9d3::t_6e270879536219 53,56
+  s_880fb7bcd8b9d3::t_137f9844e69032 99
+packages/backend/src/auth/auth.instance.spec.ts
+  s_880fb7bcd8b9d3::t_6e270879536219 518-523,645-646
+  s_880fb7bcd8b9d3::t_ce4bb81074d8d5 644
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6b27c6690fef18d3e391847ce4f1f458c90f20d1",
+  "prompts": {},
+  "sessions": {
+    "s_880fb7bcd8b9d3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0aa39-c03d-72b2-a17c-a2ef61231989",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
