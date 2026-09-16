@@ -1,0 +1,123 @@
+packages/frontend/src/services/install-endpoints.ts
+  s_880fb7bcd8b9d3::t_9750e67fba2853 4-6,12-17,19
+packages/backend/src/mcp/mcp-discovery.ts
+  s_880fb7bcd8b9d3::t_93ce587fd3b8f7 7-9,41,73,75-80
+packages/cli/src/telemetry.ts
+  s_880fb7bcd8b9d3::t_cd0fffaf1f5bdd 54-56
+packages/frontend/src/components/HeaderTierSnippetModal.tsx
+  s_880fb7bcd8b9d3::t_9750e67fba2853 4,25
+packages/backend/src/mcp/mcp.controller.ts
+  s_880fb7bcd8b9d3::t_93ce587fd3b8f7 11-16,144-146,156-158,164,208-209
+.changeset/restore-app-setup.md
+  s_880fb7bcd8b9d3::t_91c21591e58748 1-5
+packages/backend/src/auth/auth.instance.ts
+  s_880fb7bcd8b9d3::t_91c21591e58748 90-91
+  s_880fb7bcd8b9d3::t_ffb1109f285800 53-57,89,181-188
+  s_880fb7bcd8b9d3::t_ec1ae1c9c599c0 45-52,58-67,108,150,189
+packages/frontend/src/components/RoutingInstructionModal.tsx
+  s_880fb7bcd8b9d3::t_9750e67fba2853 6,30
+packages/backend/src/mcp/mcp.controller.spec.ts
+  s_880fb7bcd8b9d3::t_0fda8a208e7542 8-15,120-134
+  s_880fb7bcd8b9d3::t_b68c3987429ac7 135-136
+packages/frontend/tests/pages/McpServer.test.tsx
+  s_880fb7bcd8b9d3::t_bf7bdc20420f9b 10,13-18
+packages/frontend/src/pages/Welcome.tsx
+  s_880fb7bcd8b9d3::t_d99607c3f44924 35
+  s_880fb7bcd8b9d3::t_9750e67fba2853 295
+packages/frontend/src/components/SetupModal.tsx
+  s_880fb7bcd8b9d3::t_9750e67fba2853 3,24
+packages/frontend/src/pages/Settings.tsx
+  s_880fb7bcd8b9d3::t_9750e67fba2853 97
+  s_880fb7bcd8b9d3::t_d99607c3f44924 12
+packages/backend/src/mcp/mcp-discovery.spec.ts
+  s_880fb7bcd8b9d3::t_0fda8a208e7542 10-19,71-81,89-105
+  s_880fb7bcd8b9d3::t_011f4f309bb8e8 106
+packages/backend/src/auth/auth.instance.spec.ts
+  s_880fb7bcd8b9d3::t_89c74d69d5c3c2 488-489,494-523,616-618,631-646
+  s_880fb7bcd8b9d3::t_60bf6678cf218b 550
+  s_880fb7bcd8b9d3::t_3f98d195216c28 647
+integrations/n8n-nodes-manifest/test/manifest-node.test.js
+  s_880fb7bcd8b9d3::t_e9ed882d911706 248,259
+CONTRIBUTING.md
+  s_880fb7bcd8b9d3::t_7ce8d7591d85b7 17
+README.md
+  s_880fb7bcd8b9d3::t_b26ff6b3e72cda 64
+credentials/ManifestApi.credentials.ts
+  s_880fb7bcd8b9d3::t_99a57d888ab74e 26-27
+integrations/n8n-nodes-manifest/README.md
+  s_880fb7bcd8b9d3::t_61d92f6e9c812e 49
+integrations/n8n-nodes-manifest/credentials/ManifestApi.credentials.ts
+  s_880fb7bcd8b9d3::t_fb0a77d79f7dd6 26-27
+integrations/n8n-nodes-manifest/dist/credentials/ManifestApi.credentials.js
+  s_880fb7bcd8b9d3::t_a7b17d2c57d88e 19-20
+integrations/n8n-nodes-manifest/dist/credentials/ManifestApi.credentials.js.map
+  s_880fb7bcd8b9d3::t_edeea20a4d9b70 1
+integrations/n8n-nodes-manifest/dist/nodes/LmChatManifest/LmChatManifest.node.js
+  s_880fb7bcd8b9d3::t_ede1758def4b6c 40
+integrations/n8n-nodes-manifest/dist/nodes/LmChatManifest/LmChatManifest.node.js.map
+  s_880fb7bcd8b9d3::t_633bc67f699225 1
+integrations/n8n-nodes-manifest/dist/nodes/Manifest/Manifest.node.js
+  s_880fb7bcd8b9d3::t_f0823aa91399f0 150
+integrations/n8n-nodes-manifest/dist/nodes/Manifest/Manifest.node.js.map
+  s_880fb7bcd8b9d3::t_6dc96b43addcbb 1
+integrations/n8n-nodes-manifest/nodes/LmChatManifest/LmChatManifest.node.ts
+  s_880fb7bcd8b9d3::t_a8703a45476cee 28
+integrations/n8n-nodes-manifest/nodes/Manifest/Manifest.node.ts
+  s_880fb7bcd8b9d3::t_6af90b74f56182 223
+nodes/LmChatManifest/LmChatManifest.node.ts
+  s_880fb7bcd8b9d3::t_aac96cf91f9846 28
+nodes/Manifest/Manifest.node.ts
+  s_880fb7bcd8b9d3::t_c311f505ba3216 223
+packages/backend/.env.example
+  s_880fb7bcd8b9d3::t_d71907c27376df 160
+packages/backend/src/billing/billing-email-sender.spec.ts
+  s_880fb7bcd8b9d3::t_c823dc1ee2ae1c 90,94,98,144-145,167-168,188,210
+packages/backend/src/common/filters/spa-fallback.filter.spec.ts
+  s_880fb7bcd8b9d3::t_35bbe3d12c4682 8-9,126,134
+packages/backend/src/common/utils/dashboard-url.spec.ts
+  s_880fb7bcd8b9d3::t_fafb953b5d573e 12-13,15
+packages/backend/src/common/utils/dashboard-url.ts
+  s_880fb7bcd8b9d3::t_4ee903e61064b6 2
+packages/backend/src/common/utils/og-rewrite.spec.ts
+  s_880fb7bcd8b9d3::t_fee4433a612b29 6-8,18,22,29
+packages/backend/src/common/utils/og-rewrite.ts
+  s_880fb7bcd8b9d3::t_d3a39a8cdb76ac 8
+packages/backend/src/cors-csp-config.ts
+  s_880fb7bcd8b9d3::t_01d604349a499a 219
+packages/backend/src/otlp/otlp-deprecated.controller.spec.ts
+  s_880fb7bcd8b9d3::t_f9252e6627d47a 122
+packages/backend/src/otlp/otlp-deprecated.controller.ts
+  s_880fb7bcd8b9d3::t_fc7e082dcbbbc5 33
+packages/cli/src/commands/commands.spec.ts
+  s_880fb7bcd8b9d3::t_521692a02139d3 3238
+packages/cli/src/config.ts
+  s_880fb7bcd8b9d3::t_45983461d1f78e 6,35
+packages/frontend/index.html
+  s_880fb7bcd8b9d3::t_a088c46366bba2 23-24,31
+packages/frontend/src/services/waitlist.ts
+  s_880fb7bcd8b9d3::t_c7c83393e024ad 9
+packages/frontend/tests/components/HeaderTierSnippetModal.test.tsx
+  s_880fb7bcd8b9d3::t_9764a6e473d004 98,106
+packages/frontend/tests/components/SetupModal.test.tsx
+  s_880fb7bcd8b9d3::t_491dd9f3c8d3f8 136,147
+packages/frontend/tests/pages/Settings.test.tsx
+  s_880fb7bcd8b9d3::t_99d0a20262776b 635,647
+packages/frontend/tests/services/waitlist.test.ts
+  s_880fb7bcd8b9d3::t_7deeb2bb012126 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9687714c8f398cddeefda32c6073ea1a255da327",
+  "prompts": {},
+  "sessions": {
+    "s_880fb7bcd8b9d3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0aa39-c03d-72b2-a17c-a2ef61231989",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
