@@ -1,0 +1,52 @@
+packages/frontend/src/components/SocialButtons.tsx
+  s_880fb7bcd8b9d3::t_82ca25c9d71306 2,67,73
+packages/frontend/tests/components/SocialButtons.test.tsx
+  s_880fb7bcd8b9d3::t_82adca0eda59cc 6,10,26,108-116
+  s_880fb7bcd8b9d3::t_a5f187b4a2a799 117-119
+packages/frontend/src/pages/OauthError.tsx
+  s_880fb7bcd8b9d3::t_82ca25c9d71306 1-20
+packages/backend/src/mcp/mcp-discovery.spec.ts
+  s_880fb7bcd8b9d3::t_9c7a8437a74a4a 68-80
+  s_880fb7bcd8b9d3::t_78195f74d007f5 81-84
+packages/backend/src/auth/mcp-oauth-response.ts
+  s_880fb7bcd8b9d3::t_af3cdadab559cd 6-9,13-16,27,29-32,41-44
+  s_880fb7bcd8b9d3::t_b77bad51fb928a 1-5,10-12,17-26,28,33-40,45-60
+packages/backend/src/main.ts
+  s_880fb7bcd8b9d3::t_b77bad51fb928a 10,218-223
+packages/frontend/src/pages/Login.tsx
+  s_880fb7bcd8b9d3::t_82ca25c9d71306 93,125
+packages/frontend/src/index.tsx
+  s_880fb7bcd8b9d3::t_82ca25c9d71306 36,157-158
+  s_880fb7bcd8b9d3::t_e242562adb9232 159
+packages/frontend/src/services/auth-redirects.ts
+  s_880fb7bcd8b9d3::t_82ca25c9d71306 25-35,50-53,57,59-62
+  s_880fb7bcd8b9d3::t_78c88141fe981d 63-65
+packages/frontend/tests/services/auth-redirects.test.ts
+  s_880fb7bcd8b9d3::t_b2cb36233d8d27 8,38-51
+  s_880fb7bcd8b9d3::t_d18ba4d9b6cfa2 52-55
+packages/backend/src/auth/mcp-oauth-response.spec.ts
+  s_880fb7bcd8b9d3::t_b2cb36233d8d27 1-30,32-34,39-45,49-58
+  s_880fb7bcd8b9d3::t_af3cdadab559cd 31,35-38,46-48
+packages/frontend/tests/pages/Login.test.tsx
+  s_880fb7bcd8b9d3::t_9c7a8437a74a4a 283-306
+.changeset/mcp-oauth-errors.md
+  s_880fb7bcd8b9d3::t_9c7a8437a74a4a 1-5
+packages/backend/src/mcp/mcp-discovery.ts
+  s_880fb7bcd8b9d3::t_b77bad51fb928a 5,41-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "452f1eea9ac27cb5279d95dd2c6bdc2eac50f4e4",
+  "prompts": {},
+  "sessions": {
+    "s_880fb7bcd8b9d3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0aa39-c03d-72b2-a17c-a2ef61231989",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
