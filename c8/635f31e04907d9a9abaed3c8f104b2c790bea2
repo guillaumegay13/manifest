@@ -1,0 +1,22 @@
+.changeset/cli-npm-readme.md
+  s_4cd8c0bc0c9d3b::t_4a0036d2b571b1 1-5
+packages/cli/README.md
+  s_4cd8c0bc0c9d3b::t_daf4521dc66429 46-53
+  s_4cd8c0bc0c9d3b::t_18b4124051b4de 1,3,5,7,14,20,22,25-31,34,36,39,42-45,54-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c8635f31e04907d9a9abaed3c8f104b2c790bea2",
+  "prompts": {},
+  "sessions": {
+    "s_4cd8c0bc0c9d3b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0a956-4248-7c31-8739-9989d84a6be8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
