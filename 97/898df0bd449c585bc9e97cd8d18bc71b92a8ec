@@ -1,0 +1,22 @@
+packages/frontend/src/components/GuestGuard.tsx
+  s_880fb7bcd8b9d3::t_baa5e3ce643ace 1,11,42
+packages/frontend/tests/components/GuestGuard.test.tsx
+  s_880fb7bcd8b9d3::t_baa5e3ce643ace 9,14,36,133-157
+  s_880fb7bcd8b9d3::t_32a6d7054cb95b 158-160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "97898df0bd449c585bc9e97cd8d18bc71b92a8ec",
+  "prompts": {},
+  "sessions": {
+    "s_880fb7bcd8b9d3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0aa39-c03d-72b2-a17c-a2ef61231989",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
