@@ -1,0 +1,28 @@
+.changeset/tidy-pugs-redirect.md
+  s_77568db2968bd1::t_de329411248b52 1-5
+packages/backend/src/auth/auth.instance.ts
+  s_77568db2968bd1::t_fce31b6ad1a4e2 215
+  s_77568db2968bd1::t_3f34dce9a52ff2 45-94
+packages/backend/src/auth/auth.instance.spec.ts
+  s_77568db2968bd1::t_974080f9fe2f8b 481-565
+packages/backend/.env.example
+  s_77568db2968bd1::t_e37fe9ef279b22 23
+docker/.env.example
+  s_77568db2968bd1::t_efbd56f0f481ab 37-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "128ef20053469b1ea91b0b2c1c5b7dd81fe16ca4",
+  "prompts": {},
+  "sessions": {
+    "s_77568db2968bd1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f56db1ec7ffeHjoSGsFupVde2J",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
