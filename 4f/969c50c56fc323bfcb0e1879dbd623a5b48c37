@@ -1,0 +1,24 @@
+docker/.env.example
+  s_77568db2968bd1::t_acd2722570a025 41
+docker/docker-compose.yml
+  s_77568db2968bd1::t_6f499041f58e40 68-71
+packages/backend/src/auth/auth.instance.spec.ts
+  s_77568db2968bd1::t_21b0e9c543812d 504,508
+  s_77568db2968bd1::t_8a1682b1023ed7 519,521-522,533,535
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4f969c50c56fc323bfcb0e1879dbd623a5b48c37",
+  "prompts": {},
+  "sessions": {
+    "s_77568db2968bd1": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f56db1ec7ffeHjoSGsFupVde2J",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
