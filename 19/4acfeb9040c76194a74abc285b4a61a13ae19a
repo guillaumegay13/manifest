@@ -1,0 +1,45 @@
+.changeset/mcp-oauth-errors.md
+  s_880fb7bcd8b9d3::t_56a0df87c9d8f2 1-5
+packages/backend/src/auth/mcp-oauth-response.spec.ts
+  s_880fb7bcd8b9d3::t_c8ffa00400aa66 1-58
+packages/backend/src/auth/mcp-oauth-response.ts
+  s_880fb7bcd8b9d3::t_bd02eeec251ffe 1-60
+packages/backend/src/main.ts
+  s_880fb7bcd8b9d3::t_da140dc226e8ed 10,218-223
+packages/backend/src/mcp/mcp-discovery.spec.ts
+  s_880fb7bcd8b9d3::t_e069f2c60f2f9e 89-105,107-112
+packages/backend/src/mcp/mcp-discovery.ts
+  s_880fb7bcd8b9d3::t_45b19ad1c9a267 5,41-43,46,48
+packages/frontend/src/components/SocialButtons.tsx
+  s_880fb7bcd8b9d3::t_a0d4bb8379e5ea 2,67,73
+packages/frontend/src/index.tsx
+  s_880fb7bcd8b9d3::t_718bed2f97ab37 36,157-159
+packages/frontend/src/pages/Login.tsx
+  s_880fb7bcd8b9d3::t_e873e5e8736555 93,125
+packages/frontend/src/pages/OauthError.tsx
+  s_880fb7bcd8b9d3::t_102bfd15313c84 1-20
+packages/frontend/src/services/auth-redirects.ts
+  s_880fb7bcd8b9d3::t_8f8bf532731a25 25-35,50-53,57,59-65
+packages/frontend/tests/components/SocialButtons.test.tsx
+  s_880fb7bcd8b9d3::t_7fd71355aa4470 6,10,26,108-119
+packages/frontend/tests/pages/Login.test.tsx
+  s_880fb7bcd8b9d3::t_00c990dff2a36f 283-306
+packages/frontend/tests/services/auth-redirects.test.ts
+  s_880fb7bcd8b9d3::t_0833623caa5720 8,38-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "194acfeb9040c76194a74abc285b4a61a13ae19a",
+  "prompts": {},
+  "sessions": {
+    "s_880fb7bcd8b9d3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0aa39-c03d-72b2-a17c-a2ef61231989",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
