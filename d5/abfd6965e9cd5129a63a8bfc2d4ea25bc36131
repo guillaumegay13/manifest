@@ -1,0 +1,19 @@
+packages/frontend/tests/pages/Login-validation.test.tsx
+  s_2fef775deb0812::t_caa95e87de2ec8 181,184,222,240
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d5abfd6965e9cd5129a63a8bfc2d4ea25bc36131",
+  "prompts": {},
+  "sessions": {
+    "s_2fef775deb0812": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0a956-843e-7db1-b2c9-206bf75844d8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
