@@ -1,0 +1,31 @@
+packages/frontend/src/pages/Login.tsx
+  s_2fef775deb0812::t_5376f90810dac6 35-38,118-121,186-199
+packages/frontend/tests/services/auth-redirects.test.ts
+  s_2fef775deb0812::t_5376f90810dac6 52,59
+packages/frontend/tests/components/SocialButtons.test.tsx
+  s_2fef775deb0812::t_5376f90810dac6 90,101,111
+.changeset/google-link-recovery.md
+  s_2fef775deb0812::t_6513df65215a04 1-5
+packages/frontend/src/services/auth-redirects.ts
+  s_2fef775deb0812::t_5376f90810dac6 54-56
+packages/frontend/tests/pages/Login.test.tsx
+  s_2fef775deb0812::t_7159cf66d03b0a 335-366
+packages/frontend/tests/pages/Register.test.tsx
+  s_2fef775deb0812::t_5376f90810dac6 266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dc7a314f90963535d1e4048842cc1ea03f402a56",
+  "prompts": {},
+  "sessions": {
+    "s_2fef775deb0812": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0a956-843e-7db1-b2c9-206bf75844d8",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
