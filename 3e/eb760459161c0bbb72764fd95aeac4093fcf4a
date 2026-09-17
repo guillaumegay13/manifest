@@ -1,0 +1,19 @@
+.changeset/lucky-donkeys-smile.md
+  s_763320c049821d::t_d697f276f65e9f 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3eeb760459161c0bbb72764fd95aeac4093fcf4a",
+  "prompts": {},
+  "sessions": {
+    "s_763320c049821d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d241f544-886c-4478-9c40-a21de680606f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
