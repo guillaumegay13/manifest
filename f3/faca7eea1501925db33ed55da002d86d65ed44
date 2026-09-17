@@ -1,0 +1,41 @@
+packages/backend/src/analytics/services/request-volume.service.ts
+  s_763320c049821d::t_c473269c76072f 108-155,161-163,179-199,214,229-230,244
+  s_763320c049821d::t_05c2d4e48c1f9b 178
+  s_763320c049821d::t_872ed46151267b 8-9,220,250
+packages/backend/src/database/migrations/1802400000000-TuneFactTableAutovacuum.ts
+  s_763320c049821d::t_c161b04f49d5a8 1-80
+packages/backend/src/database/migrations/1802300000000-AddPlaygroundAgentLookupIndexes.spec.ts
+  s_763320c049821d::t_87a229aeb34538 1-79
+packages/backend/src/analytics/services/aggregation.service.ts
+  s_763320c049821d::t_530bfa3be81d9c 250
+  s_763320c049821d::t_e7ec6c016047e9 15,17,259,273
+packages/backend/src/database/migrations/1802400000000-TuneFactTableAutovacuum.spec.ts
+  s_763320c049821d::t_1e82b20a522947 27
+  s_763320c049821d::t_9ef7b5a1fe34e1 1-26,28-85
+packages/backend/src/analytics/services/request-volume.service.spec.ts
+  s_763320c049821d::t_f96fe483781f89 33-46
+packages/backend/src/database/migrations/1802300000000-AddPlaygroundAgentLookupIndexes.ts
+  s_763320c049821d::t_bc14952351e504 1-78
+packages/backend/src/analytics/services/aggregation.service.spec.ts
+  s_763320c049821d::t_de5ec7d1d757c7 428-437
+packages/backend/src/analytics/services/query-helpers.ts
+  s_763320c049821d::t_dbaf54462e00a1 217-259
+packages/backend/src/database/data-source-definitions.ts
+  s_763320c049821d::t_913177006af034 51-52,339-340
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f3faca7eea1501925db33ed55da002d86d65ed44",
+  "prompts": {},
+  "sessions": {
+    "s_763320c049821d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d241f544-886c-4478-9c40-a21de680606f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
