@@ -45,6 +45,7 @@ describe('ProviderModelFetcherService', () => {
       'zai',
       'zai-subscription',
       'anthropic',
+      'atria',
       'gemini',
       'openrouter',
       'gemini-free',
