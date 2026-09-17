@@ -1,0 +1,29 @@
+packages/backend/src/model-discovery/published-gateway-models.ts
+  s_0f629ba4dd5144::t_96e8bdb227ace8 1-55
+packages/backend/src/routing/model.controller.spec.ts
+  s_0f629ba4dd5144::t_a56aee027b8148 83,87
+  s_0f629ba4dd5144::t_4e503ec3d773fe 380-401
+packages/backend/src/model-discovery/published-gateway-models.spec.ts
+  s_0f629ba4dd5144::t_c969919ddfe78e 1-37,39-82
+  s_0f629ba4dd5144::t_255457582a5a33 38
+packages/backend/src/routing/model.controller.ts
+  s_0f629ba4dd5144::t_59a0b65922a76b 17,131-135
+.changeset/olive-pugs-hammer.md
+  s_0f629ba4dd5144::t_fcfe6e0ea3fd4c 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "aea2abff04782dba36a0d42011ebcccc77c93118",
+  "prompts": {},
+  "sessions": {
+    "s_0f629ba4dd5144": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "24a5c38a-a634-4fe7-85e1-ac501a1c736b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
