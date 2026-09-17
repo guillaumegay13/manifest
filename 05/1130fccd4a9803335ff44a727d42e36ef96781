@@ -1,0 +1,23 @@
+packages/backend/test/playground-exclusion.e2e-spec.ts
+  s_763320c049821d::t_7c22b9f1265c9a 164-165
+  s_763320c049821d::t_1a3509015d1c36 6-9,217-218,221
+  s_763320c049821d::t_2026c1b00fae34 46,147-157,223-235
+  s_763320c049821d::t_7a928c949f97a9 1-5,10-45,47-122,125-127,129-146,158-163,166-167,188,200-202,207-208,210-211,216,219-220,222,236-240,242-244,246-248,250-251,257-258,264-265
+  s_763320c049821d::t_aef4bde21703e5 123-124,128,168-187,189-199,203-206,209,212-215,241,245,249,252-256,259-263
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "051130fccd4a9803335ff44a727d42e36ef96781",
+  "prompts": {},
+  "sessions": {
+    "s_763320c049821d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d241f544-886c-4478-9c40-a21de680606f",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
