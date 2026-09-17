@@ -1,0 +1,23 @@
+packages/backend/src/model-discovery/opencode-go-catalog.service.ts
+  s_0f629ba4dd5144::t_b056da6dc86f5c 229-231,246-250
+packages/backend/src/model-discovery/metadata-identity.spec.ts
+  s_0f629ba4dd5144::t_8926a23e858752 62-70
+packages/backend/src/model-discovery/metadata-identity.ts
+  s_0f629ba4dd5144::t_8926a23e858752 47-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "81349e0869db0edd488be152087aad9512a08c58",
+  "prompts": {},
+  "sessions": {
+    "s_0f629ba4dd5144": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "24a5c38a-a634-4fe7-85e1-ac501a1c736b",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
