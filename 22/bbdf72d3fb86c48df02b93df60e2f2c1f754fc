@@ -1,0 +1,30 @@
+packages/frontend/src/services/api/billing.ts
+  s_8f8a5ecab23446::t_7d2ac9370a0c74 15-20,22
+packages/frontend/src/services/api/core.ts
+  s_8f8a5ecab23446::t_7d2ac9370a0c74 15-22,41,43,45,49,63
+packages/frontend/tests/services/plan-store.test.ts
+  s_8f8a5ecab23446::t_8e427cbd46dea9 33-54
+packages/frontend/src/services/plan-store.ts
+  s_8f8a5ecab23446::t_ffe2369bd8d687 19-20,29-36,38,43,45-46,65
+packages/frontend/tests/services/api/billing.test.ts
+  s_8f8a5ecab23446::t_ffe2369bd8d687 17-21,31-39
+  s_8f8a5ecab23446::t_a6e7145c6ef964 40-41
+packages/frontend/tests/services/api/core.test.ts
+  s_8f8a5ecab23446::t_f9466eb3cdb70d 2-7,60,103-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "22bbdf72d3fb86c48df02b93df60e2f2c1f754fc",
+  "prompts": {},
+  "sessions": {
+    "s_8f8a5ecab23446": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4ef14e9-89de-4af2-a47c-872a7a6b810c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
