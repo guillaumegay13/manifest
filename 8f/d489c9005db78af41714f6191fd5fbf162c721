@@ -1,0 +1,32 @@
+packages/frontend/tests/components/AuthGuard.test.tsx
+  s_8f8a5ecab23446::t_8912fa25ae8c2c 119-132
+  s_8f8a5ecab23446::t_4dd82c73142bad 172-184
+packages/frontend/src/services/plan-store.ts
+  s_8f8a5ecab23446::t_e23ba9c6442691 27-30,35-38
+.changeset/first-paint-waterfall.md
+  s_8f8a5ecab23446::t_bd98758bcdebd4 1-5
+packages/backend/src/auth/auth.instance.spec.ts
+  s_8f8a5ecab23446::t_4dd82c73142bad 84-96
+packages/frontend/tests/services/plan-store.test.ts
+  s_8f8a5ecab23446::t_4dd82c73142bad 37-40
+packages/frontend/src/components/AuthGuard.tsx
+  s_8f8a5ecab23446::t_e23ba9c6442691 16-21
+packages/backend/src/auth/auth.instance.ts
+  s_8f8a5ecab23446::t_e23ba9c6442691 246-253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8fd489c9005db78af41714f6191fd5fbf162c721",
+  "prompts": {},
+  "sessions": {
+    "s_8f8a5ecab23446": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4ef14e9-89de-4af2-a47c-872a7a6b810c",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
