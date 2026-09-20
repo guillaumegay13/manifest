@@ -1,0 +1,67 @@
+packages/frontend/tests/services/setup-status.test.ts
+  s_929b0667f43e0e::t_173d6cc7a7f404 9,302-346
+packages/backend/src/main.ts
+  s_929b0667f43e0e::t_5366cb121a9a17 11,243
+  s_929b0667f43e0e::t_0a1358d9d04b01 9,236-242,244-245
+CLAUDE.md
+  s_929b0667f43e0e::t_bbd35928c780d1 373,477
+packages/backend/src/mcp/mcp-discovery.ts
+  s_929b0667f43e0e::t_b07ef76f00678d 77,89-107
+  s_929b0667f43e0e::t_50604a4c405db2 14-25
+  s_929b0667f43e0e::t_f82d24c77abaf7 108-110
+packages/backend/src/auth/mcp-availability.spec.ts
+  s_929b0667f43e0e::t_3ea0123d9a4f12 1-136
+packages/frontend/tests/components/Sidebar.test.tsx
+  s_929b0667f43e0e::t_3f556fb6d01fc7 49-51,54,175-186
+  s_929b0667f43e0e::t_907864a7bf2e49 187-188
+packages/backend/src/app.module.ts
+  s_929b0667f43e0e::t_6fa906c3c4540e 40,80-86,126
+packages/backend/src/auth/mcp-availability.ts
+  s_929b0667f43e0e::t_2e8199238249f1 1-97
+packages/frontend/src/components/Sidebar.tsx
+  s_929b0667f43e0e::t_b86e2ffa0418a8 5,32-35,142-152
+.changeset/hip-donkeys-invite.md
+  s_929b0667f43e0e::t_bbd35928c780d1 1-5
+packages/backend/src/auth/auth.instance.spec.ts
+  s_929b0667f43e0e::t_14e63b99987f80 620-665
+packages/backend/src/setup/setup.controller.spec.ts
+  s_929b0667f43e0e::t_c05ab29fa19b90 18,28,43,63,77,92,108,124
+packages/backend/src/setup/setup.service.ts
+  s_929b0667f43e0e::t_f30f4f68a2b4bc 7,65-73
+  s_929b0667f43e0e::t_5352e8707c12aa 74-75
+packages/backend/src/auth/auth.instance.ts
+  s_929b0667f43e0e::t_a8337d0a439d7b 20,38,41-49,177-186,219-249
+  s_929b0667f43e0e::t_277c576f143eb2 250-252
+packages/backend/src/setup/setup.controller.ts
+  s_929b0667f43e0e::t_f30f4f68a2b4bc 19,30
+packages/backend/src/setup/setup.service.spec.ts
+  s_929b0667f43e0e::t_87fc825f0ca8bd 268-303
+packages/frontend/src/services/setup-status.ts
+  s_929b0667f43e0e::t_8525be1a933585 13,23,42,54-55,65,101-108
+  s_929b0667f43e0e::t_2acac3fdb16a42 109-110
+packages/frontend/src/pages/integrations/McpServer.tsx
+  s_929b0667f43e0e::t_652d07dfa2ec11 1,6,75-77,95-116,118-145,147,150-166,168
+packages/frontend/tests/pages/McpServer.test.tsx
+  s_929b0667f43e0e::t_2718a7e2f634a2 2,9-15,36-49
+packages/backend/src/mcp/mcp-discovery.spec.ts
+  s_929b0667f43e0e::t_5366cb121a9a17 3,138-164
+  s_929b0667f43e0e::t_ebabb2ea64f06f 165
+packages/backend/.env.example
+  s_929b0667f43e0e::t_df935c6699cb71 26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9f67ba04911993c5e219bbbf053881e9c286570c",
+  "prompts": {},
+  "sessions": {
+    "s_929b0667f43e0e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6686b9c9-8ff2-400a-8841-7139fcb3e609",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
