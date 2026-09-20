@@ -1,0 +1,25 @@
+docker/.env.example
+  s_929b0667f43e0e::t_ed029decea451f 43
+packages/backend/src/auth/mcp-availability.spec.ts
+  s_929b0667f43e0e::t_d876e9fdf3b88a 6,110-130,167-199
+packages/backend/src/auth/mcp-availability.ts
+  s_929b0667f43e0e::t_333fda569be863 50-55,57,62,64-91,116-117,121-123
+packages/frontend/tests/pages/McpServer.test.tsx
+  s_929b0667f43e0e::t_885dbbb8f09de6 12,14,44-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "37a4c4472118b1462c7232e7bebc7124138382f2",
+  "prompts": {},
+  "sessions": {
+    "s_929b0667f43e0e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6686b9c9-8ff2-400a-8841-7139fcb3e609",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
