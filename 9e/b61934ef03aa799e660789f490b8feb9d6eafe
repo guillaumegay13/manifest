@@ -1,0 +1,45 @@
+packages/backend/src/setup/setup.controller.spec.ts
+  s_929b0667f43e0e::t_f6de31162ebe47 53-59
+docker/docker-compose.yml
+  s_929b0667f43e0e::t_f6de31162ebe47 72
+packages/backend/src/setup/setup.service.ts
+  s_929b0667f43e0e::t_f6de31162ebe47 7,66-70,73
+packages/backend/src/auth/mcp-availability.spec.ts
+  s_929b0667f43e0e::t_f6de31162ebe47 4,6,35-36,39-42,44,48-52,66-79,99-102
+packages/frontend/src/components/Sidebar.tsx
+  s_929b0667f43e0e::t_f6de31162ebe47 33-35,143
+packages/backend/.env.example
+  s_929b0667f43e0e::t_f6de31162ebe47 26
+packages/frontend/tests/pages/McpServer.test.tsx
+  s_929b0667f43e0e::t_f6de31162ebe47 36-42,57-58,63-64,74-75,90-91,107-108,126-127
+packages/backend/src/auth/mcp-availability.ts
+  s_929b0667f43e0e::t_f6de31162ebe47 62-66,98,103-120
+packages/backend/src/app.module.ts
+  s_929b0667f43e0e::t_f6de31162ebe47 40,85
+packages/frontend/src/pages/integrations/McpServer.tsx
+  s_929b0667f43e0e::t_f6de31162ebe47 76-78,110
+packages/backend/src/auth/auth.instance.spec.ts
+  s_929b0667f43e0e::t_f6de31162ebe47 621-631
+docker/.env.example
+  s_929b0667f43e0e::t_f6de31162ebe47 43
+packages/backend/src/setup/setup.service.spec.ts
+  s_929b0667f43e0e::t_f6de31162ebe47 35-36,280,288
+packages/backend/src/auth/auth.instance.ts
+  s_929b0667f43e0e::t_f6de31162ebe47 20,47-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9eb61934ef03aa799e660789f490b8feb9d6eafe",
+  "prompts": {},
+  "sessions": {
+    "s_929b0667f43e0e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6686b9c9-8ff2-400a-8841-7139fcb3e609",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
