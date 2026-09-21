@@ -1,0 +1,36 @@
+packages/backend/src/mcp/mcp.controller.ts
+  s_86ec4831e6f1fb::t_3d0a60208cf51e 6-8
+  s_86ec4831e6f1fb::t_b5c1cce0c03772 225-243
+  s_86ec4831e6f1fb::t_ed98a27c8f7cd7 246-257
+  s_86ec4831e6f1fb::t_66570dabdf92de 14
+packages/backend/src/mcp/mcp-server.factory.ts
+  s_86ec4831e6f1fb::t_ed98a27c8f7cd7 30
+  s_86ec4831e6f1fb::t_bd5019df0d8fb5 24-29
+packages/backend/src/mcp/mcp.controller.spec.ts
+  s_86ec4831e6f1fb::t_a4577d1686aa7e 218-219
+  s_86ec4831e6f1fb::t_d7ac179681f271 61-81
+  s_86ec4831e6f1fb::t_d9c574db67583a 3
+  s_86ec4831e6f1fb::t_98bc94c1f49a6c 164-166,213
+  s_86ec4831e6f1fb::t_c1b6adb0448fc1 167-185
+  s_86ec4831e6f1fb::t_241a643ab13be9 101-102,123-163,186-212,214
+.changeset/heavy-pugs-repeat.md
+  s_86ec4831e6f1fb::t_d39ac753dc5b6c 1-5
+packages/backend/src/mcp/mcp-server.factory.spec.ts
+  s_86ec4831e6f1fb::t_083596202b69b3 46-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f8cd61e26e1e19a43e890d6a07c9ea173f5b1707",
+  "prompts": {},
+  "sessions": {
+    "s_86ec4831e6f1fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "006518e2-d2f5-42e0-9c57-093e3ac5a1b9",
+        "model": "claude-opus-5"
+      },
+      "human_author": null
+    }
+  }
+}
