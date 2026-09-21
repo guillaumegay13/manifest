@@ -1,0 +1,26 @@
+packages/backend/src/database/migrations/1802600000000-AddAgentMessagesRecordingIndex.spec.ts
+  s_5f1e3a3a791977::t_7f19330925f270 1-72
+packages/backend/src/database/migrations/1802600000000-AddAgentMessagesRecordingIndex.ts
+  s_5f1e3a3a791977::t_994b585563a2ed 1-69
+packages/backend/src/database/data-source-definitions.ts
+  s_5f1e3a3a791977::t_75841bd8505c88 53,342
+.changeset/retention-job-partial-index.md
+  s_5f1e3a3a791977::t_7e151e878eb302 1,3-5
+  s_5f1e3a3a791977::t_cadde8ae243292 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0341edf2c2d8c2c54a2c1a5f613d457b49a8e2bc",
+  "prompts": {},
+  "sessions": {
+    "s_5f1e3a3a791977": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e967fec-5138-401b-a923-c81be54883cd",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
