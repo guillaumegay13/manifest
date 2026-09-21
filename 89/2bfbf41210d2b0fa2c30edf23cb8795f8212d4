@@ -1,0 +1,23 @@
+docker/docker-compose.yml
+  s_ddb7f03c6dfadb::t_b709f8069a02fd 163-164
+docker/.env.example
+  s_ddb7f03c6dfadb::t_b709f8069a02fd 177-179
+docs/agent-usage-daily.md
+  s_ddb7f03c6dfadb::t_b709f8069a02fd 160-161,286-287,289-291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "892bfbf41210d2b0fa2c30edf23cb8795f8212d4",
+  "prompts": {},
+  "sessions": {
+    "s_ddb7f03c6dfadb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c3c0-41ab-70a2-a190-4ba4917c184f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
