@@ -1,0 +1,25 @@
+packages/backend/src/analytics/services/messages-query.service.ts
+  s_2ead458ef7f46f::t_6844ed42b7689a 401-416
+packages/backend/src/analytics/services/messages-query.requests.spec.ts
+  s_2ead458ef7f46f::t_42449a07ab0906 334-336,361-370,375-389
+  s_2ead458ef7f46f::t_55103185ec3b5c 337-360,371-374
+  s_2ead458ef7f46f::t_14f3d05d38862c 390-391
+.changeset/quiet-falcons-count.md
+  s_2ead458ef7f46f::t_e0a155d0fb81c3 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "330af6371af7b2f3cccaab9edf492389cefe787a",
+  "prompts": {},
+  "sessions": {
+    "s_2ead458ef7f46f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c552-2b0e-75f1-a883-4de3471e0556",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": null
+    }
+  }
+}
