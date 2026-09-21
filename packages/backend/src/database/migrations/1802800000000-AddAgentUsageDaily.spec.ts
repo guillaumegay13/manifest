@@ -1,6 +1,6 @@
-import { AddAgentUsageDaily1802700000000 } from './1802700000000-AddAgentUsageDaily';
+import { AddAgentUsageDaily1802800000000 } from './1802800000000-AddAgentUsageDaily';
 
-describe('AddAgentUsageDaily1802700000000', () => {
+describe('AddAgentUsageDaily1802800000000', () => {
   const statements: Array<{ sql: string; params?: unknown[] }> = [];
   const queryRunner = { query: jest.fn() };
 
@@ -16,7 +16,7 @@ describe('AddAgentUsageDaily1802700000000', () => {
   });
 
   it('creates only schema and the resumable queue index', async () => {
-    const migration = new AddAgentUsageDaily1802700000000();
+    const migration = new AddAgentUsageDaily1802800000000();
     await migration.up(queryRunner as never);
 
     const sql = statements.map((statement) => statement.sql).join('\n');
@@ -43,14 +43,14 @@ describe('AddAgentUsageDaily1802700000000', () => {
       return [];
     });
 
-    await new AddAgentUsageDaily1802700000000().up(queryRunner as never);
+    await new AddAgentUsageDaily1802800000000().up(queryRunner as never);
 
     const sql = statements.map((statement) => statement.sql).join('\n');
     expect(sql).toContain('DROP INDEX CONCURRENTLY IF EXISTS "IDX_requests_agent_usage_pending"');
   });
 
   it('removes the queue index before the marker and rollup table', async () => {
-    await new AddAgentUsageDaily1802700000000().down(queryRunner as never);
+    await new AddAgentUsageDaily1802800000000().down(queryRunner as never);
 
     const sql = statements.map((statement) => statement.sql).join('\n');
     expect(sql.indexOf('DROP INDEX CONCURRENTLY')).toBeLessThan(

@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddAgentUsageDaily1802700000000 implements MigrationInterface {
-  name = 'AddAgentUsageDaily1802700000000';
+export class AddAgentUsageDaily1802800000000 implements MigrationInterface {
+  name = 'AddAgentUsageDaily1802800000000';
   transaction = false;
 
   private static readonly REQUEST_INDEX = 'IDX_requests_agent_usage_pending';
@@ -41,7 +41,7 @@ export class AddAgentUsageDaily1802700000000 implements MigrationInterface {
       await queryRunner.query(`RESET lock_timeout`);
     }
 
-    const { REQUEST_INDEX, ATTEMPT_INDEX, READ_INDEX } = AddAgentUsageDaily1802700000000;
+    const { REQUEST_INDEX, ATTEMPT_INDEX, READ_INDEX } = AddAgentUsageDaily1802800000000;
     for (const index of [REQUEST_INDEX, ATTEMPT_INDEX, READ_INDEX]) {
       if (await this.indexIsInvalid(queryRunner, index)) {
         await queryRunner.query(`DROP INDEX CONCURRENTLY IF EXISTS "${index}"`);
@@ -72,7 +72,7 @@ export class AddAgentUsageDaily1802700000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    const { REQUEST_INDEX, ATTEMPT_INDEX, READ_INDEX } = AddAgentUsageDaily1802700000000;
+    const { REQUEST_INDEX, ATTEMPT_INDEX, READ_INDEX } = AddAgentUsageDaily1802800000000;
     for (const index of [REQUEST_INDEX, ATTEMPT_INDEX, READ_INDEX]) {
       await queryRunner.query(`DROP INDEX CONCURRENTLY IF EXISTS "${index}"`);
     }
