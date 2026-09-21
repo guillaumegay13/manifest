@@ -157,8 +157,8 @@ worker to process a batch at a time.
 
 Each batch must use one database transaction:
 
-1. Select up to 1,000 eligible completed Requests and Provider Attempts with
-   `FOR UPDATE SKIP LOCKED`.
+1. Select up to 1,000 eligible completed Requests and up to 1,000 eligible
+   completed Provider Attempts with `FOR UPDATE SKIP LOCKED`.
 2. Exclude source rows whose `agent_id` does not resolve to an Agent.
 3. Aggregate Request counters and Attempt usage by tenant, agent, and UTC day.
 4. Upsert the resulting increments into `agent_usage_daily`.
@@ -283,19 +283,12 @@ correct rollup lag.
 
 ## Observability
 
-Expose these values in logs or metrics:
+Each productive run logs the number of processed source rows, written daily
+rows, and batch duration. Failed runs log the processed count and error.
 
-- oldest unprocessed completed source-row age;
-- number of eligible unprocessed Requests and Provider Attempts;
-- source rows processed per batch;
-- batch duration;
-- last successful worker time;
-- worker error count;
-- daily parity difference during rollout.
-
-Alert when the oldest unprocessed Request exceeds five minutes. The normal
-freshness target is one minute, but the alert allows short deploy and database
-pressure delays.
+Before enabling reads, operators query marker backlog and compare daily totals
+with the compatibility query. These rollout checks are not application metrics
+in the first version.
 
 ## Rollout
 

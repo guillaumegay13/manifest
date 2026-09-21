@@ -160,6 +160,8 @@ services:
       - AGENT_USAGE_DAILY_WORKER=${AGENT_USAGE_DAILY_WORKER:-}
       - AGENT_USAGE_DAILY_READS=${AGENT_USAGE_DAILY_READS:-}
       - AGENT_USAGE_DAILY_READ_TENANTS=${AGENT_USAGE_DAILY_READ_TENANTS:-}
+      - AGENT_USAGE_DAILY_BATCH_SIZE=${AGENT_USAGE_DAILY_BATCH_SIZE:-}
+      - AGENT_USAGE_DAILY_RUN_BUDGET_MS=${AGENT_USAGE_DAILY_RUN_BUDGET_MS:-}
       # Update check (opt-out). Once a day the dashboard asks GitHub for the
       # latest Manifest release so it can show a "new version available"
       # badge. Set MANIFEST_UPDATE_CHECK_DISABLED=1 on air-gapped installs.
