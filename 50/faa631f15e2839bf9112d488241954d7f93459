@@ -1,0 +1,19 @@
+packages/backend/src/analytics/services/agent-usage-daily.service.spec.ts
+  s_ddb7f03c6dfadb::t_a83180a0c4f5e2 6-8,11,16-21,53-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "50faa631f15e2839bf9112d488241954d7f93459",
+  "prompts": {},
+  "sessions": {
+    "s_ddb7f03c6dfadb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c3c0-41ab-70a2-a190-4ba4917c184f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
