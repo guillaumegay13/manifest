@@ -8,6 +8,7 @@ describe('AgentUsageDailyService', () => {
   const originalRunBudget = process.env['AGENT_USAGE_DAILY_RUN_BUDGET_MS'];
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
     if (originalReads === undefined) delete process.env['AGENT_USAGE_DAILY_READS'];
     else process.env['AGENT_USAGE_DAILY_READS'] = originalReads;
@@ -38,6 +39,7 @@ describe('AgentUsageDailyService', () => {
   });
 
   it('reads only the bounded tenant window', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-21T12:00:00.000Z'));
     const query = jest.fn().mockResolvedValue([]);
     const service = new AgentUsageDailyService({ query } as never);
 
@@ -48,6 +50,7 @@ describe('AgentUsageDailyService', () => {
     expect(query.mock.calls[0][0]).toContain('"tenant_id" = $1');
     expect(query.mock.calls[0][0]).toContain('"day" >= $2::date');
     expect(query.mock.calls[0][1][0]).toBe('tenant-a');
+    expect(query.mock.calls[0][1][1]).toBe('2026-08-23');
   });
 
   it('skips scheduled work when disabled or already running', async () => {
@@ -96,8 +99,8 @@ describe('AgentUsageDailyService', () => {
   });
 
   it('logs scheduled failures, uses safe defaults, and releases the runner', async () => {
-    process.env['AGENT_USAGE_DAILY_BATCH_SIZE'] = '0';
-    process.env['AGENT_USAGE_DAILY_RUN_BUDGET_MS'] = 'invalid';
+    process.env['AGENT_USAGE_DAILY_BATCH_SIZE'] = '1e3';
+    process.env['AGENT_USAGE_DAILY_RUN_BUDGET_MS'] = '1.5';
     const service = new AgentUsageDailyService({} as never);
     const processBatch = jest
       .spyOn(service, 'processBatch')
@@ -151,8 +154,12 @@ describe('AgentUsageDailyService', () => {
     const sql = manager.query.mock.calls[3][0] as string;
     expect(sql).toContain('FOR UPDATE SKIP LOCKED');
     expect(sql).toContain('ON CONFLICT ("tenant_id", "agent_id", "day") DO UPDATE');
+    expect(sql).toContain('FROM "agent_messages" pa');
+    expect(sql).toContain('pa."agent_usage_rolled_up_at" IS NULL');
+    expect(sql).toContain('pa."request_id" IS NULL');
+    expect(sql).toContain('EXISTS (SELECT 1 FROM "agents"');
     expect(sql).toContain('SET "agent_usage_rolled_up_at" = NOW()');
-    expect(sql.indexOf('upserted AS')).toBeLessThan(sql.indexOf('marked AS'));
+    expect(sql.indexOf('upserted AS')).toBeLessThan(sql.indexOf('marked_requests AS'));
     expect(manager.query.mock.calls[3][1][0]).toBe(2);
   });
 });

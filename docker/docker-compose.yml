@@ -156,6 +156,10 @@ services:
       # https://manifest.build/docs/self-hosted#telemetry for the payload shape.
       - MANIFEST_TELEMETRY_DISABLED=${MANIFEST_TELEMETRY_DISABLED:-0}
       - TELEMETRY_ENDPOINT=${TELEMETRY_ENDPOINT:-}
+      # Daily Harness usage rollup. Reads stay off until backfill parity passes.
+      - AGENT_USAGE_DAILY_WORKER=${AGENT_USAGE_DAILY_WORKER:-}
+      - AGENT_USAGE_DAILY_READS=${AGENT_USAGE_DAILY_READS:-}
+      - AGENT_USAGE_DAILY_READ_TENANTS=${AGENT_USAGE_DAILY_READ_TENANTS:-}
       # Update check (opt-out). Once a day the dashboard asks GitHub for the
       # latest Manifest release so it can show a "new version available"
       # badge. Set MANIFEST_UPDATE_CHECK_DISABLED=1 on air-gapped installs.

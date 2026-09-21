@@ -679,6 +679,7 @@ describe('TimeseriesQueriesService', () => {
 
     it('uses bounded daily rows after the tenant read cutover', async () => {
       const today = new Date().toISOString().slice(0, 10);
+      const oldDay = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       const agentQb = {
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
@@ -707,6 +708,15 @@ describe('TimeseriesQueriesService', () => {
             cost_usd: '1.25',
             last_active_at: '2026-09-21T10:00:00.000Z',
           },
+          {
+            agent_id: 'agent-1',
+            day: oldDay,
+            request_count: '2',
+            input_tokens: '20',
+            output_tokens: '5',
+            cost_usd: '0.25',
+            last_active_at: '2026-09-11T10:00:00.000Z',
+          },
         ]),
       };
       const rollupAware = new TimeseriesQueriesService(
@@ -728,10 +738,10 @@ describe('TimeseriesQueriesService', () => {
           display_name: 'Bot One',
           agent_category: 'code',
           agent_platform: 'codex',
-          message_count: 3,
+          message_count: 5,
           last_active: '2026-09-21T10:00:00.000Z',
-          total_cost: 1.25,
-          total_tokens: 150,
+          total_cost: 1.5,
+          total_tokens: 175,
           sparkline: [150],
         },
       ]);

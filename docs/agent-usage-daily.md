@@ -1,6 +1,6 @@
 # Agent usage daily rollup
 
-Status: Proposed
+Status: Implemented; rollout pending
 
 ## Summary
 
@@ -10,9 +10,9 @@ contains one UTC day of usage for one tenant and one agent.
 `GET /api/v1/agents` will read this table instead of aggregating 30 days of raw
 `requests` and `agent_messages` rows. The API response will not change.
 
-The rollup worker will process completed Requests asynchronously. Dashboard
-usage can lag live traffic by up to one minute. Request routing and recording
-must not wait for the rollup.
+The rollup worker will process completed Requests and Provider Attempts
+asynchronously. Dashboard usage can lag live traffic by up to one minute.
+Request routing and recording must not wait for the rollup.
 
 ## Problem
 
@@ -72,20 +72,27 @@ CREATE TABLE agent_usage_daily (
 );
 ```
 
-The primary key supports the complete read predicate:
+The primary key enforces one row per agent and day. A separate read index
+supports the complete range predicate:
 
 ```text
 tenant_id = ? AND day >= ?
 ```
 
-No second index is required for the initial read path.
+```sql
+CREATE INDEX idx_agent_usage_daily_tenant_day
+  ON agent_usage_daily (tenant_id, day);
+```
 
-### Request marker
+### Source markers
 
-Add a nullable marker to `requests`:
+Add one nullable marker to each source table:
 
 ```sql
 ALTER TABLE requests
+  ADD COLUMN agent_usage_rolled_up_at timestamp NULL;
+
+ALTER TABLE agent_messages
   ADD COLUMN agent_usage_rolled_up_at timestamp NULL;
 ```
 
@@ -95,16 +102,24 @@ Add a partial queue index without blocking production writes:
 CREATE INDEX CONCURRENTLY idx_requests_agent_usage_pending
   ON requests (timestamp, id)
   WHERE agent_usage_rolled_up_at IS NULL
-    AND status IN ('success', 'failed')
+    AND (status IS NULL OR status NOT IN ('pending', 'cancelled'))
+    AND tenant_id IS NOT NULL
+    AND agent_id IS NOT NULL;
+
+CREATE INDEX CONCURRENTLY idx_agent_messages_agent_usage_pending
+  ON agent_messages (timestamp, id)
+  WHERE agent_usage_rolled_up_at IS NULL
+    AND (status IS NULL OR status NOT IN ('pending', 'cancelled'))
     AND tenant_id IS NOT NULL
     AND agent_id IS NOT NULL;
 ```
 
-The marker is the durable queue state. It also gives the worker exactly-once
-behavior without an external queue or an event table.
+The markers are durable queue state. Independent Request and Attempt markers
+avoid a race when a terminal Request is persisted before its final Attempt.
+They also include historical unlinked Attempts without an external queue.
 
 The migration that creates the concurrent index must run outside a transaction.
-Adding the nullable marker must not rewrite existing `requests` rows.
+Adding the nullable markers must not rewrite existing source rows.
 
 ## Metric contract
 
@@ -112,9 +127,9 @@ The definitions in [the analytics glossary](./glossary.md) remain authoritative.
 
 | Rollup column              | Source and rule                                                                                                         |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `request_count`            | One for each completed Request: `requests.status IN ('success', 'failed')`.                                             |
-| `successful_request_count` | One when `requests.status = 'success'`.                                                                                 |
-| `failed_request_count`     | One when `requests.status = 'failed'`.                                                                                  |
+| `request_count`            | One for each completed Request, plus one for each completed legacy unlinked Attempt.                                    |
+| `successful_request_count` | One for each successful Request or legacy unlinked Attempt. NULL and `ok` are historical success values.                |
+| `failed_request_count`     | One for each other completed Request or legacy unlinked Attempt.                                                        |
 | `input_tokens`             | Sum of `agent_messages.input_tokens` for completed Provider Attempts.                                                   |
 | `output_tokens`            | Sum of `agent_messages.output_tokens` for completed Provider Attempts.                                                  |
 | `cost_usd`                 | Sum of non-negative `agent_messages.cost_usd` for completed Provider Attempts. Null and negative costs contribute zero. |
@@ -126,9 +141,10 @@ Request counters use the UTC day of `requests.timestamp`. Token and cost values
 use the UTC day of `agent_messages.timestamp`. One Request can therefore update
 more than one daily row if its Provider Attempts cross midnight.
 
-All linked completed Provider Attempts contribute token and cost usage. A
-fallback or Autofix chain can contain several Attempts, so its Attempt usage is
-the sum of those Attempts while its Request count remains one.
+All completed Provider Attempts contribute token and cost usage. A fallback or
+Autofix chain can contain several Attempts, so its Attempt usage is the sum of
+those Attempts while its Request count remains one. Each unlinked historical
+Attempt is its own compatibility Request.
 
 Playground usage can exist in the rollup. User-facing readers continue to hide
 Playground agents through the `agents.is_playground` rule.
@@ -141,13 +157,12 @@ worker to process a batch at a time.
 
 Each batch must use one database transaction:
 
-1. Select up to 1,000 eligible completed Requests with
+1. Select up to 1,000 eligible completed Requests and Provider Attempts with
    `FOR UPDATE SKIP LOCKED`.
-2. Aggregate Request counters by tenant, agent, and UTC day.
-3. Aggregate completed linked Provider Attempt usage by tenant, agent, and UTC
-   day.
+2. Exclude source rows whose `agent_id` does not resolve to an Agent.
+3. Aggregate Request counters and Attempt usage by tenant, agent, and UTC day.
 4. Upsert the resulting increments into `agent_usage_daily`.
-5. Set `requests.agent_usage_rolled_up_at = NOW()` for the selected Requests.
+5. Mark the selected rows in both source tables.
 6. Commit.
 
 The upsert adds counters and keeps the greatest `last_active_at`:
@@ -171,9 +186,9 @@ ON CONFLICT (tenant_id, agent_id, day) DO UPDATE SET
   updated_at = NOW();
 ```
 
-If the process stops before commit, both the increments and the markers roll
-back. The next worker can safely process the same Requests. If commit succeeds,
-the marker prevents a second increment.
+If the process stops before commit, both the increments and markers roll back.
+The next worker can safely process the same source rows. If commit succeeds,
+each source marker prevents a second increment.
 
 The worker must stop after a fixed time budget per run. A slow or backlogged
 rollup must not create sustained database pressure. The next scheduled run
@@ -181,20 +196,19 @@ continues from the remaining marker rows.
 
 ## Historical backfill
 
-The same batch algorithm handles historical Requests. Process newest Requests
-first so the active 30-day dashboard window becomes complete before older
-history.
+The same batch algorithm handles historical Requests and Attempts. Process
+newest rows first so the active 30-day dashboard window becomes complete before
+older history.
 
 Before read cutover, verify all of these conditions:
 
-1. The Request transition is complete for the dashboard window.
-2. No eligible unlinked legacy Provider Attempts remain in that window.
-3. No completed Request in that window has a null
+1. No eligible Request or Provider Attempt in the dashboard window has a null
    `agent_usage_rolled_up_at`.
-4. Daily rollup totals match the existing query for selected tenants and days.
+2. Daily rollup totals match the compatibility query for selected tenants and
+   UTC days.
 
 Continue the backfill outside the active window until all eligible historical
-Requests have a marker. Throttle batch work when normal database latency or
+source rows have a marker. Throttle batch work when normal database latency or
 connection pressure exceeds its operating threshold.
 
 Do not run a full-table aggregate inside a schema migration. The migration only
@@ -206,12 +220,14 @@ data work in bounded transactions.
 `GET /api/v1/agents` keeps its current response shape. It performs:
 
 1. One small query for active agent metadata.
-2. One query for the tenant's last 30 UTC days from `agent_usage_daily`.
+2. One indexed query for the current UTC day and preceding 29 UTC days from
+   `agent_usage_daily`.
 3. An in-process fold by `agent_id` that produces totals, `last_active`, and the
    seven-day token sparkline.
 
-At most 30 rows per agent enter the fold. Raw `requests` and `agent_messages`
-must not be read by this endpoint after cutover.
+At most 30 rows per agent enter the fold. This calendar-day boundary is the
+rollup metric contract; parity checks compare the raw data using the same UTC
+boundaries. Raw source tables must not be read by this endpoint after cutover.
 
 The endpoint continues to return:
 
@@ -257,9 +273,10 @@ correct rollup lag.
   marker updates share one transaction.
 - A completed Request with no Provider Attempt still increments Request counts
   with zero token and cost usage.
-- Completed Request and Provider Attempt rows are immutable for rollup fields
-  after their marker is set. Code that introduces a valid late correction must
-  also define a rollup repair operation.
+- A Provider Attempt that completes after its Request is rolled up remains in
+  the Attempt queue and contributes when its own marker is set.
+- Completed source rows are immutable for rollup fields after their marker is
+  set. A valid late correction must also define a rollup repair operation.
 - The initial repair procedure pauses the worker, recomputes selected UTC days
   from raw data, replaces those daily rows, resets affected markers if needed,
   and resumes the worker.
@@ -268,9 +285,9 @@ correct rollup lag.
 
 Expose these values in logs or metrics:
 
-- oldest unprocessed completed Request age;
-- number of eligible unprocessed Requests;
-- Requests processed per batch;
+- oldest unprocessed completed source-row age;
+- number of eligible unprocessed Requests and Provider Attempts;
+- source rows processed per batch;
 - batch duration;
 - last successful worker time;
 - worker error count;
@@ -282,7 +299,7 @@ pressure delays.
 
 ## Rollout
 
-1. Deploy the table, Request marker, and partial queue index.
+1. Deploy the table, source markers, read index, and partial queue indexes.
 2. Deploy the worker with rollup reads disabled.
 3. Backfill the latest 30 days, then continue through older history.
 4. Run shadow reads and compare per-agent totals with the current raw query.

@@ -24,6 +24,7 @@ export interface AgentUsageBatchResult {
 }
 
 function positiveInteger(value: string | undefined, fallback: number): number {
+  if (!value || !/^\d+$/.test(value)) return fallback;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
@@ -119,10 +120,24 @@ export class AgentUsageDailyService {
            SELECT r."id", r."tenant_id", r."agent_id", r."timestamp", r."status"
            FROM "requests" r
            WHERE r."agent_usage_rolled_up_at" IS NULL
-             AND r."status" IN ('success', 'failed')
+             AND (r."status" IS NULL OR r."status" NOT IN ('pending', 'cancelled'))
              AND r."tenant_id" IS NOT NULL
              AND r."agent_id" IS NOT NULL
+             AND EXISTS (SELECT 1 FROM "agents" a WHERE a."id" = r."agent_id")
            ORDER BY r."timestamp" DESC, r."id" DESC
+           LIMIT $1
+           FOR UPDATE SKIP LOCKED
+         ), selected_attempts AS MATERIALIZED (
+           SELECT
+             pa."id", pa."request_id", pa."tenant_id", pa."agent_id", pa."timestamp",
+             pa."status", pa."input_tokens", pa."output_tokens", pa."cost_usd"
+           FROM "agent_messages" pa
+           WHERE pa."agent_usage_rolled_up_at" IS NULL
+             AND (pa."status" IS NULL OR pa."status" NOT IN ('pending', 'cancelled'))
+             AND pa."tenant_id" IS NOT NULL
+             AND pa."agent_id" IS NOT NULL
+             AND EXISTS (SELECT 1 FROM "agents" a WHERE a."id" = pa."agent_id")
+           ORDER BY pa."timestamp" DESC, pa."id" DESC
            LIMIT $1
            FOR UPDATE SKIP LOCKED
          ), request_rollups AS (
@@ -131,8 +146,8 @@ export class AgentUsageDailyService {
              s."agent_id",
              (((s."timestamp" AT TIME ZONE $2) AT TIME ZONE 'UTC')::date) AS "day",
              COUNT(*)::bigint AS "request_count",
-             COUNT(*) FILTER (WHERE s."status" = 'success')::bigint AS "successful_request_count",
-             COUNT(*) FILTER (WHERE s."status" = 'failed')::bigint AS "failed_request_count",
+             COUNT(*) FILTER (WHERE s."status" IS NULL OR s."status" IN ('ok', 'success'))::bigint AS "successful_request_count",
+             COUNT(*) FILTER (WHERE s."status" IS NOT NULL AND s."status" NOT IN ('ok', 'success'))::bigint AS "failed_request_count",
              0::bigint AS "input_tokens",
              0::bigint AS "output_tokens",
              0::numeric AS "cost_usd",
@@ -141,20 +156,25 @@ export class AgentUsageDailyService {
            GROUP BY s."tenant_id", s."agent_id", "day"
          ), attempt_rollups AS (
            SELECT
-             s."tenant_id",
-             s."agent_id",
+             pa."tenant_id",
+             pa."agent_id",
              (((pa."timestamp" AT TIME ZONE $2) AT TIME ZONE 'UTC')::date) AS "day",
-             0::bigint AS "request_count",
-             0::bigint AS "successful_request_count",
-             0::bigint AS "failed_request_count",
+             COUNT(*) FILTER (WHERE pa."request_id" IS NULL)::bigint AS "request_count",
+             COUNT(*) FILTER (
+               WHERE pa."request_id" IS NULL
+                 AND (pa."status" IS NULL OR pa."status" IN ('ok', 'success'))
+             )::bigint AS "successful_request_count",
+             COUNT(*) FILTER (
+               WHERE pa."request_id" IS NULL
+                 AND pa."status" IS NOT NULL
+                 AND pa."status" NOT IN ('ok', 'success')
+             )::bigint AS "failed_request_count",
              COALESCE(SUM(pa."input_tokens"), 0)::bigint AS "input_tokens",
              COALESCE(SUM(pa."output_tokens"), 0)::bigint AS "output_tokens",
              COALESCE(SUM(CASE WHEN pa."cost_usd" >= 0 THEN pa."cost_usd" ELSE 0 END), 0)::numeric AS "cost_usd",
              MAX(pa."timestamp") AS "last_active_at"
-           FROM selected s
-           JOIN "agent_messages" pa ON pa."request_id" = s."id"
-           WHERE pa."status" IS NULL OR pa."status" NOT IN ('pending', 'cancelled')
-           GROUP BY s."tenant_id", s."agent_id", "day"
+           FROM selected_attempts pa
+           GROUP BY pa."tenant_id", pa."agent_id", "day"
          ), increments AS (
            SELECT
              "tenant_id",
@@ -194,15 +214,24 @@ export class AgentUsageDailyService {
              "last_active_at" = GREATEST("agent_usage_daily"."last_active_at", EXCLUDED."last_active_at"),
              "updated_at" = NOW()
            RETURNING 1
-         ), marked AS (
+         ), marked_requests AS (
            UPDATE "requests" r
            SET "agent_usage_rolled_up_at" = NOW()
            FROM selected s, (SELECT COUNT(*) FROM upserted) ready
            WHERE r."id" = s."id"
            RETURNING 1
+         ), marked_attempts AS (
+           UPDATE "agent_messages" pa
+           SET "agent_usage_rolled_up_at" = NOW()
+           FROM selected_attempts s, (SELECT COUNT(*) FROM upserted) ready
+           WHERE pa."id" = s."id"
+           RETURNING 1
          )
          SELECT
-           (SELECT COUNT(*)::int FROM marked) AS processed,
+           (
+             (SELECT COUNT(*)::int FROM marked_requests) +
+             (SELECT COUNT(*)::int FROM marked_attempts)
+           ) AS processed,
            (SELECT COUNT(*)::int FROM upserted) AS rollups`,
         [Math.max(1, Math.floor(batchSize)), storageTimeZone],
       )) as Array<{ processed: number | string; rollups: number | string }>;
