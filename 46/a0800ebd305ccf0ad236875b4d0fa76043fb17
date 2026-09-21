@@ -1,0 +1,21 @@
+packages/backend/src/database/request-recording-retention.service.ts
+  s_5f1e3a3a791977::t_36bf732c1bf50e 27-30,36
+packages/backend/src/database/request-recording-retention.service.spec.ts
+  s_5f1e3a3a791977::t_c704bf250fecbd 69-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "46a0800ebd305ccf0ad236875b4d0fa76043fb17",
+  "prompts": {},
+  "sessions": {
+    "s_5f1e3a3a791977": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e967fec-5138-401b-a923-c81be54883cd",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
