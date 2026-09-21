@@ -134,8 +134,12 @@ describe('IngestEventBusService', () => {
 describe('IngestEventBusService message cache invalidation', () => {
   let service: IngestEventBusService;
   let invalidate: jest.Mock;
+  const originalReads = process.env['AGENT_USAGE_DAILY_READS'];
+  const originalTenants = process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
 
   beforeEach(() => {
+    delete process.env['AGENT_USAGE_DAILY_READS'];
+    delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
     jest.useFakeTimers();
     invalidate = jest.fn().mockResolvedValue(undefined);
     service = new IngestEventBusService({ invalidate } as unknown as AgentListCacheService);
@@ -144,6 +148,13 @@ describe('IngestEventBusService message cache invalidation', () => {
   afterEach(() => {
     service.onModuleDestroy();
     jest.useRealTimers();
+  });
+
+  afterAll(() => {
+    if (originalReads === undefined) delete process.env['AGENT_USAGE_DAILY_READS'];
+    else process.env['AGENT_USAGE_DAILY_READS'] = originalReads;
+    if (originalTenants === undefined) delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
+    else process.env['AGENT_USAGE_DAILY_READ_TENANTS'] = originalTenants;
   });
 
   it('waits for cache invalidation before publishing a message event', async () => {
@@ -208,5 +219,17 @@ describe('IngestEventBusService message cache invalidation', () => {
     await jest.advanceTimersByTimeAsync(250);
 
     expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it('does not invalidate the retired response cache for a rollup-read tenant', async () => {
+    process.env['AGENT_USAGE_DAILY_READ_TENANTS'] = 'tenant-1';
+    const received: IngestEvent[] = [];
+    service.forTenant('tenant-1').subscribe((event) => received.push(event));
+
+    service.emit('tenant-1', 'message');
+    await jest.advanceTimersByTimeAsync(250);
+
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(received).toEqual([{ tenantId: 'tenant-1', kind: 'message', userId: undefined }]);
   });
 });

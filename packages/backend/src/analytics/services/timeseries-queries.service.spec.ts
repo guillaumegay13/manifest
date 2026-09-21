@@ -677,6 +677,66 @@ describe('TimeseriesQueriesService', () => {
       expect(clauses).not.toContain('a.is_playground = false');
     });
 
+    it('uses bounded daily rows after the tenant read cutover', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const agentQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            id: 'agent-1',
+            name: 'bot-1',
+            display_name: 'Bot One',
+            agent_category: 'code',
+            agent_platform: 'codex',
+            created_at: '2026-01-01',
+          },
+        ]),
+      };
+      const turnRepo = { createQueryBuilder: jest.fn() };
+      const daily = {
+        readsEnabledFor: jest.fn().mockReturnValue(true),
+        getRows: jest.fn().mockResolvedValue([
+          {
+            agent_id: 'agent-1',
+            day: today,
+            request_count: '3',
+            input_tokens: '100',
+            output_tokens: '50',
+            cost_usd: '1.25',
+            last_active_at: '2026-09-21T10:00:00.000Z',
+          },
+        ]),
+      };
+      const rollupAware = new TimeseriesQueriesService(
+        turnRepo as never,
+        { createQueryBuilder: jest.fn(() => agentQb) } as never,
+        undefined,
+        undefined,
+        undefined,
+        daily as never,
+      );
+
+      const result = await rollupAware.getAgentList('tenant-1');
+
+      expect(daily.getRows).toHaveBeenCalledWith('tenant-1');
+      expect(turnRepo.createQueryBuilder).not.toHaveBeenCalled();
+      expect(result).toEqual([
+        {
+          agent_name: 'bot-1',
+          display_name: 'Bot One',
+          agent_category: 'code',
+          agent_platform: 'codex',
+          message_count: 3,
+          last_active: '2026-09-21T10:00:00.000Z',
+          total_cost: 1.25,
+          total_tokens: 150,
+          sparkline: [150],
+        },
+      ]);
+    });
+
     it('returns agents with sparkline data and display_name', async () => {
       mockGetMany.mockResolvedValueOnce([
         { id: 'agent-1', name: 'bot-1', display_name: 'Bot One', created_at: '2026-02-16' },

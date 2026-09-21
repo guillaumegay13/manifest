@@ -26,6 +26,7 @@ import {
   sqlCastFloat,
   sqlSanitizeCost,
 } from '../../common/utils/postgres-sql';
+import { AgentUsageDailyService, type AgentUsageDailyRow } from './agent-usage-daily.service';
 
 interface TimeseriesBucketRow {
   hour?: string;
@@ -62,6 +63,8 @@ export class TimeseriesQueriesService {
     @Optional()
     @InjectDataSource()
     private readonly dataSource?: DataSource,
+    @Optional()
+    private readonly agentUsageDaily?: AgentUsageDailyService,
   ) {}
 
   async getTimeseries(
@@ -304,6 +307,15 @@ export class TimeseriesQueriesService {
     if (!includePlayground) {
       agentQb.andWhere('a.is_playground = false');
     }
+    agentQb.andWhere('a.is_active = true').orderBy('a.created_at', 'DESC');
+
+    if (this.agentUsageDaily?.readsEnabledFor(tenantId)) {
+      const [agents, rows] = await Promise.all([
+        agentQb.getMany(),
+        this.agentUsageDaily.getRows(tenantId),
+      ]);
+      return this.foldAgentUsageRows(agents, rows);
+    }
 
     const statsCutoff = computeCutoff('30 days');
     const sparkCutoff = computeCutoff('7 days');
@@ -356,7 +368,6 @@ export class TimeseriesQueriesService {
       unlinkedCountsQb.groupBy('at.agent_id');
     }
 
-    agentQb.andWhere('a.is_active = true').orderBy('a.created_at', 'DESC');
     bucketsQb
       .groupBy('at.agent_id')
       .addGroupBy('date')
@@ -449,6 +460,58 @@ export class TimeseriesQueriesService {
         total_cost: stats?.total_cost ?? 0,
         total_tokens: stats?.total_tokens ?? 0,
         sparkline: sparkMap.get(a.id) ?? [],
+      };
+    });
+  }
+
+  private foldAgentUsageRows(agents: Agent[], rows: AgentUsageDailyRow[]) {
+    const sparkCutoff = new Date();
+    sparkCutoff.setUTCDate(sparkCutoff.getUTCDate() - 6);
+    const sparkCutoffDay = sparkCutoff.toISOString().slice(0, 10);
+    const stats = new Map<
+      string,
+      {
+        message_count: number;
+        total_cost: number;
+        total_tokens: number;
+        last_active: string;
+        sparkline: number[];
+      }
+    >();
+
+    for (const row of rows) {
+      const lastActive =
+        row.last_active_at instanceof Date
+          ? row.last_active_at.toISOString()
+          : String(row.last_active_at ?? '');
+      const current = stats.get(row.agent_id) ?? {
+        message_count: 0,
+        total_cost: 0,
+        total_tokens: 0,
+        last_active: '',
+        sparkline: [],
+      };
+      const tokens = Number(row.input_tokens ?? 0) + Number(row.output_tokens ?? 0);
+      current.message_count += Number(row.request_count ?? 0);
+      current.total_cost += Number(row.cost_usd ?? 0);
+      current.total_tokens += tokens;
+      if (lastActive > current.last_active) current.last_active = lastActive;
+      if (row.day >= sparkCutoffDay) current.sparkline.push(tokens);
+      stats.set(row.agent_id, current);
+    }
+
+    return agents.map((agent) => {
+      const usage = stats.get(agent.id);
+      return {
+        agent_name: agent.name,
+        display_name: agent.display_name ?? agent.name,
+        agent_category: agent.agent_category ?? null,
+        agent_platform: agent.agent_platform ?? null,
+        message_count: usage?.message_count ?? 0,
+        last_active: usage?.last_active || String(agent.created_at ?? ''),
+        total_cost: usage?.total_cost ?? 0,
+        total_tokens: usage?.total_tokens ?? 0,
+        sparkline: usage?.sparkline ?? [],
       };
     });
   }
