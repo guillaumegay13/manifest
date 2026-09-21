@@ -1,0 +1,19 @@
+packages/backend/src/mcp/mcp.controller.spec.ts
+  s_86ec4831e6f1fb::t_db4aee87efcc85 273-276,285-288,290
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "eca5ecb80cc5a61429bb811ae8a1d4868aa84519",
+  "prompts": {},
+  "sessions": {
+    "s_86ec4831e6f1fb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "006518e2-d2f5-42e0-9c57-093e3ac5a1b9",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
