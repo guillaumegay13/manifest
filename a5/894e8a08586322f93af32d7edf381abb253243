@@ -1,0 +1,24 @@
+packages/backend/src/database/migrations/1802600000000-AddAgentMessagesRecordingIndex.ts
+  s_5f1e3a3a791977::t_cc22e9eccaabc1 23-30
+  s_5f1e3a3a791977::t_4a699f7f67d4f2 34-36
+  s_5f1e3a3a791977::t_26e82be20c9317 33
+  s_5f1e3a3a791977::t_a711dc52a79bb6 10-14
+packages/backend/src/database/request-recording-retention.service.ts
+  s_5f1e3a3a791977::t_a29f799e9e88a4 30-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a5894e8a08586322f93af32d7edf381abb253243",
+  "prompts": {},
+  "sessions": {
+    "s_5f1e3a3a791977": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e967fec-5138-401b-a923-c81be54883cd",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
