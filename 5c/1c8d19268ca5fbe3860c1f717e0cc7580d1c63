@@ -1,0 +1,25 @@
+packages/backend/src/analytics/services/agent-usage-daily.service.ts
+  s_ddb7f03c6dfadb::t_91775ea1a69412 7
+packages/backend/src/analytics/services/agent-usage-daily.service.spec.ts
+  s_ddb7f03c6dfadb::t_91775ea1a69412 190,205,278
+.changeset/calm-dingos-roll.md
+  s_ddb7f03c6dfadb::t_91775ea1a69412 1-5
+packages/backend/.env.example
+  s_ddb7f03c6dfadb::t_91775ea1a69412 35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5c1c8d19268ca5fbe3860c1f717e0cc7580d1c63",
+  "prompts": {},
+  "sessions": {
+    "s_ddb7f03c6dfadb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c3c0-41ab-70a2-a190-4ba4917c184f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
