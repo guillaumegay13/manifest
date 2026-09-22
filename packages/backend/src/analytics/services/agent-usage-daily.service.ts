@@ -1,11 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
-import { agentUsageDailyReadsEnabled } from '../../common/utils/agent-usage-daily-flags';
+import {
+  agentUsageDailyReadsEnabled,
+  setAgentUsageDailyAutomaticReadsReady,
+} from '../../common/utils/agent-usage-daily-flags';
 
 const AGENT_USAGE_ROLLUP_LOCK_KEY = 1_802_700_000;
 const DEFAULT_BATCH_SIZE = 250;
 const DEFAULT_RUN_BUDGET_MS = 5_000;
+// The 365-day dashboard comparison also reads the preceding 365 days.
+const READ_BACKFILL_DAYS = 730;
+// Ignore the live tail that the one-minute worker has not processed yet.
+const READ_LAG_GRACE_MINUTES = 2;
 
 export interface AgentUsageDailyRow {
   agent_id: string;
@@ -46,14 +53,60 @@ const DAILY_RANGE_DAYS: Readonly<Record<string, number>> = {
 };
 
 @Injectable()
-export class AgentUsageDailyService {
+export class AgentUsageDailyService implements OnModuleInit {
   private readonly logger = new Logger(AgentUsageDailyService.name);
   private running = false;
 
   constructor(private readonly dataSource: DataSource) {}
 
+  async onModuleInit(): Promise<void> {
+    await this.refreshAutomaticReads();
+  }
+
   readsEnabledFor(tenantId: string | null): boolean {
     return agentUsageDailyReadsEnabled(tenantId);
+  }
+
+  async refreshAutomaticReads(): Promise<void> {
+    try {
+      const rows = (await this.dataSource.query(
+        `WITH pending_request AS (
+           SELECT r."id"
+           FROM "requests" r
+           WHERE r."agent_usage_rolled_up_at" IS NULL
+             AND (r."status" IS NULL OR r."status" NOT IN ('pending', 'cancelled'))
+             AND r."tenant_id" IS NOT NULL
+             AND r."agent_id" IS NOT NULL
+             AND r."timestamp" >= NOW() - ($1::int * INTERVAL '1 day')
+             AND r."timestamp" < NOW() - ($2::int * INTERVAL '1 minute')
+             AND EXISTS (SELECT 1 FROM "agents" a WHERE a."id" = r."agent_id")
+           ORDER BY r."timestamp" ASC, r."id" ASC
+           LIMIT 1
+         ), pending_attempt AS (
+           SELECT pa."id"
+           FROM "agent_messages" pa
+           WHERE pa."agent_usage_rolled_up_at" IS NULL
+             AND (pa."status" IS NULL OR pa."status" NOT IN ('pending', 'cancelled'))
+             AND pa."tenant_id" IS NOT NULL
+             AND pa."agent_id" IS NOT NULL
+             AND pa."timestamp" >= NOW() - ($1::int * INTERVAL '1 day')
+             AND pa."timestamp" < NOW() - ($2::int * INTERVAL '1 minute')
+             AND EXISTS (SELECT 1 FROM "agents" a WHERE a."id" = pa."agent_id")
+           ORDER BY pa."timestamp" ASC, pa."id" ASC
+           LIMIT 1
+         )
+         SELECT NOT EXISTS (
+           SELECT 1 FROM pending_request
+           UNION ALL
+           SELECT 1 FROM pending_attempt
+         ) AS "ready"`,
+        [READ_BACKFILL_DAYS, READ_LAG_GRACE_MINUTES],
+      )) as Array<{ ready: boolean }>;
+      setAgentUsageDailyAutomaticReadsReady(rows[0].ready === true);
+    } catch (error) {
+      setAgentUsageDailyAutomaticReadsReady(false);
+      this.logger.warn(`agent usage rollup readiness check failed: ${String(error)}`);
+    }
   }
 
   supportsRange(tenantId: string | null, range: string): tenantId is string {
@@ -259,6 +312,7 @@ export class AgentUsageDailyService {
         `agent usage rollup failed after ${processed} request(s): ${error instanceof Error ? error.message : String(error)}`,
       );
     } finally {
+      await this.refreshAutomaticReads();
       this.running = false;
     }
   }

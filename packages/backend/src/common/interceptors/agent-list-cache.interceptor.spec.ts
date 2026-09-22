@@ -4,6 +4,7 @@ import type { Cache } from 'cache-manager';
 import { firstValueFrom, ReplaySubject } from 'rxjs';
 import { AgentListCacheInterceptor } from './agent-list-cache.interceptor';
 import { AgentListCacheService } from '../services/agent-list-cache.service';
+import { setAgentUsageDailyAutomaticReadsReady } from '../utils/agent-usage-daily-flags';
 
 function createMockContext(
   tenantContext: { tenantId?: string } | undefined,
@@ -36,6 +37,7 @@ describe('AgentListCacheInterceptor', () => {
   const originalTenants = process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
 
   beforeEach(() => {
+    setAgentUsageDailyAutomaticReadsReady(false);
     delete process.env['AGENT_USAGE_DAILY_READS'];
     delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
     cacheManager = {
@@ -48,6 +50,7 @@ describe('AgentListCacheInterceptor', () => {
   });
 
   afterAll(() => {
+    setAgentUsageDailyAutomaticReadsReady(false);
     if (originalReads === undefined) delete process.env['AGENT_USAGE_DAILY_READS'];
     else process.env['AGENT_USAGE_DAILY_READS'] = originalReads;
     if (originalTenants === undefined) delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
@@ -135,8 +138,8 @@ describe('AgentListCacheInterceptor', () => {
       expect(key).toBeUndefined();
     });
 
-    it('bypasses the response cache for a tenant using daily rollup reads', () => {
-      process.env['AGENT_USAGE_DAILY_READ_TENANTS'] = 't1';
+    it('bypasses the response cache after the automatic rollup cutover', () => {
+      setAgentUsageDailyAutomaticReadsReady(true);
       const key = interceptor['trackBy'](createMockContext({ tenantId: 't1' }, undefined));
       expect(key).toBeUndefined();
     });

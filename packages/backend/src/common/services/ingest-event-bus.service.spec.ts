@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { AgentListCacheService } from './agent-list-cache.service';
+import { setAgentUsageDailyAutomaticReadsReady } from '../utils/agent-usage-daily-flags';
 import { IngestEventBusService, IngestEvent } from './ingest-event-bus.service';
 
 describe('IngestEventBusService', () => {
@@ -7,6 +8,7 @@ describe('IngestEventBusService', () => {
   let invalidate: jest.Mock;
 
   beforeEach(() => {
+    setAgentUsageDailyAutomaticReadsReady(false);
     jest.useFakeTimers();
     invalidate = jest.fn().mockResolvedValue(undefined);
     service = new IngestEventBusService({ invalidate } as unknown as AgentListCacheService);
@@ -151,6 +153,7 @@ describe('IngestEventBusService message cache invalidation', () => {
   });
 
   afterAll(() => {
+    setAgentUsageDailyAutomaticReadsReady(false);
     if (originalReads === undefined) delete process.env['AGENT_USAGE_DAILY_READS'];
     else process.env['AGENT_USAGE_DAILY_READS'] = originalReads;
     if (originalTenants === undefined) delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
@@ -221,8 +224,8 @@ describe('IngestEventBusService message cache invalidation', () => {
     expect(invalidate).not.toHaveBeenCalled();
   });
 
-  it('does not invalidate the retired response cache for a rollup-read tenant', async () => {
-    process.env['AGENT_USAGE_DAILY_READ_TENANTS'] = 'tenant-1';
+  it('does not invalidate the retired response cache after automatic cutover', async () => {
+    setAgentUsageDailyAutomaticReadsReady(true);
     const received: IngestEvent[] = [];
     service.forTenant('tenant-1').subscribe((event) => received.push(event));
 

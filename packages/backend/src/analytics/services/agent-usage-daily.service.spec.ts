@@ -1,4 +1,5 @@
 import { AgentUsageDailyService } from './agent-usage-daily.service';
+import { setAgentUsageDailyAutomaticReadsReady } from '../../common/utils/agent-usage-daily-flags';
 
 describe('AgentUsageDailyService', () => {
   const originalReads = process.env['AGENT_USAGE_DAILY_READS'];
@@ -8,6 +9,7 @@ describe('AgentUsageDailyService', () => {
   const originalRunBudget = process.env['AGENT_USAGE_DAILY_RUN_BUDGET_MS'];
 
   afterEach(() => {
+    setAgentUsageDailyAutomaticReadsReady(false);
     jest.useRealTimers();
     jest.restoreAllMocks();
     if (originalReads === undefined) delete process.env['AGENT_USAGE_DAILY_READS'];
@@ -22,7 +24,7 @@ describe('AgentUsageDailyService', () => {
     else process.env['AGENT_USAGE_DAILY_RUN_BUDGET_MS'] = originalRunBudget;
   });
 
-  it('keeps reads off by default and supports a selected-tenant rollout', () => {
+  it('keeps reads off before automatic cutover and supports a selected-tenant rollout', () => {
     delete process.env['AGENT_USAGE_DAILY_READS'];
     process.env['AGENT_USAGE_DAILY_READ_TENANTS'] = 'tenant-a, tenant-b';
     const service = new AgentUsageDailyService({} as never);
@@ -36,6 +38,63 @@ describe('AgentUsageDailyService', () => {
     process.env['AGENT_USAGE_DAILY_READS'] = 'true';
     const service = new AgentUsageDailyService({} as never);
     expect(service.readsEnabledFor('tenant-c')).toBe(true);
+  });
+
+  it('enables reads automatically after the supported history is backfilled', async () => {
+    delete process.env['AGENT_USAGE_DAILY_READS'];
+    delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
+    const query = jest.fn().mockResolvedValue([{ ready: true }]);
+    const service = new AgentUsageDailyService({ query } as never);
+
+    expect(service.readsEnabledFor('tenant-a')).toBe(false);
+    await service.onModuleInit();
+
+    expect(service.readsEnabledFor('tenant-a')).toBe(true);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('pending_request AS'), [730, 2]);
+    expect(query.mock.calls[0][0]).toContain('pending_attempt AS');
+    expect(query.mock.calls[0][0]).toContain('ORDER BY r."timestamp" ASC, r."id" ASC');
+    expect(query.mock.calls[0][0]).toContain('ORDER BY pa."timestamp" ASC, pa."id" ASC');
+  });
+
+  it('returns to raw reads when historical rows remain', async () => {
+    delete process.env['AGENT_USAGE_DAILY_READS'];
+    delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
+    setAgentUsageDailyAutomaticReadsReady(true);
+    const service = new AgentUsageDailyService({
+      query: jest.fn().mockResolvedValue([{ ready: false }]),
+    } as never);
+
+    await service.refreshAutomaticReads();
+
+    expect(service.readsEnabledFor('tenant-a')).toBe(false);
+  });
+
+  it('lets operators force the raw path after automatic cutover', async () => {
+    process.env['AGENT_USAGE_DAILY_READS'] = 'false';
+    delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
+    const service = new AgentUsageDailyService({
+      query: jest.fn().mockResolvedValue([{ ready: true }]),
+    } as never);
+
+    await service.refreshAutomaticReads();
+
+    expect(service.readsEnabledFor('tenant-a')).toBe(false);
+  });
+
+  it('fails closed when the automatic readiness check fails', async () => {
+    delete process.env['AGENT_USAGE_DAILY_READS'];
+    delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
+    setAgentUsageDailyAutomaticReadsReady(true);
+    const service = new AgentUsageDailyService({
+      query: jest.fn().mockRejectedValue(new Error('db unavailable')),
+    } as never);
+    const logger = (service as unknown as { logger: { warn: (message: string) => void } }).logger;
+    const warn = jest.spyOn(logger, 'warn').mockImplementation();
+
+    await service.refreshAutomaticReads();
+
+    expect(service.readsEnabledFor('tenant-a')).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('db unavailable'));
   });
 
   it('reads only the bounded tenant window', async () => {
@@ -148,6 +207,7 @@ describe('AgentUsageDailyService', () => {
     process.env['AGENT_USAGE_DAILY_BATCH_SIZE'] = '2';
     process.env['AGENT_USAGE_DAILY_RUN_BUDGET_MS'] = '5000';
     const service = new AgentUsageDailyService({} as never);
+    const refreshAutomaticReads = jest.spyOn(service, 'refreshAutomaticReads').mockResolvedValue();
     const processBatch = jest
       .spyOn(service, 'processBatch')
       .mockResolvedValueOnce({ acquired: true, processed: 2, rollups: 1 })
@@ -159,12 +219,14 @@ describe('AgentUsageDailyService', () => {
 
     expect(processBatch).toHaveBeenCalledTimes(2);
     expect(processBatch).toHaveBeenCalledWith(2);
+    expect(refreshAutomaticReads).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledWith(expect.stringContaining('processed 3 request(s)'));
     expect((service as unknown as { running: boolean }).running).toBe(false);
   });
 
   it('stops scheduled work when another replica owns the lock', async () => {
     const service = new AgentUsageDailyService({} as never);
+    jest.spyOn(service, 'refreshAutomaticReads').mockResolvedValue();
     const processBatch = jest
       .spyOn(service, 'processBatch')
       .mockResolvedValue({ acquired: false, processed: 0, rollups: 0 });
@@ -179,6 +241,7 @@ describe('AgentUsageDailyService', () => {
     process.env['AGENT_USAGE_DAILY_BATCH_SIZE'] = '1e3';
     process.env['AGENT_USAGE_DAILY_RUN_BUDGET_MS'] = '1.5';
     const service = new AgentUsageDailyService({} as never);
+    jest.spyOn(service, 'refreshAutomaticReads').mockResolvedValue();
     const processBatch = jest
       .spyOn(service, 'processBatch')
       .mockRejectedValue(new Error('db down'));
@@ -196,6 +259,7 @@ describe('AgentUsageDailyService', () => {
     process.env['AGENT_USAGE_DAILY_BATCH_SIZE'] = '0';
     process.env['AGENT_USAGE_DAILY_RUN_BUDGET_MS'] = '0';
     const service = new AgentUsageDailyService({} as never);
+    jest.spyOn(service, 'refreshAutomaticReads').mockResolvedValue();
     const processBatch = jest.spyOn(service, 'processBatch').mockRejectedValue('db unavailable');
     const logger = (service as unknown as { logger: { error: (message: string) => void } }).logger;
     const error = jest.spyOn(logger, 'error').mockImplementation();
