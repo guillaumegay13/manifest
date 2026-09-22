@@ -1,0 +1,81 @@
+packages/backend/src/analytics/services/timeseries-queries.service.spec.ts
+  s_ddb7f03c6dfadb::t_b2a3a9cd1db20e 634-677,1214-1243
+packages/frontend/src/services/api/analytics.ts
+  s_ddb7f03c6dfadb::t_a3c48a31161204 242-254
+packages/frontend/src/pages/GlobalOverview.tsx
+  s_ddb7f03c6dfadb::t_1f72005318f2f0 245
+  s_ddb7f03c6dfadb::t_f05ddcb0f255bf 799,832-837,923-927
+  s_ddb7f03c6dfadb::t_fbebcadca6bfe4 29,124-125,239
+  s_ddb7f03c6dfadb::t_04dbb413432714 249-252
+  s_ddb7f03c6dfadb::t_4298d85eb59c1f 928
+packages/frontend/src/pages/Overview.tsx
+  s_ddb7f03c6dfadb::t_f05ddcb0f255bf 571-575,592
+  s_ddb7f03c6dfadb::t_04dbb413432714 187,189
+  s_ddb7f03c6dfadb::t_f254faee9098df 27,107-108,179,183-186,188,190
+  s_ddb7f03c6dfadb::t_06fc0708584997 288,501,513-514,517
+packages/backend/src/analytics/services/timeseries-queries.service.ts
+  s_ddb7f03c6dfadb::t_60f25f84267589 82-95,114,119,122-124,743-765
+  s_ddb7f03c6dfadb::t_f14b14b62bb336 96-113,115-118,120-121
+packages/backend/src/analytics/services/aggregation.service.ts
+  s_ddb7f03c6dfadb::t_f0c0f9ad54c490 22,39-40,191-211
+packages/backend/src/analytics/services/aggregation.service.spec.ts
+  s_ddb7f03c6dfadb::t_0afe09027738ea 342-361
+packages/backend/src/database/data-source-definitions.ts
+  s_ddb7f03c6dfadb::t_5d2c8bce797cd2 57,350
+docs/agent-usage-daily.md
+  s_ddb7f03c6dfadb::t_dbc5cf5d71273f 3,13-17,259-262
+  s_ddb7f03c6dfadb::t_daa1bcbfd8adcb 263
+packages/frontend/tests/pages/ProviderOverviewPages.test.tsx
+  s_ddb7f03c6dfadb::t_eedc7c6758e922 869
+  s_ddb7f03c6dfadb::t_f05ddcb0f255bf 22,102,753
+packages/backend/src/analytics/controllers/overview.controller.ts
+  s_ddb7f03c6dfadb::t_7fb3a15759cd32 54,90-92,105-113,119-132,148,154-165,275-295
+  s_ddb7f03c6dfadb::t_6d93a64aacdf84 296
+packages/frontend/tests/services/api/analytics.test.ts
+  s_ddb7f03c6dfadb::t_f05ddcb0f255bf 45-59
+packages/backend/src/common/dto/range-query.dto.spec.ts
+  s_ddb7f03c6dfadb::t_c997005a746c27 32-43
+.changeset/fast-overviews-use-rollups.md
+  s_ddb7f03c6dfadb::t_dbc5cf5d71273f 1-5
+packages/frontend/tests/pages/Overview-limits.test.tsx
+  s_ddb7f03c6dfadb::t_f05ddcb0f255bf 24
+  s_ddb7f03c6dfadb::t_cff47792dc6fe3 92-93
+packages/frontend/tests/pages/Overview.test.tsx
+  s_ddb7f03c6dfadb::t_f05ddcb0f255bf 47,475,1115
+  s_ddb7f03c6dfadb::t_9eb486e0b151df 17-20,123-124,362,410-411,423,483-484,490
+packages/backend/src/analytics/services/agent-usage-daily.service.ts
+  s_ddb7f03c6dfadb::t_090744e5726ee2 142-143,165-166,195-197
+  s_ddb7f03c6dfadb::t_dadcb215d44852 12,15-16,41-47,59-62,81-141,144-164,167-194,198-217
+  s_ddb7f03c6dfadb::t_b37b39695c2efd 218-219
+packages/backend/src/common/dto/range-query.dto.ts
+  s_ddb7f03c6dfadb::t_fb8ab2681ef0b6 12-15
+packages/frontend/tests/pages/GlobalOverviewFilter.test.tsx
+  s_ddb7f03c6dfadb::t_f05ddcb0f255bf 17,102,351
+  s_ddb7f03c6dfadb::t_1979f9af5ea61e 111-112,377,386,424
+packages/backend/src/analytics/services/agent-usage-daily.service.spec.ts
+  s_ddb7f03c6dfadb::t_7629d99c946cbe 56-113,116-127
+  s_ddb7f03c6dfadb::t_090744e5726ee2 114-115
+packages/backend/src/database/migrations/1802900000000-AddAgentMessagesDirectUsageIndex.ts
+  s_ddb7f03c6dfadb::t_5d2c8bce797cd2 1-38
+packages/backend/src/analytics/controllers/overview.controller.spec.ts
+  s_ddb7f03c6dfadb::t_ca1705a493377a 157-178
+packages/backend/src/database/migrations/1802900000000-AddAgentMessagesDirectUsageIndex.spec.ts
+  s_ddb7f03c6dfadb::t_4558228b607cf0 18
+  s_ddb7f03c6dfadb::t_5d2c8bce797cd2 1-17,19-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b6360c41c5918e2febe1cc8169e35bf1b799ba0d",
+  "prompts": {},
+  "sessions": {
+    "s_ddb7f03c6dfadb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c3c0-41ab-70a2-a190-4ba4917c184f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
