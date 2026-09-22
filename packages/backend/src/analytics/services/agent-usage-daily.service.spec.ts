@@ -187,7 +187,7 @@ describe('AgentUsageDailyService', () => {
 
     await service.runScheduled();
 
-    expect(processBatch).toHaveBeenCalledWith(1_000);
+    expect(processBatch).toHaveBeenCalledWith(250);
     expect(error).toHaveBeenCalledWith(expect.stringContaining('db down'));
     expect((service as unknown as { running: boolean }).running).toBe(false);
   });
@@ -202,7 +202,7 @@ describe('AgentUsageDailyService', () => {
 
     await service.runScheduled();
 
-    expect(processBatch).toHaveBeenCalledWith(1_000);
+    expect(processBatch).toHaveBeenCalledWith(250);
     expect(error).toHaveBeenCalledWith(expect.stringContaining('db unavailable'));
   });
 
@@ -275,5 +275,6 @@ describe('AgentUsageDailyService', () => {
       rollups: 0,
     });
     expect(manager.query.mock.calls[3][1][1]).toBe('UTC');
+    expect(manager.query.mock.calls[3][1][0]).toBe(250);
   });
 });

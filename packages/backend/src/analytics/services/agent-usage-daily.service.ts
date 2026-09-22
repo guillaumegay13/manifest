@@ -4,7 +4,7 @@ import { DataSource } from 'typeorm';
 import { agentUsageDailyReadsEnabled } from '../../common/utils/agent-usage-daily-flags';
 
 const AGENT_USAGE_ROLLUP_LOCK_KEY = 1_802_700_000;
-const DEFAULT_BATCH_SIZE = 1_000;
+const DEFAULT_BATCH_SIZE = 250;
 const DEFAULT_RUN_BUDGET_MS = 5_000;
 
 export interface AgentUsageDailyRow {
