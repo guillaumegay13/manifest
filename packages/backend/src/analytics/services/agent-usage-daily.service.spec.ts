@@ -196,6 +196,8 @@ describe('AgentUsageDailyService', () => {
   });
 
   it('skips scheduled work when disabled or already running', async () => {
+    delete process.env['AGENT_USAGE_DAILY_READS'];
+    delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
     const service = new AgentUsageDailyService({} as never);
     const processBatch = jest.spyOn(service, 'processBatch');
 
@@ -212,6 +214,8 @@ describe('AgentUsageDailyService', () => {
   });
 
   it('keeps automatic reads off at startup when the worker is disabled', async () => {
+    delete process.env['AGENT_USAGE_DAILY_READS'];
+    delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
     process.env['AGENT_USAGE_DAILY_WORKER'] = 'false';
     const query = jest.fn();
     const service = new AgentUsageDailyService({ query } as never);
