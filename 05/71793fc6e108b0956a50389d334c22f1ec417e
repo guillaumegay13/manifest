@@ -1,0 +1,44 @@
+packages/frontend/src/pages/GlobalOverview.tsx
+  s_ddb7f03c6dfadb::t_26fa62582ff510 237,239-242,244,251-252,254-257,262
+  s_ddb7f03c6dfadb::t_95f10f83131b73 115,258-261,307-310,312-315
+packages/backend/src/analytics/controllers/overview.controller.ts
+  s_ddb7f03c6dfadb::t_ed5ae9a7878b8a 17,52,139,150,153-154,156-161
+packages/frontend/src/pages/Overview.tsx
+  s_ddb7f03c6dfadb::t_ea515ddc3385fc 77,107-110,186,189,192-195,197-200,290-296,298-301
+packages/backend/src/analytics/dto/overview-query.dto.spec.ts
+  s_ddb7f03c6dfadb::t_c55054f18f7a3c 1-15
+packages/backend/src/database/migrations/1802900000000-AddAgentMessagesDirectUsageIndex.spec.ts
+  s_ddb7f03c6dfadb::t_3e9cefc1bd6438 17-21
+packages/frontend/tests/pages/Overview-limits.test.tsx
+  s_ddb7f03c6dfadb::t_b345fa0fccc97e 22,25,173,213-216,241-244,275-278
+packages/backend/src/analytics/services/aggregation.service.spec.ts
+  s_ddb7f03c6dfadb::t_cc46d6c237fcb7 362-379
+  s_ddb7f03c6dfadb::t_07d08828862ccb 380-381
+packages/backend/src/analytics/dto/overview-query.dto.ts
+  s_ddb7f03c6dfadb::t_ed5ae9a7878b8a 1-8
+packages/backend/src/analytics/services/agent-usage-daily.service.spec.ts
+  s_ddb7f03c6dfadb::t_cc46d6c237fcb7 115-116,118-120
+  s_ddb7f03c6dfadb::t_ee58586efa90bf 113
+packages/backend/src/analytics/controllers/overview.controller.spec.ts
+  s_ddb7f03c6dfadb::t_00174f301eabf4 163-184,192-201,204-206,208-220,222-230
+docs/agent-usage-daily.md
+  s_ddb7f03c6dfadb::t_3e9cefc1bd6438 13-17
+packages/backend/src/analytics/services/agent-usage-daily.service.ts
+  s_ddb7f03c6dfadb::t_9199c836b2c3d1 108,115-116,125,144-148,152,162-174,194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0571793fc6e108b0956a50389d334c22f1ec417e",
+  "prompts": {},
+  "sessions": {
+    "s_ddb7f03c6dfadb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c3c0-41ab-70a2-a190-4ba4917c184f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
