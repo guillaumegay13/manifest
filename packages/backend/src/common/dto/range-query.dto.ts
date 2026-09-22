@@ -9,4 +9,8 @@ export class RangeQueryDto {
   @IsOptional()
   @IsString()
   agent_name?: string;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  fast?: string;
 }

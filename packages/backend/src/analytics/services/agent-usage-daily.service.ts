@@ -9,8 +9,11 @@ const DEFAULT_RUN_BUDGET_MS = 5_000;
 
 export interface AgentUsageDailyRow {
   agent_id: string;
+  agent_name?: string;
   day: string;
   request_count: string;
+  successful_request_count?: string;
+  failed_request_count?: string;
   input_tokens: string;
   output_tokens: string;
   cost_usd: string;
@@ -35,6 +38,13 @@ function utcDateDaysAgo(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+const DAILY_RANGE_DAYS: Readonly<Record<string, number>> = {
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+  '365d': 365,
+};
+
 @Injectable()
 export class AgentUsageDailyService {
   private readonly logger = new Logger(AgentUsageDailyService.name);
@@ -44,6 +54,10 @@ export class AgentUsageDailyService {
 
   readsEnabledFor(tenantId: string | null): boolean {
     return agentUsageDailyReadsEnabled(tenantId);
+  }
+
+  supportsRange(tenantId: string | null, range: string): tenantId is string {
+    return this.readsEnabledFor(tenantId) && DAILY_RANGE_DAYS[range] !== undefined;
   }
 
   async getRows(tenantId: string): Promise<AgentUsageDailyRow[]> {
@@ -62,6 +76,145 @@ export class AgentUsageDailyService {
        ORDER BY "agent_id" ASC, "day" ASC`,
       [tenantId, utcDateDaysAgo(29)],
     )) as AgentUsageDailyRow[];
+  }
+
+  async getRangeRows(
+    tenantId: string,
+    range: string,
+    options: { agentName?: string; previous?: boolean; excludeDirect?: boolean } = {},
+  ): Promise<AgentUsageDailyRow[]> {
+    const days = DAILY_RANGE_DAYS[range];
+    if (days === undefined) return [];
+    const startDay = utcDateDaysAgo((options.previous ? days * 2 : days) - 1);
+    const endDay = options.previous ? utcDateDaysAgo(days - 1) : null;
+    const rows = (await this.dataSource.query(
+      `SELECT
+         u."agent_id",
+         a."name" AS "agent_name",
+         u."day"::text AS "day",
+         u."request_count"::text AS "request_count",
+         u."successful_request_count"::text AS "successful_request_count",
+         u."failed_request_count"::text AS "failed_request_count",
+         u."input_tokens"::text AS "input_tokens",
+         u."output_tokens"::text AS "output_tokens",
+         u."cost_usd"::text AS "cost_usd",
+         u."last_active_at"
+       FROM "agent_usage_daily" u
+       JOIN "agents" a ON a."id" = u."agent_id"
+       WHERE u."tenant_id" = $1
+         AND u."day" >= $2::date
+         AND ($3::date IS NULL OR u."day" < $3::date)
+         AND a."is_playground" = false
+         AND ($4::varchar IS NULL OR a."name" = $4)
+       ORDER BY u."day" ASC, a."name" ASC`,
+      [tenantId, startDay, endDay, options.agentName ?? null],
+    )) as AgentUsageDailyRow[];
+
+    if (!options.excludeDirect || !options.agentName || rows.length === 0) return rows;
+
+    const directRows = (await this.dataSource.query(
+      `WITH target_agent AS (
+         SELECT "id"
+         FROM "agents"
+         WHERE "tenant_id" = $1 AND "name" = $4 AND "deleted_at" IS NULL
+         LIMIT 1
+       ), direct_attempts AS (
+         SELECT
+           pa."timestamp"::date AS "day",
+           COUNT(*) FILTER (WHERE pa."request_id" IS NULL)::bigint AS "request_count",
+           COUNT(*) FILTER (
+             WHERE pa."request_id" IS NULL
+               AND (pa."status" IS NULL OR pa."status" IN ('ok', 'success'))
+           )::bigint AS "successful_request_count",
+           COUNT(*) FILTER (
+             WHERE pa."request_id" IS NULL
+               AND pa."status" IS NOT NULL
+               AND pa."status" NOT IN ('ok', 'success')
+           )::bigint AS "failed_request_count",
+           COALESCE(SUM(pa."input_tokens"), 0)::bigint AS "input_tokens",
+           COALESCE(SUM(pa."output_tokens"), 0)::bigint AS "output_tokens",
+           COALESCE(SUM(CASE WHEN pa."cost_usd" >= 0 THEN pa."cost_usd" ELSE 0 END), 0)::numeric AS "cost_usd"
+         FROM "agent_messages" pa
+         JOIN target_agent a ON a."id" = pa."agent_id"
+         WHERE pa."tenant_id" = $1
+           AND pa."routing_reason" = 'direct'
+           AND pa."agent_usage_rolled_up_at" IS NOT NULL
+           AND pa."timestamp" >= $2::date
+           AND ($3::date IS NULL OR pa."timestamp" < $3::date)
+         GROUP BY "day"
+       ), direct_request_ids AS MATERIALIZED (
+         SELECT DISTINCT pa."request_id"
+         FROM "agent_messages" pa
+         JOIN target_agent a ON a."id" = pa."agent_id"
+         WHERE pa."tenant_id" = $1
+           AND pa."routing_reason" = 'direct'
+           AND pa."request_id" IS NOT NULL
+       ), direct_requests AS (
+         SELECT
+           r."timestamp"::date AS "day",
+           COUNT(*)::bigint AS "request_count",
+           COUNT(*) FILTER (WHERE r."status" IS NULL OR r."status" IN ('ok', 'success'))::bigint AS "successful_request_count",
+           COUNT(*) FILTER (
+             WHERE r."status" IS NOT NULL AND r."status" NOT IN ('ok', 'success')
+           )::bigint AS "failed_request_count"
+         FROM "requests" r
+         JOIN target_agent a ON a."id" = r."agent_id"
+         JOIN direct_request_ids d ON d."request_id" = r."id"
+         WHERE r."tenant_id" = $1
+           AND r."agent_usage_rolled_up_at" IS NOT NULL
+           AND r."timestamp" >= $2::date
+           AND ($3::date IS NULL OR r."timestamp" < $3::date)
+         GROUP BY "day"
+       )
+       SELECT
+         "day"::text AS "day",
+         SUM("request_count")::text AS "request_count",
+         SUM("successful_request_count")::text AS "successful_request_count",
+         SUM("failed_request_count")::text AS "failed_request_count",
+         SUM("input_tokens")::text AS "input_tokens",
+         SUM("output_tokens")::text AS "output_tokens",
+         SUM("cost_usd")::text AS "cost_usd"
+       FROM (
+         SELECT * FROM direct_attempts
+         UNION ALL
+         SELECT
+           "day", "request_count", "successful_request_count", "failed_request_count",
+           0::bigint, 0::bigint, 0::numeric
+         FROM direct_requests
+       ) direct_usage
+       GROUP BY "day"`,
+      [tenantId, startDay, endDay, options.agentName],
+    )) as AgentUsageDailyRow[];
+    const directByDay = new Map(directRows.map((row) => [row.day, row]));
+
+    return rows.map((row) => {
+      const direct = directByDay.get(row.day);
+      if (!direct) return row;
+      return {
+        ...row,
+        request_count: String(
+          Math.max(0, Number(row.request_count) - Number(direct.request_count)),
+        ),
+        successful_request_count: String(
+          Math.max(
+            0,
+            Number(row.successful_request_count ?? 0) -
+              Number(direct.successful_request_count ?? 0),
+          ),
+        ),
+        failed_request_count: String(
+          Math.max(
+            0,
+            Number(row.failed_request_count ?? 0) - Number(direct.failed_request_count ?? 0),
+          ),
+        ),
+        input_tokens: String(Math.max(0, Number(row.input_tokens) - Number(direct.input_tokens))),
+        output_tokens: String(
+          Math.max(0, Number(row.output_tokens) - Number(direct.output_tokens)),
+        ),
+        cost_usd: String(Math.max(0, Number(row.cost_usd) - Number(direct.cost_usd))),
+      };
+    });
   }
 
   @Cron(CronExpression.EVERY_MINUTE)

@@ -79,6 +79,49 @@ export class TimeseriesQueriesService {
     tenantProviderId?: string,
     excludeDirect = false,
   ) {
+    const useDailyRows =
+      !hourly &&
+      !!tenantId &&
+      excludePlayground &&
+      !authType &&
+      !provider &&
+      !label &&
+      !tenantProviderId &&
+      this.agentUsageDaily?.supportsRange(tenantId, range);
+    if (useDailyRows) {
+      const rows = await this.agentUsageDaily!.getRangeRows(tenantId, range, {
+        agentName,
+        excludeDirect,
+      });
+      const byDay = new Map<
+        string,
+        { input_tokens: number; output_tokens: number; cost: number; count: number }
+      >();
+      for (const row of rows) {
+        const current = byDay.get(row.day) ?? {
+          input_tokens: 0,
+          output_tokens: 0,
+          cost: 0,
+          count: 0,
+        };
+        current.input_tokens += Number(row.input_tokens);
+        current.output_tokens += Number(row.output_tokens);
+        current.cost += Number(row.cost_usd);
+        current.count += Number(row.request_count);
+        byDay.set(row.day, current);
+      }
+      const days = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
+      return {
+        tokenUsage: days.map(([date, row]) => ({
+          date,
+          input_tokens: row.input_tokens,
+          output_tokens: row.output_tokens,
+        })),
+        costUsage: days.map(([date, row]) => ({ date, cost: row.cost })),
+        messageUsage: days.map(([date, row]) => ({ date, count: row.count })),
+      };
+    }
+
     const interval = rangeToInterval(range);
     const cutoff = computeCutoff(interval);
     const bucketExpr = hourly ? sqlHourBucket('at.timestamp') : sqlDateBucket('at.timestamp');
@@ -697,6 +740,29 @@ export class TimeseriesQueriesService {
     label?: string,
     tenantProviderId?: string,
   ): Promise<UsageTimeseries> {
+    const useDailyRows =
+      !hourly &&
+      !!tenantId &&
+      !authType &&
+      !provider &&
+      !label &&
+      !tenantProviderId &&
+      this.agentUsageDaily?.supportsRange(tenantId, range);
+    if (useDailyRows) {
+      const rows = await this.agentUsageDaily!.getRangeRows(tenantId, range);
+      return pivotUsageRows(
+        rows.map((row) => ({
+          date: row.day,
+          agent_name: row.agent_name,
+          tokens: Number(row.input_tokens) + Number(row.output_tokens),
+          messages: Number(row.request_count),
+          cost: Number(row.cost_usd),
+        })),
+        'date',
+        'agent_name',
+      );
+    }
+
     const interval = rangeToInterval(range);
     const cutoff = computeCutoff(interval);
     const bucketExpr = hourly ? sqlHourBucket('at.timestamp') : sqlDateBucket('at.timestamp');

@@ -29,6 +29,18 @@ describe('RangeQueryDto', () => {
     expect(errors).toHaveLength(0);
   });
 
+  it('validates the fast overview flag', async () => {
+    const dto = plainToInstance(RangeQueryDto, { range: '365d', fast: 'true' });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('rejects an invalid fast overview flag', async () => {
+    const dto = plainToInstance(RangeQueryDto, { fast: 'yes' });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
   it('validates empty object (all optional)', async () => {
     const dto = plainToInstance(RangeQueryDto, {});
     const errors = await validate(dto);

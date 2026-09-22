@@ -1,6 +1,6 @@
 # Agent usage daily rollup
 
-Status: Implemented; rollout pending
+Status: Implemented; production backfill in progress
 
 ## Summary
 
@@ -9,6 +9,11 @@ contains one UTC day of usage for one tenant and one agent.
 
 `GET /api/v1/agents` will read this table instead of aggregating 30 days of raw
 `requests` and `agent_messages` rows. The API response will not change.
+
+The Overview and Harness Overview usage series use the same table for 7, 30,
+90, and 365-day ranges. Their model breakdown and recent Requests remain exact
+raw-data queries, but load separately after the critical usage response so they
+cannot hold the page skeleton open.
 
 The rollup worker will process completed Requests and Provider Attempts
 asynchronously. Dashboard usage can lag live traffic by up to one minute.
@@ -250,6 +255,11 @@ The first version does not split metadata and usage into separate public
 endpoints. The rollup makes the combined response bounded and preserves API,
 CLI, MCP, and frontend compatibility. A later UI change can render metadata
 before usage without changing the storage design.
+
+Overview uses the same indexed rows for its current and previous calendar
+windows. Harness Overview subtracts client-pinned `direct` traffic to preserve
+its routing-only contract. A small partial index over direct Provider Attempts
+keeps that subtraction proportional to the selected harness and range.
 
 ## Cache and event cleanup
 

@@ -53,6 +53,78 @@ describe('AgentUsageDailyService', () => {
     expect(query.mock.calls[0][1][1]).toBe('2026-08-23');
   });
 
+  it('supports only enabled daily dashboard ranges', () => {
+    process.env['AGENT_USAGE_DAILY_READS'] = 'true';
+    const service = new AgentUsageDailyService({} as never);
+
+    expect(service.supportsRange('tenant-a', '7d')).toBe(true);
+    expect(service.supportsRange('tenant-a', '365d')).toBe(true);
+    expect(service.supportsRange('tenant-a', '24h')).toBe(false);
+    expect(service.supportsRange(null, '30d')).toBe(false);
+  });
+
+  it('reads the selected UTC range and subtracts rolled-up direct usage', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-21T12:00:00.000Z'));
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          agent_id: 'agent-1',
+          agent_name: 'bot-1',
+          day: '2026-09-21',
+          request_count: '10',
+          successful_request_count: '9',
+          failed_request_count: '1',
+          input_tokens: '100',
+          output_tokens: '50',
+          cost_usd: '2.5',
+          last_active_at: '2026-09-21T10:00:00.000Z',
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          day: '2026-09-21',
+          request_count: '2',
+          successful_request_count: '2',
+          failed_request_count: '0',
+          input_tokens: '20',
+          output_tokens: '5',
+          cost_usd: '0.5',
+        },
+      ]);
+    const service = new AgentUsageDailyService({ query } as never);
+
+    await expect(
+      service.getRangeRows('tenant-a', '30d', {
+        agentName: 'bot-1',
+        excludeDirect: true,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        request_count: '8',
+        successful_request_count: '7',
+        failed_request_count: '1',
+        input_tokens: '80',
+        output_tokens: '45',
+        cost_usd: '2',
+      }),
+    ]);
+    expect(query.mock.calls[0][1]).toEqual(['tenant-a', '2026-08-23', null, 'bot-1']);
+    expect(query.mock.calls[1][0]).toContain('pa."agent_usage_rolled_up_at" IS NOT NULL');
+    expect(query.mock.calls[1][0]).toContain('pa."timestamp" >= $2::date');
+    expect(query.mock.calls[1][0]).not.toContain('pa."timestamp"::date >=');
+  });
+
+  it('uses the preceding calendar window for trend totals', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-21T12:00:00.000Z'));
+    const query = jest.fn().mockResolvedValue([]);
+    const service = new AgentUsageDailyService({ query } as never);
+
+    await service.getRangeRows('tenant-a', '7d', { previous: true });
+
+    expect(query.mock.calls[0][1]).toEqual(['tenant-a', '2026-09-08', '2026-09-15', null]);
+  });
+
   it('skips scheduled work when disabled or already running', async () => {
     const service = new AgentUsageDailyService({} as never);
     const processBatch = jest.spyOn(service, 'processBatch');

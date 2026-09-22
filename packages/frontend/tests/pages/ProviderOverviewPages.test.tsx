@@ -19,6 +19,7 @@ const apiMocks = vi.hoisted(() => ({
   refreshModels: vi.fn(),
   fetchMutate: vi.fn(),
   getOverview: vi.fn(),
+  getOverviewDetails: vi.fn(),
   getOverviewAgentUsage: vi.fn(),
   getOverviewProviderUsage: vi.fn(),
   getBillingStatus: vi.fn(),
@@ -98,6 +99,7 @@ vi.mock('../../src/services/api/analytics.js', () => ({
   attemptSuccessRate: (row: { attempts: number; succeeded?: number }) =>
     !row.attempts || row.succeeded == null ? null : row.succeeded / row.attempts,
   getOverview: (...args: unknown[]) => apiMocks.getOverview(...args),
+  getOverviewDetails: (...args: unknown[]) => apiMocks.getOverviewDetails(...args),
   getOverviewAgentUsage: (...args: unknown[]) => apiMocks.getOverviewAgentUsage(...args),
   getOverviewProviderUsage: (...args: unknown[]) => apiMocks.getOverviewProviderUsage(...args),
   getConnectionDetail: (...args: unknown[]) => apiMocks.getConnectionDetail(...args),
@@ -748,6 +750,7 @@ beforeEach(() => {
   apiMocks.refreshModels.mockResolvedValue(undefined);
   apiMocks.fetchMutate.mockResolvedValue({});
   apiMocks.getOverview.mockResolvedValue(overviewResponse);
+  apiMocks.getOverviewDetails.mockResolvedValue({});
   apiMocks.getOverviewAgentUsage.mockResolvedValue(agentUsageTimeseries);
   apiMocks.getOverviewProviderUsage.mockResolvedValue(providerUsageTimeseries);
   apiMocks.getBillingStatus.mockResolvedValue({
@@ -863,7 +866,7 @@ describe('GlobalOverview (analytics)', () => {
 
     await waitFor(() => expect(screen.getByTestId('provider-chart-card')).toBeDefined());
     await waitFor(() => expect(localStorage.getItem('manifest_global_range')).toBe('7d'));
-    expect(apiMocks.getOverview).toHaveBeenCalledWith('7d');
+    expect(apiMocks.getOverview).toHaveBeenCalledWith('7d', undefined, true);
 
     const rangeSelect = screen.getByRole('combobox') as HTMLSelectElement;
     const lockedOptions = Array.from(rangeSelect.options).filter((option) =>

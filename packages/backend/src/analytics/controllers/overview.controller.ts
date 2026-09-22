@@ -51,6 +51,7 @@ export class OverviewController {
   async getOverview(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
     const range = query.range ?? '24h';
     const agentName = query.agent_name;
+    const fast = query.fast === 'true';
     const hourly = isHourlyRange(range);
     const tenantId = ctx.tenantId;
     // Scoped to one harness => show only what that harness's routing did. A
@@ -86,7 +87,9 @@ export class OverviewController {
       // the previous window here for the trend arrows instead of repeating the
       // full current+previous double-scan.
       this.aggregation.getPreviousWindowMetrics(range, tenantId, agentName, true, excludeDirect),
-      this.aggregation.getRequestReliability(range, tenantId, agentName, true, excludeDirect),
+      fast
+        ? Promise.resolve(null)
+        : this.aggregation.getRequestReliability(range, tenantId, agentName, true, excludeDirect),
       this.timeseries.getTimeseries(
         range,
         tenantId,
@@ -99,30 +102,34 @@ export class OverviewController {
         undefined,
         excludeDirect,
       ),
-      this.timeseries.getCostByModel(range, tenantId, agentName, true, excludeDirect),
-      this.messagesQuery
-        ? this.messagesQuery
-            .getMessages({
-              range,
-              tenantId,
-              agent_name: agentName,
-              limit: 5,
-              include_total: false,
-              include_filter_options: false,
-              exclude_playground: true,
-              exclude_direct: excludeDirect,
-            })
-            .then((result) => result.items)
-        : this.timeseries.getRecentActivity(range, tenantId, 5, agentName, true, excludeDirect),
-      this.timeseries.getActiveSkills(range, tenantId, agentName, true, excludeDirect),
+      fast
+        ? Promise.resolve([])
+        : this.timeseries.getCostByModel(range, tenantId, agentName, true, excludeDirect),
+      fast
+        ? Promise.resolve([])
+        : this.getRecentActivity(range, tenantId, agentName, excludeDirect),
+      fast
+        ? Promise.resolve([])
+        : this.timeseries.getActiveSkills(range, tenantId, agentName, true, excludeDirect),
       this.aggregation.hasAnyData(tenantId, agentName, true, excludeDirect),
       this.hasActiveProviders(tenantId, agentName),
     ]);
 
     const summary = AggregationService.buildSummary(sumTimeseries(tsData), prevMetrics);
-    summary.messages = {
-      value: requestReliability.total,
-      trend_pct: computeTrend(requestReliability.total, requestReliability.previous_total),
+    if (requestReliability) {
+      summary.messages = {
+        value: requestReliability.total,
+        trend_pct: computeTrend(requestReliability.total, requestReliability.previous_total),
+      };
+    }
+    const reliability = requestReliability ?? {
+      total: summary.messages.value,
+      successful: 0,
+      success_rate: 0,
+      attempt_success_rate: 0,
+      manifest_lift_pct: 0,
+      recovered: 0,
+      previous_total: prevMetrics.messages,
     };
 
     return {
@@ -138,10 +145,22 @@ export class OverviewController {
       cost_by_model: costByModel,
       recent_activity: recentActivity,
       active_skills: activeSkills,
-      request_reliability: requestReliability,
+      request_reliability: reliability,
       has_data: hasData,
       has_providers: hasProviders,
     };
+  }
+
+  @Get('overview/details')
+  async getOverviewDetails(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
+    const range = query.range ?? '24h';
+    const agentName = query.agent_name;
+    const excludeDirect = !!agentName;
+    const [costByModel, recentActivity] = await Promise.all([
+      this.timeseries.getCostByModel(range, ctx.tenantId, agentName, true, excludeDirect),
+      this.getRecentActivity(range, ctx.tenantId, agentName, excludeDirect),
+    ]);
+    return { cost_by_model: costByModel, recent_activity: recentActivity };
   }
 
   @Get('overview/per-agent-timeseries')
@@ -252,5 +271,27 @@ export class OverviewController {
     } catch {
       return false;
     }
+  }
+
+  private getRecentActivity(
+    range: string,
+    tenantId: string | null,
+    agentName: string | undefined,
+    excludeDirect: boolean,
+  ) {
+    return this.messagesQuery
+      ? this.messagesQuery
+          .getMessages({
+            range,
+            tenantId,
+            agent_name: agentName,
+            limit: 5,
+            include_total: false,
+            include_filter_options: false,
+            exclude_playground: true,
+            exclude_direct: excludeDirect,
+          })
+          .then((result) => result.items)
+      : this.timeseries.getRecentActivity(range, tenantId, 5, agentName, true, excludeDirect);
   }
 }

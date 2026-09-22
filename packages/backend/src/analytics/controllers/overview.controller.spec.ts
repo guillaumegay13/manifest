@@ -154,6 +154,28 @@ describe('OverviewController', () => {
     );
   });
 
+  it('returns the critical overview without waiting for detail queries', async () => {
+    const result = await controller.getOverview({ range: '90d', fast: 'true' }, ctx as never);
+
+    expect(result.summary.messages).toEqual({ value: 50, trend_pct: 11 });
+    expect(result.cost_by_model).toEqual([]);
+    expect(result.recent_activity).toEqual([]);
+    expect(agg.getRequestReliability).not.toHaveBeenCalled();
+    expect(ts.getCostByModel).not.toHaveBeenCalled();
+    expect(ts.getRecentActivity).not.toHaveBeenCalled();
+    expect(ts.getActiveSkills).not.toHaveBeenCalled();
+  });
+
+  it('loads slow overview details independently', async () => {
+    ts.getCostByModel.mockResolvedValueOnce([{ model: 'gpt-5', tokens: 10 }]);
+    ts.getRecentActivity.mockResolvedValueOnce([{ id: 'request-1' }]);
+
+    await expect(controller.getOverviewDetails({ range: '365d' }, ctx as never)).resolves.toEqual({
+      cost_by_model: [{ model: 'gpt-5', tokens: 10 }],
+      recent_activity: [{ id: 'request-1' }],
+    });
+  });
+
   it('uses request rows for recent activity when the request query service is available', async () => {
     const requestItems = [{ id: 'request-1', status: 'ok' }];
     const messagesQuery = { getMessages: jest.fn().mockResolvedValue({ items: requestItems }) };

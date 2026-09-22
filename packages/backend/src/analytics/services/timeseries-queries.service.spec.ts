@@ -631,6 +631,50 @@ describe('TimeseriesQueriesService', () => {
       expect(result.messageUsage).toEqual([{ date: '2026-07-14', count: 2 }]);
     });
 
+    it('uses daily rollups for non-hourly overview usage', async () => {
+      const daily = {
+        supportsRange: jest.fn().mockReturnValue(true),
+        getRangeRows: jest.fn().mockResolvedValue([
+          {
+            agent_name: 'alpha',
+            day: '2026-09-20',
+            request_count: '2',
+            input_tokens: '10',
+            output_tokens: '5',
+            cost_usd: '1',
+          },
+          {
+            agent_name: 'bravo',
+            day: '2026-09-20',
+            request_count: '3',
+            input_tokens: '20',
+            output_tokens: '10',
+            cost_usd: '2',
+          },
+        ]),
+      };
+      const rollupAware = new TimeseriesQueriesService(
+        { createQueryBuilder: jest.fn() } as never,
+        {} as never,
+        undefined,
+        undefined,
+        undefined,
+        daily as never,
+      );
+
+      await expect(
+        rollupAware.getTimeseries('90d', 'tenant-1', false, undefined, undefined, undefined, true),
+      ).resolves.toEqual({
+        tokenUsage: [{ date: '2026-09-20', input_tokens: 30, output_tokens: 15 }],
+        costUsage: [{ date: '2026-09-20', cost: 3 }],
+        messageUsage: [{ date: '2026-09-20', count: 5 }],
+      });
+      expect(daily.getRangeRows).toHaveBeenCalledWith('tenant-1', '90d', {
+        agentName: undefined,
+        excludeDirect: false,
+      });
+    });
+
     it('returns no request buckets when tenant scope is absent', async () => {
       const makeQb = () => ({
         select: jest.fn().mockReturnThis(),
@@ -1165,6 +1209,36 @@ describe('TimeseriesQueriesService', () => {
       const clauses = mockTurnQb.andWhere.mock.calls.map((c) => c[0]);
       expect(clauses).toContain('at.auth_type = :authType');
       expect(clauses).toContain('at.provider = :provider');
+    });
+
+    it('pivots daily rollups by agent for long overview ranges', async () => {
+      const daily = {
+        supportsRange: jest.fn().mockReturnValue(true),
+        getRangeRows: jest.fn().mockResolvedValue([
+          {
+            agent_name: 'alpha',
+            day: '2026-09-20',
+            request_count: '2',
+            input_tokens: '10',
+            output_tokens: '5',
+            cost_usd: '1.5',
+          },
+        ]),
+      };
+      const rollupAware = new TimeseriesQueriesService(
+        { createQueryBuilder: jest.fn() } as never,
+        {} as never,
+        undefined,
+        undefined,
+        undefined,
+        daily as never,
+      );
+
+      const result = await rollupAware.getAgentUsageTimeseries('365d', 'tenant-1', false);
+
+      expect(result.tokenUsage.timeseries).toEqual([{ date: '2026-09-20', alpha: 15 }]);
+      expect(result.messageUsage.timeseries).toEqual([{ date: '2026-09-20', alpha: 2 }]);
+      expect(result.costUsage.timeseries).toEqual([{ date: '2026-09-20', alpha: 1.5 }]);
     });
 
     const labelClause = "LOWER(COALESCE(at.provider_key_label, 'Default')) = LOWER(:keyLabel)";

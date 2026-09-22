@@ -26,6 +26,7 @@ import { customProviderLogo } from '../components/ProviderIcon.jsx';
 import { stripCustomPrefix } from '../services/routing-utils.js';
 import {
   getOverview,
+  getOverviewDetails,
   getOverviewAgentUsage,
   getOverviewProviderUsage,
 } from '../services/api/analytics.js';
@@ -119,6 +120,8 @@ interface OverviewResponse {
   has_data: boolean;
   has_providers: boolean;
 }
+
+type OverviewDetails = Pick<OverviewResponse, 'cost_by_model' | 'recent_activity'>;
 
 interface AgentRow {
   agent_name: string;
@@ -233,16 +236,20 @@ const GlobalOverview: Component = () => {
   // ── Data resources (5 parallel) ──────────────────────────────────────
   const [overview] = createResource(
     () => ({ range: effectiveChartRange(), _ping: analyticsPing() }),
-    (p) => getOverview(p.range) as Promise<OverviewResponse>,
+    (p) => getOverview(p.range, undefined, true) as Promise<OverviewResponse>,
   );
 
   // Show the skeleton on a range change, but not on the frequent background SSE
   // `_ping` refetches (those update in place). Track the range the visible
   // overview belongs to; while a newer range is loading, treat it as changing.
-  const [loadedRange, setLoadedRange] = createSignal(effectiveChartRange());
+  const [loadedRange, setLoadedRange] = createSignal<string>();
   createEffect(() => {
     if (!overview.loading && overview() !== undefined) setLoadedRange(effectiveChartRange());
   });
+  const [overviewDetails] = createResource(
+    loadedRange,
+    (range) => getOverviewDetails(range) as Promise<OverviewDetails>,
+  );
   const rangeChanging = () => overview.loading && loadedRange() !== effectiveChartRange();
 
   const [agents] = createResource(
@@ -789,7 +796,7 @@ const GlobalOverview: Component = () => {
               };
               return (
                 <MessageTable
-                  items={overview()?.recent_activity ?? []}
+                  items={overviewDetails()?.recent_activity ?? overview()?.recent_activity ?? []}
                   columns={cols()}
                   customProviderName={() => undefined}
                   expandable
@@ -822,7 +829,12 @@ const GlobalOverview: Component = () => {
                 </tr>
               </thead>
               <tbody>
-                <For each={(overview()?.cost_by_model ?? []).slice(0, 10)}>
+                <For
+                  each={(overviewDetails()?.cost_by_model ?? overview()?.cost_by_model ?? []).slice(
+                    0,
+                    10,
+                  )}
+                >
                   {(row) => (
                     <tr>
                       <td>
@@ -908,7 +920,12 @@ const GlobalOverview: Component = () => {
                     </tr>
                   )}
                 </For>
-                <Show when={(overview()?.cost_by_model ?? []).length === 0}>
+                <Show
+                  when={
+                    (overviewDetails()?.cost_by_model ?? overview()?.cost_by_model ?? []).length ===
+                    0
+                  }
+                >
                   <tr>
                     <td
                       colspan="3"
