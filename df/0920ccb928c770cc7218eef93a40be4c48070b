@@ -1,0 +1,36 @@
+packages/backend/src/common/services/ingest-event-bus.service.spec.ts
+  s_ddb7f03c6dfadb::t_bb08492fc57cc4 212,219
+packages/backend/.env.example
+  s_ddb7f03c6dfadb::t_1b95ca320513f3 33
+packages/backend/src/analytics/services/agent-usage-daily.service.ts
+  s_ddb7f03c6dfadb::t_8b5fe3fbd4a7f5 64,66-67,85-86,97-98,109-110,112,292,294-296
+  s_ddb7f03c6dfadb::t_d174f7d8828beb 103-104
+  s_ddb7f03c6dfadb::t_ed2e82ae5e41f7 4,111
+  s_ddb7f03c6dfadb::t_971d44793574f7 65,114,293
+packages/backend/src/common/services/ingest-event-bus.service.ts
+  s_ddb7f03c6dfadb::t_8b5fe3fbd4a7f5 25
+docker/.env.example
+  s_ddb7f03c6dfadb::t_1b95ca320513f3 173
+packages/backend/src/analytics/services/agent-usage-daily.service.spec.ts
+  s_ddb7f03c6dfadb::t_91ed08bf6d6061 45,55,58,205,214-222
+  s_ddb7f03c6dfadb::t_9cef452428c75a 2,56-57
+  s_ddb7f03c6dfadb::t_d174f7d8828beb 60
+  s_ddb7f03c6dfadb::t_6332e153e314bf 203
+  s_ddb7f03c6dfadb::t_d55329a77d5834 223-224
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "df0920ccb928c770cc7218eef93a40be4c48070b",
+  "prompts": {},
+  "sessions": {
+    "s_ddb7f03c6dfadb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c3c0-41ab-70a2-a190-4ba4917c184f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
