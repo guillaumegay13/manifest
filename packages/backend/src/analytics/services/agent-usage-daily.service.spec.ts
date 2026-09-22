@@ -115,6 +115,20 @@ describe('AgentUsageDailyService', () => {
     expect((service as unknown as { running: boolean }).running).toBe(false);
   });
 
+  it('falls back for non-positive limits and non-Error failures', async () => {
+    process.env['AGENT_USAGE_DAILY_BATCH_SIZE'] = '0';
+    process.env['AGENT_USAGE_DAILY_RUN_BUDGET_MS'] = '0';
+    const service = new AgentUsageDailyService({} as never);
+    const processBatch = jest.spyOn(service, 'processBatch').mockRejectedValue('db unavailable');
+    const logger = (service as unknown as { logger: { error: (message: string) => void } }).logger;
+    const error = jest.spyOn(logger, 'error').mockImplementation();
+
+    await service.runScheduled();
+
+    expect(processBatch).toHaveBeenCalledWith(1_000);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('db unavailable'));
+  });
+
   it('does no work when another replica owns the transaction lock', async () => {
     const manager = {
       query: jest
@@ -161,5 +175,28 @@ describe('AgentUsageDailyService', () => {
     expect(sql).toContain('SET "agent_usage_rolled_up_at" = NOW()');
     expect(sql.indexOf('upserted AS')).toBeLessThan(sql.indexOf('marked_requests AS'));
     expect(manager.query.mock.calls[3][1][0]).toBe(2);
+  });
+
+  it('uses UTC and zero counts when the database returns no aggregate row', async () => {
+    jest.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockReturnValue({
+      timeZone: '',
+    } as Intl.ResolvedDateTimeFormatOptions);
+    const manager = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ acquired: true }])
+        .mockResolvedValueOnce([]),
+    };
+    const dataSource = { transaction: (run: (value: unknown) => unknown) => run(manager) };
+    const service = new AgentUsageDailyService(dataSource as never);
+
+    await expect(service.processBatch()).resolves.toEqual({
+      acquired: true,
+      processed: 0,
+      rollups: 0,
+    });
+    expect(manager.query.mock.calls[3][1][1]).toBe('UTC');
   });
 });

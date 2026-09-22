@@ -747,6 +747,88 @@ describe('TimeseriesQueriesService', () => {
       ]);
     });
 
+    it('defaults missing daily values and agents without usage', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const lastActive = new Date('2026-09-21T10:00:00.000Z');
+      const agentQb = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([
+          {
+            id: 'agent-1',
+            name: 'bot-1',
+            display_name: 'Bot One',
+            created_at: '2026-01-01',
+          },
+          {
+            id: 'agent-2',
+            name: 'bot-2',
+            display_name: null,
+            agent_category: null,
+            agent_platform: null,
+            created_at: null,
+          },
+        ]),
+      };
+      const daily = {
+        readsEnabledFor: jest.fn().mockReturnValue(true),
+        getRows: jest.fn().mockResolvedValue([
+          {
+            agent_id: 'agent-1',
+            day: today,
+            request_count: null,
+            input_tokens: null,
+            output_tokens: null,
+            cost_usd: null,
+            last_active_at: lastActive,
+          },
+          {
+            agent_id: 'agent-1',
+            day: today,
+            request_count: null,
+            input_tokens: null,
+            output_tokens: null,
+            cost_usd: null,
+            last_active_at: null,
+          },
+        ]),
+      };
+      const rollupAware = new TimeseriesQueriesService(
+        { createQueryBuilder: jest.fn() } as never,
+        { createQueryBuilder: jest.fn(() => agentQb) } as never,
+        undefined,
+        undefined,
+        undefined,
+        daily as never,
+      );
+
+      await expect(rollupAware.getAgentList('tenant-1')).resolves.toEqual([
+        {
+          agent_name: 'bot-1',
+          display_name: 'Bot One',
+          agent_category: null,
+          agent_platform: null,
+          message_count: 0,
+          last_active: lastActive.toISOString(),
+          total_cost: 0,
+          total_tokens: 0,
+          sparkline: [0, 0],
+        },
+        {
+          agent_name: 'bot-2',
+          display_name: 'bot-2',
+          agent_category: null,
+          agent_platform: null,
+          message_count: 0,
+          last_active: '',
+          total_cost: 0,
+          total_tokens: 0,
+          sparkline: [],
+        },
+      ]);
+    });
+
     it('returns agents with sparkline data and display_name', async () => {
       mockGetMany.mockResolvedValueOnce([
         { id: 'agent-1', name: 'bot-1', display_name: 'Bot One', created_at: '2026-02-16' },
