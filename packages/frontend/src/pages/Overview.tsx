@@ -74,7 +74,7 @@ interface OverviewData {
     attempt_success_rate: number;
     manifest_lift_pct: number;
     recovered: number;
-  };
+  } | null;
   token_usage: Array<{
     hour?: string;
     date?: string;
@@ -104,7 +104,10 @@ interface OverviewData {
   has_providers?: boolean;
 }
 
-type OverviewDetails = Pick<OverviewData, 'cost_by_model' | 'recent_activity'>;
+type OverviewDetails = Pick<
+  OverviewData,
+  'cost_by_model' | 'recent_activity' | 'request_reliability' | 'active_skills'
+>;
 
 type PivotedTimeseries = {
   agents: string[];
@@ -180,14 +183,21 @@ const Overview: Component = () => {
     }),
   );
   const data = () => overviewResult()?.data;
-  const [overviewDetails] = createResource(
+  const [overviewDetailsResult] = createResource(
     () => {
       const result = overviewResult();
-      if (overviewResult.loading || !result || result.scope !== overviewScope()) return false;
+      if (!result || result.scope !== overviewScope()) return false;
       return result.scope;
     },
-    (scope) => getOverviewDetails(scope.range, scope.agentName) as Promise<OverviewDetails>,
+    async (scope) => ({
+      scope,
+      data: (await getOverviewDetails(scope.range, scope.agentName)) as OverviewDetails,
+    }),
   );
+  const overviewDetails = () => {
+    const result = overviewDetailsResult();
+    return result?.scope === overviewScope() ? result.data : undefined;
+  };
 
   // The resource re-fetches on range, agent, and every SSE `_ping`. We only want
   // the loading skeleton on a range change or agent switch — not on the frequent
@@ -277,15 +287,18 @@ const Overview: Component = () => {
   );
 
   // ── Autofix resources ─────────────────────────────────
-  const [autofixStats] = createResource(
-    () => ({
-      range: effectiveRange(),
-      agent: decodeURIComponent(params.agentName),
-      _ping: analyticsPing(),
-    }),
-    (p) => getAutofixStats(p.range, p.agent),
+  const autofixScope = createMemo(() => ({
+    range: effectiveRange(),
+    agent: decodeURIComponent(params.agentName),
+  }));
+  const [autofixStatsResult] = createResource(
+    () => ({ scope: autofixScope(), _ping: analyticsPing() }),
+    async (p) => ({ scope: p.scope, data: await getAutofixStats(p.scope.range, p.scope.agent) }),
   );
-  const currentAutofixStats = () => (autofixStats.loading ? undefined : autofixStats());
+  const currentAutofixStats = () => {
+    const result = autofixStatsResult();
+    return result?.scope === autofixScope() ? result.data : undefined;
+  };
   // Disposition timeseries: the Requests chart's ONLY view on this page (an
   // agent is the harness, and a request may touch several providers, so no
   // other grouping is meaningful) + the Healed requests tab subset.

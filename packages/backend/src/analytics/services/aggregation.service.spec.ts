@@ -359,6 +359,26 @@ describe('AggregationService', () => {
       });
     });
 
+    it('keeps the raw fallback when rollup reads do not support the range', async () => {
+      const daily = {
+        supportsRange: jest.fn().mockReturnValue(false),
+        getRangeRows: jest.fn(),
+      };
+      const rollupAware = new AggregationService(
+        { createQueryBuilder: jest.fn().mockReturnValue(mockQb) } as never,
+        undefined,
+        daily as never,
+      );
+      mockGetRawOne.mockResolvedValueOnce({ msg_count: 4, tokens: 100, cost: 1 });
+
+      await expect(
+        rollupAware.getPreviousWindowMetrics('365d', 'tenant-1', undefined, true),
+      ).resolves.toEqual({ tokens: 100, cost: 1, messages: 4 });
+      expect(daily.supportsRange).toHaveBeenCalledWith('tenant-1', '365d');
+      expect(daily.getRangeRows).not.toHaveBeenCalled();
+      expect(mockGetRawOne).toHaveBeenCalledTimes(1);
+    });
+
     it('returns previous-window token, cost, and message totals', async () => {
       mockGetRawOne.mockResolvedValueOnce({ msg_count: 40, tokens: 4000, cost: 4.0 });
 

@@ -112,7 +112,7 @@ interface OverviewResponse {
     attempt_success_rate: number;
     manifest_lift_pct: number;
     recovered: number;
-  };
+  } | null;
   token_usage: Array<{ hour?: string; date?: string; input_tokens: number; output_tokens: number }>;
   message_usage: Array<{ hour?: string; date?: string; count: number }>;
   cost_by_model: CostByModelRow[];
@@ -234,23 +234,32 @@ const GlobalOverview: Component = () => {
   });
 
   // ── Data resources (5 parallel) ──────────────────────────────────────
-  const [overview] = createResource(
+  const [overviewResult] = createResource(
     () => ({ range: effectiveChartRange(), _ping: analyticsPing() }),
-    (p) => getOverview(p.range, undefined, true) as Promise<OverviewResponse>,
+    async (p) => ({
+      range: p.range,
+      data: (await getOverview(p.range, undefined, true)) as OverviewResponse,
+    }),
   );
+  const overview = () => overviewResult()?.data;
 
   // Show the skeleton on a range change, but not on the frequent background SSE
   // `_ping` refetches (those update in place). Track the range the visible
   // overview belongs to; while a newer range is loading, treat it as changing.
   const [loadedRange, setLoadedRange] = createSignal<string>();
   createEffect(() => {
-    if (!overview.loading && overview() !== undefined) setLoadedRange(effectiveChartRange());
+    const result = overviewResult();
+    if (!overviewResult.loading && result !== undefined) setLoadedRange(result.range);
   });
-  const [overviewDetails] = createResource(
-    loadedRange,
-    (range) => getOverviewDetails(range) as Promise<OverviewDetails>,
-  );
-  const rangeChanging = () => overview.loading && loadedRange() !== effectiveChartRange();
+  const [overviewDetailsResult] = createResource(loadedRange, async (range) => ({
+    range,
+    data: (await getOverviewDetails(range)) as OverviewDetails,
+  }));
+  const overviewDetails = () => {
+    const result = overviewDetailsResult();
+    return result?.range === effectiveChartRange() ? result.data : undefined;
+  };
+  const rangeChanging = () => overviewResult.loading && loadedRange() !== effectiveChartRange();
 
   const [agents] = createResource(
     () => ({ _agentPing: agentPing(), _analyticsPing: analyticsPing() }),
@@ -295,10 +304,15 @@ const GlobalOverview: Component = () => {
   );
 
   // ── Autofix resources ─────────────────────────────────
-  const [autofixStats] = createResource(
-    () => ({ range: effectiveChartRange(), _ping: analyticsPing() }),
-    (p) => getAutofixStats(p.range),
+  const autofixScope = createMemo(() => ({ range: effectiveChartRange() }));
+  const [autofixStatsResult] = createResource(
+    () => ({ scope: autofixScope(), _ping: analyticsPing() }),
+    async (p) => ({ scope: p.scope, data: await getAutofixStats(p.scope.range) }),
   );
+  const autofixStats = () => {
+    const result = autofixStatsResult();
+    return result?.scope === autofixScope() ? result.data : undefined;
+  };
 
   // Disposition timeseries: feeds the "By request status" chart view AND the
   // Self-healed requests tab (recovered subset: healed + fallback series).

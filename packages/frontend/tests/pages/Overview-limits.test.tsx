@@ -19,9 +19,10 @@ vi.mock('@solidjs/meta', () => ({
 }));
 
 const mockGetOverview = vi.fn();
+const mockGetOverviewDetails = vi.fn();
 vi.mock('../../src/services/api.js', () => ({
   getOverview: (...args: unknown[]) => mockGetOverview(...args),
-  getOverviewDetails: () => Promise.resolve({}),
+  getOverviewDetails: (...args: unknown[]) => mockGetOverviewDetails(...args),
   getCustomProviders: vi.fn().mockResolvedValue([]),
 }));
 
@@ -169,6 +170,7 @@ describe('Overview - trend badges and status display', () => {
     localStorage.clear();
     localStorage.setItem('manifest_global_group', 'provider');
     mockAgentName = 'test-agent';
+    mockGetOverviewDetails.mockResolvedValue({});
   });
 
   it('does not render trend badge when trend_pct is 0', async () => {
@@ -208,6 +210,10 @@ describe('Overview - trend badges and status display', () => {
       ],
     };
     mockGetOverview.mockResolvedValue(rateLimitedData);
+    mockGetOverviewDetails.mockResolvedValue({
+      recent_activity: rateLimitedData.recent_activity,
+      cost_by_model: [],
+    });
     const { container } = render(() => <Overview />);
     await vi.waitFor(() => {
       // Binary status: a provider rate limit is just a "Failed" pill now.
@@ -232,6 +238,10 @@ describe('Overview - trend badges and status display', () => {
       ],
     };
     mockGetOverview.mockResolvedValue(routedData);
+    mockGetOverviewDetails.mockResolvedValue({
+      recent_activity: routedData.recent_activity,
+      cost_by_model: [],
+    });
     const { container } = render(() => <Overview />);
     await vi.waitFor(() => {
       const tierBadge = container.querySelector('.tier-badge--complex');
@@ -262,6 +272,10 @@ describe('Overview - trend badges and status display', () => {
 
   it('renders status-specific class on status badge', async () => {
     mockGetOverview.mockResolvedValue(overviewData);
+    mockGetOverviewDetails.mockResolvedValue({
+      recent_activity: overviewData.recent_activity,
+      cost_by_model: [],
+    });
     const { container } = render(() => <Overview />);
     await vi.waitFor(() => {
       expect(container.querySelector('.status-badge--ok')).not.toBeNull();

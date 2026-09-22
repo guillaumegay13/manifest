@@ -110,9 +110,14 @@ describe('AgentUsageDailyService', () => {
       }),
     ]);
     expect(query.mock.calls[0][1]).toEqual(['tenant-a', '2026-08-23', null, 'bot-1']);
+    expect(query.mock.calls[0][0]).toContain('a."deleted_at" IS NULL');
     expect(query.mock.calls[1][0]).toContain('pa."agent_usage_rolled_up_at" IS NOT NULL');
-    expect(query.mock.calls[1][0]).toContain('pa."timestamp" >= $2::date');
+    expect(query.mock.calls[1][0]).toContain(`AT TIME ZONE 'UTC'`);
+    expect(query.mock.calls[1][0]).toContain('pa."timestamp" >= (($2::date::timestamp');
     expect(query.mock.calls[1][0]).not.toContain('pa."timestamp"::date >=');
+    expect(query.mock.calls[1][0]).toContain('pa."request_id" = r."id"');
+    expect(query.mock.calls[1][1].slice(0, 4)).toEqual(['tenant-a', '2026-08-23', null, 'bot-1']);
+    expect(query.mock.calls[1][1][4]).toEqual(expect.any(String));
   });
 
   it('uses the preceding calendar window for trend totals', async () => {

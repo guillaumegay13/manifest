@@ -14,6 +14,7 @@ import { Repository } from 'typeorm';
 import { AgentEnabledProvider } from '../../entities/agent-enabled-provider.entity';
 import { computeTrend } from '../services/query-helpers';
 import { MessagesQueryService } from '../services/messages-query.service';
+import { OverviewQueryDto } from '../dto/overview-query.dto';
 
 /** Sum the timeseries buckets into current-window totals for the summary cards. */
 function sumTimeseries(tsData: {
@@ -48,7 +49,7 @@ export class OverviewController {
   ) {}
 
   @Get('overview')
-  async getOverview(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
+  async getOverview(@Query() query: OverviewQueryDto, @TenantCtx() ctx: TenantContext) {
     const range = query.range ?? '24h';
     const agentName = query.agent_name;
     const fast = query.fast === 'true';
@@ -122,16 +123,6 @@ export class OverviewController {
         trend_pct: computeTrend(requestReliability.total, requestReliability.previous_total),
       };
     }
-    const reliability = requestReliability ?? {
-      total: summary.messages.value,
-      successful: 0,
-      success_rate: 0,
-      attempt_success_rate: 0,
-      manifest_lift_pct: 0,
-      recovered: 0,
-      previous_total: prevMetrics.messages,
-    };
-
     return {
       summary: {
         tokens_today: summary.tokens.tokens_today,
@@ -145,7 +136,7 @@ export class OverviewController {
       cost_by_model: costByModel,
       recent_activity: recentActivity,
       active_skills: activeSkills,
-      request_reliability: reliability,
+      request_reliability: requestReliability,
       has_data: hasData,
       has_providers: hasProviders,
     };
@@ -156,11 +147,18 @@ export class OverviewController {
     const range = query.range ?? '24h';
     const agentName = query.agent_name;
     const excludeDirect = !!agentName;
-    const [costByModel, recentActivity] = await Promise.all([
+    const [costByModel, recentActivity, requestReliability, activeSkills] = await Promise.all([
       this.timeseries.getCostByModel(range, ctx.tenantId, agentName, true, excludeDirect),
       this.getRecentActivity(range, ctx.tenantId, agentName, excludeDirect),
+      this.aggregation.getRequestReliability(range, ctx.tenantId, agentName, true, excludeDirect),
+      this.timeseries.getActiveSkills(range, ctx.tenantId, agentName, true, excludeDirect),
     ]);
-    return { cost_by_model: costByModel, recent_activity: recentActivity };
+    return {
+      cost_by_model: costByModel,
+      recent_activity: recentActivity,
+      request_reliability: requestReliability,
+      active_skills: activeSkills,
+    };
   }
 
   @Get('overview/per-agent-timeseries')

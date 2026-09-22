@@ -14,6 +14,11 @@ describe('AddAgentMessagesDirectUsageIndex1802900000000', () => {
       'IDX_agent_messages_direct_usage',
     ]);
     expect(queryRunner.query.mock.calls[1][0]).toContain('CREATE INDEX CONCURRENTLY');
+    expect(queryRunner.query.mock.calls[1][0]).toContain(
+      'ON "agent_messages" ("tenant_id", "agent_id", "timestamp")',
+    );
+    expect(queryRunner.query.mock.calls[1][0]).toContain('INCLUDE (');
+    expect(queryRunner.query.mock.calls[1][0]).toContain('"agent_usage_rolled_up_at"');
     expect(queryRunner.query.mock.calls[1][0]).toContain(`WHERE "routing_reason" = 'direct'`);
     expect(queryRunner.query).toHaveBeenCalledTimes(2);
   });

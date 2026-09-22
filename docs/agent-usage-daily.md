@@ -10,10 +10,11 @@ contains one UTC day of usage for one tenant and one agent.
 `GET /api/v1/agents` will read this table instead of aggregating 30 days of raw
 `requests` and `agent_messages` rows. The API response will not change.
 
-The Overview and Harness Overview usage series use the same table for 7, 30,
-90, and 365-day ranges. Their model breakdown and recent Requests remain exact
-raw-data queries, but load separately after the critical usage response so they
-cannot hold the page skeleton open.
+The Overview and Harness Overview usage series will use the same table for the
+7, 30, 90, and 365-day ranges once rollup reads are enabled behind the existing
+rollout switch. Their model breakdown and recent Requests remain exact raw-data
+queries, but load separately after the critical usage response so they cannot
+hold the page skeleton open.
 
 The rollup worker will process completed Requests and Provider Attempts
 asynchronously. Dashboard usage can lag live traffic by up to one minute.
