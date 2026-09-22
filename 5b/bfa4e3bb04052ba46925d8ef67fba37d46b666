@@ -1,0 +1,21 @@
+packages/backend/src/analytics/services/agent-usage-daily.service.spec.ts
+  s_ddb7f03c6dfadb::t_dd37a4ea79190e 118-131,179-201
+packages/backend/src/analytics/services/timeseries-queries.service.spec.ts
+  s_ddb7f03c6dfadb::t_dd37a4ea79190e 750-831
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5bbfa4e3bb04052ba46925d8ef67fba37d46b666",
+  "prompts": {},
+  "sessions": {
+    "s_ddb7f03c6dfadb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c3c0-41ab-70a2-a190-4ba4917c184f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
