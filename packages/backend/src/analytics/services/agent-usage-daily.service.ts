@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
+import { computeCutoff, toLocalSqlTimestamp } from '../../common/utils/postgres-sql';
 import {
   agentUsageDailyReadsEnabled,
   setAgentUsageDailyAutomaticReadsReady,
@@ -60,6 +61,10 @@ export class AgentUsageDailyService implements OnModuleInit {
   constructor(private readonly dataSource: DataSource) {}
 
   async onModuleInit(): Promise<void> {
+    if (process.env['AGENT_USAGE_DAILY_WORKER'] === 'false') {
+      setAgentUsageDailyAutomaticReadsReady(false);
+      return;
+    }
     await this.refreshAutomaticReads();
   }
 
@@ -77,8 +82,8 @@ export class AgentUsageDailyService implements OnModuleInit {
              AND (r."status" IS NULL OR r."status" NOT IN ('pending', 'cancelled'))
              AND r."tenant_id" IS NOT NULL
              AND r."agent_id" IS NOT NULL
-             AND r."timestamp" >= NOW() - ($1::int * INTERVAL '1 day')
-             AND r."timestamp" < NOW() - ($2::int * INTERVAL '1 minute')
+             AND r."timestamp" >= $1::timestamp
+             AND r."timestamp" < $2::timestamp
              AND EXISTS (SELECT 1 FROM "agents" a WHERE a."id" = r."agent_id")
            ORDER BY r."timestamp" ASC, r."id" ASC
            LIMIT 1
@@ -89,20 +94,24 @@ export class AgentUsageDailyService implements OnModuleInit {
              AND (pa."status" IS NULL OR pa."status" NOT IN ('pending', 'cancelled'))
              AND pa."tenant_id" IS NOT NULL
              AND pa."agent_id" IS NOT NULL
-             AND pa."timestamp" >= NOW() - ($1::int * INTERVAL '1 day')
-             AND pa."timestamp" < NOW() - ($2::int * INTERVAL '1 minute')
+             AND pa."timestamp" >= $1::timestamp
+             AND pa."timestamp" < $2::timestamp
              AND EXISTS (SELECT 1 FROM "agents" a WHERE a."id" = pa."agent_id")
            ORDER BY pa."timestamp" ASC, pa."id" ASC
            LIMIT 1
          )
-         SELECT NOT EXISTS (
+         SELECT to_regclass('agent_usage_daily') IS NOT NULL
+           AND NOT EXISTS (
            SELECT 1 FROM pending_request
            UNION ALL
            SELECT 1 FROM pending_attempt
          ) AS "ready"`,
-        [READ_BACKFILL_DAYS, READ_LAG_GRACE_MINUTES],
+        [
+          computeCutoff(`${READ_BACKFILL_DAYS} days`),
+          toLocalSqlTimestamp(new Date(Date.now() - READ_LAG_GRACE_MINUTES * 60_000)),
+        ],
       )) as Array<{ ready: boolean }>;
-      setAgentUsageDailyAutomaticReadsReady(rows[0].ready === true);
+      setAgentUsageDailyAutomaticReadsReady(rows[0]?.ready === true);
     } catch (error) {
       setAgentUsageDailyAutomaticReadsReady(false);
       this.logger.warn(`agent usage rollup readiness check failed: ${String(error)}`);
@@ -280,7 +289,11 @@ export class AgentUsageDailyService implements OnModuleInit {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async runScheduled(): Promise<void> {
-    if (process.env['AGENT_USAGE_DAILY_WORKER'] === 'false' || this.running) return;
+    if (process.env['AGENT_USAGE_DAILY_WORKER'] === 'false') {
+      setAgentUsageDailyAutomaticReadsReady(false);
+      return;
+    }
+    if (this.running) return;
     this.running = true;
     const startedAt = Date.now();
     let processed = 0;

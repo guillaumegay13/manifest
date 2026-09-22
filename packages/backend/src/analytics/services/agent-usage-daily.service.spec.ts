@@ -1,4 +1,5 @@
 import { AgentUsageDailyService } from './agent-usage-daily.service';
+import { computeCutoff, toLocalSqlTimestamp } from '../../common/utils/postgres-sql';
 import { setAgentUsageDailyAutomaticReadsReady } from '../../common/utils/agent-usage-daily-flags';
 
 describe('AgentUsageDailyService', () => {
@@ -41,6 +42,7 @@ describe('AgentUsageDailyService', () => {
   });
 
   it('enables reads automatically after the supported history is backfilled', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-21T12:00:00.000Z'));
     delete process.env['AGENT_USAGE_DAILY_READS'];
     delete process.env['AGENT_USAGE_DAILY_READ_TENANTS'];
     const query = jest.fn().mockResolvedValue([{ ready: true }]);
@@ -50,8 +52,12 @@ describe('AgentUsageDailyService', () => {
     await service.onModuleInit();
 
     expect(service.readsEnabledFor('tenant-a')).toBe(true);
-    expect(query).toHaveBeenCalledWith(expect.stringContaining('pending_request AS'), [730, 2]);
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('pending_request AS'), [
+      computeCutoff('730 days'),
+      toLocalSqlTimestamp(new Date(Date.now() - 2 * 60_000)),
+    ]);
     expect(query.mock.calls[0][0]).toContain('pending_attempt AS');
+    expect(query.mock.calls[0][0]).toContain("to_regclass('agent_usage_daily') IS NOT NULL");
     expect(query.mock.calls[0][0]).toContain('ORDER BY r."timestamp" ASC, r."id" ASC');
     expect(query.mock.calls[0][0]).toContain('ORDER BY pa."timestamp" ASC, pa."id" ASC');
   });
@@ -194,13 +200,26 @@ describe('AgentUsageDailyService', () => {
     const processBatch = jest.spyOn(service, 'processBatch');
 
     process.env['AGENT_USAGE_DAILY_WORKER'] = 'false';
+    setAgentUsageDailyAutomaticReadsReady(true);
     await service.runScheduled();
+    expect(service.readsEnabledFor('tenant-a')).toBe(false);
 
     delete process.env['AGENT_USAGE_DAILY_WORKER'];
     (service as unknown as { running: boolean }).running = true;
     await service.runScheduled();
 
     expect(processBatch).not.toHaveBeenCalled();
+  });
+
+  it('keeps automatic reads off at startup when the worker is disabled', async () => {
+    process.env['AGENT_USAGE_DAILY_WORKER'] = 'false';
+    const query = jest.fn();
+    const service = new AgentUsageDailyService({ query } as never);
+
+    await service.onModuleInit();
+
+    expect(query).not.toHaveBeenCalled();
+    expect(service.readsEnabledFor('tenant-a')).toBe(false);
   });
 
   it('runs scheduled batches until the queue returns a partial batch', async () => {

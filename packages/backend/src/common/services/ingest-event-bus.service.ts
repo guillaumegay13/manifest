@@ -2,7 +2,6 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Subject, Observable } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { AgentListCacheService } from './agent-list-cache.service';
-import { agentUsageDailyReadsEnabled } from '../utils/agent-usage-daily-flags';
 
 export type IngestEventKind = 'message' | 'agent' | 'routing';
 
@@ -23,7 +22,7 @@ export class IngestEventBusService implements OnModuleDestroy {
   constructor(private readonly agentListCache: AgentListCacheService) {}
 
   private async publish(event: IngestEvent): Promise<void> {
-    if (event.kind === 'message' && !agentUsageDailyReadsEnabled(event.tenantId)) {
+    if (event.kind === 'message') {
       // Agent-list responses carry message_count, so retire them before
       // subscribers refetch. Invalidation is generation-based and cannot leave a
       // reader on a stale key, so a failure here is housekeeping noise: publish
