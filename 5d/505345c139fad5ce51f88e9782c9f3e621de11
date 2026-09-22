@@ -1,0 +1,40 @@
+packages/backend/src/common/utils/agent-usage-daily-flags.ts
+  s_ddb7f03c6dfadb::t_e184c874162eec 1-6,9,12-19
+docker/.env.example
+  s_ddb7f03c6dfadb::t_e184c874162eec 169-170,173
+.changeset/tidy-pandas-switch.md
+  s_ddb7f03c6dfadb::t_2c7b66759d0877 1-5
+packages/backend/.env.example
+  s_ddb7f03c6dfadb::t_e184c874162eec 33
+packages/backend/src/common/services/ingest-event-bus.service.spec.ts
+  s_ddb7f03c6dfadb::t_2c7b66759d0877 3,11,156
+  s_ddb7f03c6dfadb::t_28c339be97016c 227-228
+packages/backend/src/common/interceptors/agent-list-cache.interceptor.spec.ts
+  s_ddb7f03c6dfadb::t_28c339be97016c 141-142
+  s_ddb7f03c6dfadb::t_2c7b66759d0877 7,40,53
+packages/backend/src/analytics/services/agent-usage-daily.service.spec.ts
+  s_ddb7f03c6dfadb::t_af2eeefe6db48a 59,62,210
+  s_ddb7f03c6dfadb::t_69e0f4a7fa87b4 222,229,244,262
+  s_ddb7f03c6dfadb::t_2c7b66759d0877 2,12,27,43-58,60-61,63-98
+  s_ddb7f03c6dfadb::t_a05e9bafde3410 99
+packages/backend/src/analytics/services/agent-usage-daily.service.ts
+  s_ddb7f03c6dfadb::t_781103c1eceb79 105,108
+  s_ddb7f03c6dfadb::t_e184c874162eec 1,4-7,13,15,56,62-65,70-104,106-107,109-111,315
+  s_ddb7f03c6dfadb::t_7c4e0dad64dd58 12,14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5d505345c139fad5ce51f88e9782c9f3e621de11",
+  "prompts": {},
+  "sessions": {
+    "s_ddb7f03c6dfadb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c3c0-41ab-70a2-a190-4ba4917c184f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
