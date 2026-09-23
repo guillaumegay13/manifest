@@ -1,0 +1,25 @@
+packages/frontend/src/components/OAuthDetailView.tsx
+  s_26e59e0486a0d0::t_1d16a65504e6db 195-196,198
+packages/frontend/src/pages/providers/ProviderConnectionsPage.tsx
+  s_26e59e0486a0d0::t_01f14d05a32444 417-423
+packages/frontend/tests/components/OAuthDetailView.test.tsx
+  s_26e59e0486a0d0::t_c2f4a34bff8e5f 618-622
+packages/frontend/tests/pages/ProviderPages.test.tsx
+  s_26e59e0486a0d0::t_6831a79eaa4004 344-345,349-375
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "695238f29193fcca206dda386f401d1e63c809ea",
+  "prompts": {},
+  "sessions": {
+    "s_26e59e0486a0d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f353378-e6c2-419f-9c37-68e78860a75f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
