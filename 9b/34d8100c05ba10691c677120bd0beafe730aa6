@@ -1,0 +1,25 @@
+.changeset/autofix-stream-warmup-verdict.md
+  s_0c9099ab3f0682::t_47f880dedff87a 1-5
+packages/backend/src/routing/proxy/__tests__/proxy.service.spec.ts
+  s_0c9099ab3f0682::t_9232f78f48cf3c 4,26-27,976-1106
+packages/backend/src/routing/proxy/__tests__/stream-warmup.spec.ts
+  s_0c9099ab3f0682::t_82efce5a391e80 198-210
+packages/backend/src/routing/proxy/proxy.service.ts
+  s_0c9099ab3f0682::t_151bdb73d580af 217-231,622,723-752
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9b34d8100c05ba10691c677120bd0beafe730aa6",
+  "prompts": {},
+  "sessions": {
+    "s_0c9099ab3f0682": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad97d56e-f47e-4757-8c7e-5a108020615c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
