@@ -1,0 +1,22 @@
+packages/frontend/src/pages/providers/ConnectionDetail.tsx
+  s_d4c9957cc50edd::t_ea996bbacb04e9 1309-1319
+packages/frontend/tests/pages/ProviderOverviewPages.test.tsx
+  s_d4c9957cc50edd::t_e6cf877fecc6f6 1656-1670
+  s_d4c9957cc50edd::t_127bea866dfbfa 1671-1672
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "80396eb6ebc820b513cf21b0fec75b4d26aed3cb",
+  "prompts": {},
+  "sessions": {
+    "s_d4c9957cc50edd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad71c9ec-c5b3-44e8-b141-d0ca56965ad5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
