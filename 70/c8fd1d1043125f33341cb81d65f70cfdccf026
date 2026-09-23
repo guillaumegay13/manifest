@@ -1,0 +1,44 @@
+packages/backend/src/mcp/tools/tools.spec.ts
+  s_1798c724194e34::t_2903e80ba89895 568-569,574
+packages/backend/src/mcp/tools/environment.tools.ts
+  s_1798c724194e34::t_8ec3ec4d6434a4 132
+.claude/skills/mnfst-cli/SKILL.md
+  s_1798c724194e34::t_5a68d85cddefaf 44
+packages/backend/src/mcp/tools/routing.tools.ts
+  s_1798c724194e34::t_5a68d85cddefaf 215-217
+packages/backend/src/routing/model-params/__tests__/route-model-params.service.spec.ts
+  s_1798c724194e34::t_2903e80ba89895 210-241,339-351
+  s_1798c724194e34::t_4440d8e6b1d81d 352
+packages/backend/src/routing/model-params/route-model-params.service.ts
+  s_1798c724194e34::t_07ed94871a4cf0 5,25,52-53,75,91-94,96-97,114,129,143,146-149,161-166,195-196,199-200
+packages/cli/src/commands/routing.ts
+  s_1798c724194e34::t_5a68d85cddefaf 524-525
+packages/cli/src/skill-content.gen.ts
+  s_1798c724194e34::t_8ec3ec4d6434a4 7
+packages/backend/src/common/utils/anthropic-model-id.ts
+  s_1798c724194e34::t_fecaa9776fd9a5 35-43
+packages/backend/src/routing/proxy/proxy-fallback.service.ts
+  s_1798c724194e34::t_fecaa9776fd9a5 1128
+  s_1798c724194e34::t_ec2af8cd1ec109 77
+packages/backend/test/tier-model-params.e2e-spec.ts
+  s_1798c724194e34::t_5a68d85cddefaf 96-100,117-121,147-150
+  s_1798c724194e34::t_91964575db2ab4 151
+packages/cli/src/index.ts
+  s_1798c724194e34::t_5a68d85cddefaf 133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "70c8fd1d1043125f33341cb81d65f70cfdccf026",
+  "prompts": {},
+  "sessions": {
+    "s_1798c724194e34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2e42e1b4-3cc3-4564-910e-0ff1d4db26d0",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
