@@ -1,0 +1,25 @@
+packages/backend/src/common/errors/error-codes.ts
+  s_9985d850b0c3cd::t_87d52e67bef2ff 35-36
+  s_9985d850b0c3cd::t_65940ecffbb5f3 37
+.changeset/m101-default-model.md
+  s_9985d850b0c3cd::t_7fd52f30abaf85 1-5
+packages/backend/src/common/errors/__tests__/error-codes.spec.ts
+  s_9985d850b0c3cd::t_7fd52f30abaf85 53-59
+  s_9985d850b0c3cd::t_8a0c3164a693b7 72-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8417bc185c89bec2411ef84934aeacb40e204c97",
+  "prompts": {},
+  "sessions": {
+    "s_9985d850b0c3cd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "32831f2e-0148-461d-915e-67ddb89b9dcb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
