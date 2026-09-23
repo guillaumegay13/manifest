@@ -60,6 +60,17 @@ describe('PROVIDER_REGISTRY', () => {
     expect(openrouter!.requiresApiKey).toBe(true);
   });
 
+  it('upstage is registered as an API-key provider with an OpenRouter fallback prefix', () => {
+    const upstage = PROVIDER_REGISTRY.find((p) => p.id === 'upstage');
+    expect(upstage).toBeDefined();
+    expect(upstage!.displayName).toBe('Upstage');
+    expect(upstage!.aliases).toEqual([]);
+    expect(upstage!.openRouterPrefixes).toEqual(['upstage']);
+    expect(upstage!.requiresApiKey).toBe(true);
+    expect(upstage!.localOnly).toBe(false);
+    expect(upstage!.keyPlaceholder).toBe('Upstage API key');
+  });
+
   it('anthropic has no aliases', () => {
     const anthropic = PROVIDER_REGISTRY.find((p) => p.id === 'anthropic');
     expect(anthropic).toBeDefined();

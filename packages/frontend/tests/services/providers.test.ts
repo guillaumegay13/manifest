@@ -509,6 +509,15 @@ describe('PROVIDERS', () => {
     expect(getRoutingProviderApiKeyUrl('meta')).toBe('https://dev.meta.ai/');
   });
 
+  it('exposes Upstage as an API-key provider', () => {
+    const upstage = PROVIDERS.find((provider) => provider.id === 'upstage')!;
+    expect(upstage.name).toBe('Upstage');
+    expect(upstage.subtitle).toBe('Solar Mini 4 and Solar models');
+    expect(upstage.keyPlaceholder).toBe('Upstage API key');
+    expect(upstage.supportsSubscription).toBeUndefined();
+    expect(getRoutingProviderApiKeyUrl('upstage')).toBe('https://console.upstage.ai/api/chat');
+  });
+
   it('each provider has required fields', () => {
     for (const p of PROVIDERS) {
       expect(p.id).toBeTruthy();

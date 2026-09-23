@@ -176,6 +176,13 @@ export const PROVIDER_ENDPOINTS: Record<string, ProviderEndpoint> = {
     format: 'openai',
     ...openaiStreamUsage,
   },
+  upstage: {
+    baseUrl: 'https://api.upstage.ai',
+    buildHeaders: openaiHeaders,
+    buildPath: openaiPath,
+    format: 'openai',
+    ...openaiStreamUsage,
+  },
   'openai-subscription': {
     baseUrl: CHATGPT_SUBSCRIPTION_BASE,
     buildHeaders: chatgptSubscriptionHeaders,

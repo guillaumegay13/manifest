@@ -19,6 +19,7 @@ describe('ProviderModelFetcherService', () => {
   it('should have configs for all providers including subscription variants', () => {
     const expected = [
       'openai',
+      'upstage',
       'openai-subscription',
       'bedrock',
       'cerebras',
@@ -56,6 +57,33 @@ describe('ProviderModelFetcherService', () => {
     for (const id of expected) {
       expect(PROVIDER_CONFIGS[id]).toBeDefined();
     }
+  });
+
+  it('fetches Upstage models through the OpenAI-compatible catalog endpoint', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [{ id: 'solar-mini4', object: 'model' }],
+      }),
+    });
+
+    const result = await service.fetch('upstage', 'upstage-key');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.upstage.ai/v1/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer upstage-key',
+        }),
+      }),
+    );
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'solar-mini4',
+        displayName: 'solar-mini4',
+        provider: 'upstage',
+      }),
+    ]);
   });
 
   it('discovers only Gemini models from the Gemini Free LiteLLM catalog', async () => {

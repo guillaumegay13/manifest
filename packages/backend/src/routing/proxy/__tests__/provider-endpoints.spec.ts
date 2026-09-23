@@ -173,6 +173,7 @@ describe('resolveEndpointKey', () => {
     expect(known).toContain('gemini-free');
     expect(known).toContain('nous');
     expect(known).toContain('openrouter');
+    expect(known).toContain('upstage');
     expect(known).toContain('nvidia');
     expect(known).toContain('ollama');
     expect(known).toContain('ollama-cloud');
@@ -589,6 +590,17 @@ describe('PROVIDER_ENDPOINTS', () => {
     expect(path).toBe('/api/v1/chat/completions');
   });
 
+  it('builds Upstage requests with OpenAI-compatible bearer auth', () => {
+    const ep = PROVIDER_ENDPOINTS['upstage'];
+    expect(ep.baseUrl).toBe('https://api.upstage.ai');
+    expect(ep.buildPath('solar-mini4')).toBe('/v1/chat/completions');
+    expect(ep.format).toBe('openai');
+    expect(ep.buildHeaders('upstage-key')).toEqual({
+      Authorization: 'Bearer upstage-key',
+      'Content-Type': 'application/json',
+    });
+  });
+
   it('openai-subscription uses chatgpt.com backend base URL', () => {
     const ep = PROVIDER_ENDPOINTS['openai-subscription'];
     expect(ep.baseUrl).toBe('https://chatgpt.com/backend-api');
@@ -842,6 +854,7 @@ describe('PROVIDER_ENDPOINTS', () => {
       'zai-subscription',
       'copilot',
       'openrouter',
+      'upstage',
       'ollama',
       'ollama-cloud',
       'commandcode',

@@ -473,6 +473,18 @@ export const SHARED_PROVIDERS: readonly SharedProviderEntry[] = [
     keyPlaceholder: 'sk-or-...',
   },
   {
+    id: 'upstage',
+    displayName: 'Upstage',
+    aliases: [],
+    openRouterPrefixes: ['upstage'],
+    requiresApiKey: true,
+    localOnly: false,
+    color: '#2F6BFF',
+    keyPrefix: '',
+    minKeyLength: 10,
+    keyPlaceholder: 'Upstage API key',
+  },
+  {
     id: 'xai',
     displayName: 'xAI',
     aliases: [],
