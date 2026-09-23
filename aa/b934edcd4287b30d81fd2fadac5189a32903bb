@@ -1,0 +1,47 @@
+.changeset/gemini-workspace-project.md
+  s_26e59e0486a0d0::t_0a2cb6f4c6ab85 1-5
+design-system/registry/components.json
+  s_26e59e0486a0d0::t_4ef114518de9f1 689-700,1111,1832-1840,3402,3424,3632-3645,4448,4455,4462,4469,4476,4483,4490,4497,4504,4511,4518,4525,4532,4539,4546,4553,4560,4567,4574,4581,4588,4595,4675,4683,4691,4699,4707,4715,4731,4739,4747,4755,4763,4771,4779,4827,4867,4875,4883,4891,4899,4907,4915,4923,5119-5120
+design-system/registry/llms.txt
+  s_26e59e0486a0d0::t_7f27ab1880a85e 99,136,169,232,343,362,438-456,458-460,474-479,481-487,493,498-502,504-506
+packages/backend/src/routing/oauth/core/redirect-pkce-oauth.base.ts
+  s_26e59e0486a0d0::t_5ee8e65648d6bd 93-94,98-104,154,168,225,380-381,383-386
+packages/backend/src/routing/oauth/gemini/codeassist-client.service.spec.ts
+  s_26e59e0486a0d0::t_bd531cfc3abeb5 1,136,142,152-240
+packages/backend/src/routing/oauth/gemini/codeassist-client.service.ts
+  s_26e59e0486a0d0::t_c40326badbb224 17-20,33-34,54-62,78-81,83-88,90-91,93-99,101,105-108,111-112,115-116,179-195
+packages/backend/src/routing/oauth/gemini/gemini-oauth.controller.spec.ts
+  s_26e59e0486a0d0::t_eaac7829611ef7 63,74,88,102-107,123-128,142-147,165,175,178-212
+packages/backend/src/routing/oauth/gemini/gemini-oauth.controller.ts
+  s_26e59e0486a0d0::t_671714d07c9f47 41-43,48,55,67
+packages/backend/src/routing/oauth/gemini/gemini-oauth.service.spec.ts
+  s_26e59e0486a0d0::t_0c007b30beda0a 198,212-225
+packages/backend/src/routing/oauth/gemini/gemini-oauth.service.ts
+  s_26e59e0486a0d0::t_02cbddcc7e198c 6-9,66-67,69-73
+packages/frontend/src/components/OAuthDetailView.tsx
+  s_26e59e0486a0d0::t_b55c7b87ca0dcd 70,80,136-138,198-205,296-315
+packages/frontend/src/services/api/oauth.ts
+  s_26e59e0486a0d0::t_802868b2757313 152-156,159,184-188,190
+packages/frontend/tests/components/OAuthDetailView.test.tsx
+  s_26e59e0486a0d0::t_7c1607f13155fd 247,292,423-425,611-618,620,634-651,655-659
+packages/frontend/tests/components/ProviderSelectModal.test.tsx
+  s_26e59e0486a0d0::t_00f0992bbb353e 775
+packages/frontend/tests/services/api/oauth.test.ts
+  s_26e59e0486a0d0::t_060ecbcaa711eb 317-324
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "aab934edcd4287b30d81fd2fadac5189a32903bb",
+  "prompts": {},
+  "sessions": {
+    "s_26e59e0486a0d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f353378-e6c2-419f-9c37-68e78860a75f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
