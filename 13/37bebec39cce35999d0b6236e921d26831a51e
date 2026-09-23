@@ -1,0 +1,81 @@
+packages/backend/src/routing/model-params/__tests__/route-model-params.service.spec.ts
+  s_1798c724194e34::t_fb397aec039755 1-98,106-169,173-188,192-286,290-301,305-321
+  s_1798c724194e34::t_075fab60da2c9e 99-105,170-172,189-191,287-289,302-304
+packages/backend/src/routing/model-params/route-model-params.module.ts
+  s_1798c724194e34::t_2cdd4da31fec77 1-13
+packages/cli/src/index.spec.ts
+  s_1798c724194e34::t_db928d26c22ef4 123
+  s_1798c724194e34::t_9c15cc1896367c 120-122
+packages/backend/src/routing/model-params/__tests__/route-model-params.controller.spec.ts
+  s_1798c724194e34::t_2cdd4da31fec77 1-35
+packages/cli/src/args.ts
+  s_1798c724194e34::t_6f73a0d2f3d490 8-9,22,33-34,51,54,56-63,65-66,79-81
+packages/backend/src/mcp/tools/routing.tools.ts
+  s_1798c724194e34::t_85395a1846b96a 3,184-233
+  s_1798c724194e34::t_074f5e0b838569 234-237
+packages/cli/README.md
+  s_1798c724194e34::t_4916050c88913d 52
+CLAUDE.md
+  s_1798c724194e34::t_d86832f2396202 437
+  s_1798c724194e34::t_1feb874b24517d 377
+packages/cli/src/commands/commands.spec.ts
+  s_1798c724194e34::t_db928d26c22ef4 2921-2997
+packages/cli/src/commands/routing.ts
+  s_1798c724194e34::t_6f73a0d2f3d490 495-566
+packages/cli/src/index.ts
+  s_1798c724194e34::t_6f73a0d2f3d490 70-71,143-144
+packages/backend/src/mcp/tools/tools.spec.ts
+  s_1798c724194e34::t_5e703f5b92e222 130-133,555-582
+  s_1798c724194e34::t_3499384af81a11 583
+packages/backend/src/routing/model-params.controller.ts
+  s_1798c724194e34::t_243caa888e8d53 13,144
+  s_1798c724194e34::t_075fab60da2c9e 1-2
+packages/backend/src/mcp/mcp.module.ts
+  s_1798c724194e34::t_2cdd4da31fec77 2,35
+packages/backend/src/routing/routing.module.ts
+  s_1798c724194e34::t_2cdd4da31fec77 2,60
+packages/backend/src/routing/model-params/route-model-params.service.ts
+  s_1798c724194e34::t_efd6a48e2685b5 1-18,24-215
+  s_1798c724194e34::t_075fab60da2c9e 19-23
+packages/cli/src/args.spec.ts
+  s_1798c724194e34::t_db928d26c22ef4 12,16-33
+  s_1798c724194e34::t_48f02a5941049a 34
+packages/backend/src/mcp/tool-deps.ts
+  s_1798c724194e34::t_85395a1846b96a 22,51
+packages/backend/test/tier-model-params.e2e-spec.ts
+  s_1798c724194e34::t_5ab3643db809a1 1-80,84,86-105,109-116,118-143
+  s_1798c724194e34::t_3670d94f2eb43e 81-83,85,106-108,117
+.claude/skills/mnfst-cli/SKILL.md
+  s_1798c724194e34::t_4916050c88913d 44
+packages/backend/src/routing/dto/model-params.dto.ts
+  s_1798c724194e34::t_1a691946152444 2-3,7,9-10,16-21,99-135
+  s_1798c724194e34::t_794906cc644b17 136
+packages/backend/src/routing/model-params/route-model-params.controller.ts
+  s_1798c724194e34::t_2cdd4da31fec77 1-47
+packages/cli/src/skill-content.gen.ts
+  s_1798c724194e34::t_4916050c88913d 7
+.changeset/tier-model-params-cli-mcp.md
+  s_1798c724194e34::t_1feb874b24517d 1-5
+packages/backend/src/routing/model-params/sanitize-model-params.ts
+  s_1798c724194e34::t_243caa888e8d53 1-48
+packages/backend/src/mcp/mcp.controller.ts
+  s_1798c724194e34::t_85395a1846b96a 41,80,112
+packages/backend/src/mcp/tools/environment.tools.ts
+  s_1798c724194e34::t_d86832f2396202 132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1337bebec39cce35999d0b6236e921d26831a51e",
+  "prompts": {},
+  "sessions": {
+    "s_1798c724194e34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2e42e1b4-3cc3-4564-910e-0ff1d4db26d0",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
