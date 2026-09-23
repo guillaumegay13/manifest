@@ -1,0 +1,25 @@
+packages/backend/src/routing/proxy/__tests__/proxy-message-recorder.spec.ts
+  s_0c9099ab3f0682::t_318696c5fb34ca 258-259,279-299
+packages/backend/src/routing/proxy/__tests__/proxy.controller.spec.ts
+  s_0c9099ab3f0682::t_9a16fe66981d95 3238-3239,3257,3259-3260,3264-3267,3282-3284
+packages/backend/src/routing/proxy/proxy-message-recorder.ts
+  s_0c9099ab3f0682::t_da7cab1b34b30c 744-745,748-764
+packages/backend/src/routing/proxy/proxy.controller.ts
+  s_0c9099ab3f0682::t_e28bad6fb24fb3 590,592-597
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ad4d480f4550acdc67fc190e1715cddc22a47e9b",
+  "prompts": {},
+  "sessions": {
+    "s_0c9099ab3f0682": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad97d56e-f47e-4757-8c7e-5a108020615c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
