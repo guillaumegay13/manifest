@@ -1,0 +1,19 @@
+packages/backend/src/database/run-migrations-with-lock.spec.ts
+  s_493a0de9540d86::t_e95af365562d5a 158-159,161-163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c98b9485d6d16530c126ad54800bad73dfcef318",
+  "prompts": {},
+  "sessions": {
+    "s_493a0de9540d86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d5d7f50-50bf-42c7-9355-0c62b5aa35c8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
