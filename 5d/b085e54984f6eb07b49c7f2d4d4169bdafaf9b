@@ -1,0 +1,23 @@
+.changeset/poll-migration-lock.md
+  s_493a0de9540d86::t_b2f561bd244526 1-5
+packages/backend/src/database/run-migrations-with-lock.spec.ts
+  s_493a0de9540d86::t_558a2e8f9035f8 4,16-26,47,49,67,74,76,85,93-159
+packages/backend/src/database/run-migrations-with-lock.ts
+  s_493a0de9540d86::t_9f9ee151e5f043 12-19,23-32,38-41,48-57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5db085e54984f6eb07b49c7f2d4d4169bdafaf9b",
+  "prompts": {},
+  "sessions": {
+    "s_493a0de9540d86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d5d7f50-50bf-42c7-9355-0c62b5aa35c8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
