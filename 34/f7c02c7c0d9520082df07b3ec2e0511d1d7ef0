@@ -1,0 +1,36 @@
+packages/backend/src/mcp/tools/routing.tools.ts
+  s_9985d850b0c3cd::t_c005157b40c2b6 8-12,451-460,462-470,480-483
+packages/backend/src/routing/routing-core/tier.service.ts
+  s_9985d850b0c3cd::t_d6781d3ef49ed2 17-22,112,313-314
+  s_9985d850b0c3cd::t_deaaa7edc45a85 325-327,329
+packages/backend/src/mcp/tools/tools.spec.ts
+  s_9985d850b0c3cd::t_3d8a94e1dacfa4 133-135,672-712
+  s_9985d850b0c3cd::t_2f4853de95bc18 713-714
+packages/backend/src/routing/header-tiers/header-tier.service.ts
+  s_9985d850b0c3cd::t_deaaa7edc45a85 299-301,303
+  s_9985d850b0c3cd::t_336cca62d359b4 15
+  s_9985d850b0c3cd::t_d6781d3ef49ed2 16-20
+packages/backend/src/routing/routing-core/resolve-model-route.ts
+  s_9985d850b0c3cd::t_aed44f883eb84b 4,13-14,17-18,39-40,51-57,60,72-86,91-142,146,148,150,160-163
+  s_9985d850b0c3cd::t_c005157b40c2b6 16,19,66
+  s_9985d850b0c3cd::t_deaaa7edc45a85 87-90
+packages/backend/src/routing/routing-core/__tests__/resolve-model-route.spec.ts
+  s_9985d850b0c3cd::t_a8f4b7d745d660 3,5,8,61-64,135-141,154-156,165,179-192,194,202-256
+  s_9985d850b0c3cd::t_010d16a9ed726b 257
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "34f7c02c7c0d9520082df07b3ec2e0511d1d7ef0",
+  "prompts": {},
+  "sessions": {
+    "s_9985d850b0c3cd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "32831f2e-0148-461d-915e-67ddb89b9dcb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
