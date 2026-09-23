@@ -1,0 +1,49 @@
+packages/backend/src/analytics/services/messages-query.service.ts
+  s_493a0de9540d86::t_cff41f762ea686 456-459,462,464-466
+  s_493a0de9540d86::t_fb5066a2413f83 324-326
+  s_493a0de9540d86::t_26143b219d6300 17,79-100,332-334,371-372,377-378,388-389,449-450,461,496-497,854,922-923,1111-1112,1114-1118
+  s_493a0de9540d86::t_d78bfcf636c22f 327-330,728-747,1124-1126
+  s_493a0de9540d86::t_f1082573c9b5c7 748-749
+packages/backend/src/database/migrations/1803000000000-CoverRequestsLogFilters.ts
+  s_493a0de9540d86::t_2ba3af94b5a583 1-30,32-101
+  s_493a0de9540d86::t_2e28cff37fcf5e 31
+packages/backend/src/analytics/services/messages-query.requests.spec.ts
+  s_493a0de9540d86::t_dc0f97d2d381c3 616,627,687-692,694-696,698-702,704,710-721
+  s_493a0de9540d86::t_2890e349a26d58 614-615,617-626,628-686,693,697,703,705-709,722-738
+packages/backend/test/messages-request-filters.e2e-spec.ts
+  s_493a0de9540d86::t_41063b32404cb9 32-35,37-39
+  s_493a0de9540d86::t_b84aef954df164 11
+  s_493a0de9540d86::t_2b9a4e967adeb5 268-270
+  s_493a0de9540d86::t_8b208246b7a88a 1-10,12-31,36,40-267,271-272
+packages/backend/src/database/migrations/1803000000000-CoverRequestsLogFilters.spec.ts
+  s_493a0de9540d86::t_7e439a1feebc29 1-43,49-91
+  s_493a0de9540d86::t_2b9a4e967adeb5 44-48
+packages/backend/src/analytics/services/messages-query.filter-options.spec.ts
+  s_493a0de9540d86::t_dc0f97d2d381c3 63,98-99,108,110-115,126-130,136-137
+  s_493a0de9540d86::t_2b9a4e967adeb5 131-135
+  s_493a0de9540d86::t_b2c9ff923d076a 109
+  s_493a0de9540d86::t_2890e349a26d58 138-155
+  s_493a0de9540d86::t_b770b26e91f2d6 156
+.changeset/quick-requests-filters.md
+  s_493a0de9540d86::t_b84aef954df164 1-5
+packages/backend/src/analytics/services/messages-query.service.spec.ts
+  s_493a0de9540d86::t_2890e349a26d58 208
+packages/backend/src/database/data-source-definitions.ts
+  s_493a0de9540d86::t_2e28cff37fcf5e 58,352
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e221ab4091076d5dfdf896f3b641206aa1bac6a0",
+  "prompts": {},
+  "sessions": {
+    "s_493a0de9540d86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d5d7f50-50bf-42c7-9355-0c62b5aa35c8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
