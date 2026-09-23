@@ -196,6 +196,11 @@ export const PROVIDER_CATALOG: readonly ProviderCatalogEntry[] = [
     authTypes: ['api_key'],
   },
   {
+    id: 'upstage',
+    displayName: 'Upstage',
+    authTypes: ['api_key'],
+  },
+  {
     id: 'xai',
     displayName: 'xAI',
     authTypes: ['api_key', 'subscription'],
