@@ -1,0 +1,19 @@
+packages/backend/src/routing/dto/resolve-response.ts
+  s_9985d850b0c3cd::t_e2da8b2c9e5dc0 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "26c2905bf26ab9ff3ae97a08e5b77827b7d47a04",
+  "prompts": {},
+  "sessions": {
+    "s_9985d850b0c3cd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "32831f2e-0148-461d-915e-67ddb89b9dcb",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
