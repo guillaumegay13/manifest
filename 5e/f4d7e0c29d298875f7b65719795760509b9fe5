@@ -1,0 +1,33 @@
+packages/backend/src/model-discovery/model-capabilities.ts
+  s_26e59e0486a0d0::t_bf312f7af833f7 47-49
+  s_26e59e0486a0d0::t_e42b8ee810d2e4 3,39-46,50-54,187
+packages/backend/src/model-discovery/model-discovery.service.ts
+  s_26e59e0486a0d0::t_f407f0c014d379 331-340
+packages/backend/src/model-discovery/model-discovery.service.spec.ts
+  s_26e59e0486a0d0::t_80e105e7ed21c1 1424-1427,1462
+packages/backend/src/model-discovery/model-capabilities.spec.ts
+  s_26e59e0486a0d0::t_80e105e7ed21c1 3,37-47
+  s_26e59e0486a0d0::t_c5d53dde22471b 48
+packages/backend/src/model-discovery/provider-model-fetcher.service.ts
+  s_26e59e0486a0d0::t_f407f0c014d379 78-79,84-89,104-105,119-120,141-143,191-192
+  s_26e59e0486a0d0::t_e42b8ee810d2e4 641-642
+  s_26e59e0486a0d0::t_bf312f7af833f7 3
+packages/backend/src/model-discovery/provider-model-fetcher.service.spec.ts
+  s_26e59e0486a0d0::t_80e105e7ed21c1 1488-1506
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5ef4d7e0c29d298875f7b65719795760509b9fe5",
+  "prompts": {},
+  "sessions": {
+    "s_26e59e0486a0d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f353378-e6c2-419f-9c37-68e78860a75f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
