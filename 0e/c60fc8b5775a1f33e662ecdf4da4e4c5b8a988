@@ -1,0 +1,25 @@
+packages/backend/src/routing/model-params/__tests__/route-model-params.service.spec.ts
+  s_1798c724194e34::t_3d4bf34451011c 213,227,237
+packages/backend/src/routing/routing-core/__tests__/agent-model-params.service.spec.ts
+  s_1798c724194e34::t_3d4bf34451011c 139-175
+packages/backend/src/routing/model-params/route-model-params.service.ts
+  s_1798c724194e34::t_3d4bf34451011c 52,96,114,129,199-201
+packages/backend/src/routing/routing-core/agent-model-params.service.ts
+  s_1798c724194e34::t_3d4bf34451011c 8,55-59,64,66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0ec60fc8b5775a1f33e662ecdf4da4e4c5b8a988",
+  "prompts": {},
+  "sessions": {
+    "s_1798c724194e34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2e42e1b4-3cc3-4564-910e-0ff1d4db26d0",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
