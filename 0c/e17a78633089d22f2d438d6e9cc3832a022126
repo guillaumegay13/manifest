@@ -1,0 +1,29 @@
+.changeset/remove-public-usage-stats.md
+  s_493a0de9540d86::t_b439a92597496e 1-5
+.github/workflows/docker-smoke.yml
+  s_493a0de9540d86::t_bf46a31f7b6df6 181,183,185
+CLAUDE.md
+  s_493a0de9540d86::t_aab1c7df2019d0 445,508
+packages/backend/src/config/app.config.ts
+  s_493a0de9540d86::t_620aa70e6981e3 55-58
+packages/backend/src/error-pages/public-error-pages.controller.spec.ts
+  s_493a0de9540d86::t_d8432da3a9c6a5 9
+packages/backend/src/error-pages/public-error-pages.controller.ts
+  s_493a0de9540d86::t_657c2b8b21c072 8-9,19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0ce17a78633089d22f2d438d6e9cc3832a022126",
+  "prompts": {},
+  "sessions": {
+    "s_493a0de9540d86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7d5d7f50-50bf-42c7-9355-0c62b5aa35c8",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
