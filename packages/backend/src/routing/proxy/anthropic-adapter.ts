@@ -511,8 +511,14 @@ export function applyAnthropicMessagesMutations(
   if (isObjectRecord(result.output_config)) {
     result.output_config = closeOutputConfigObjectSchemas(result.output_config);
   }
+  // Anthropic processes breakpoints in tools → system → messages order and
+  // rejects a one-hour breakpoint that follows a five-minute one. A caller that
+  // uses one-hour TTLs (Claude Code does, on system) has planned its own cache,
+  // so adding our default five-minute breakpoints would only produce a 400.
   const cacheBudget = {
-    remaining: Math.max(0, MAX_CACHE_CONTROL_BLOCKS - countCacheControlBlocks(body)),
+    remaining: hasOneHourCacheControl(body)
+      ? 0
+      : Math.max(0, MAX_CACHE_CONTROL_BLOCKS - countCacheControlBlocks(body)),
   };
 
   // Normalize `system` to a content-block array so cache_control + identity

@@ -2471,6 +2471,34 @@ describe('Anthropic Adapter', () => {
       expect(system[1].cache_control).toEqual({ type: 'ephemeral' });
     });
 
+    it('adds no five-minute breakpoints when the caller uses one-hour TTLs', () => {
+      // Claude Code shape: one-hour breakpoints on system, none on tools. A
+      // five-minute breakpoint on the last tool (processed before system) or
+      // on the first uncached system block would make Anthropic reject the
+      // request with "a ttl='1h' cache_control block must not come after a
+      // ttl='5m' cache_control block".
+      const oneHour = { type: 'ephemeral', ttl: '1h' };
+      const result = applyAnthropicMessagesMutations(
+        {
+          messages: [{ role: 'user', content: 'hi' }],
+          system: [
+            { type: 'text', text: 'billing header' },
+            { type: 'text', text: 'identity', cache_control: oneHour },
+            { type: 'text', text: 'instructions', cache_control: oneHour },
+          ],
+          tools: [
+            { name: 'Bash', input_schema: { type: 'object' } },
+            { name: 'Read', input_schema: { type: 'object' } },
+          ],
+        },
+        { injectSubscriptionIdentity: true },
+      );
+      const system = result.system as Array<Record<string, unknown>>;
+      expect(system.map((b) => b.cache_control)).toEqual([undefined, undefined, oneHour, oneHour]);
+      const tools = result.tools as Array<Record<string, unknown>>;
+      expect(tools.every((t) => t.cache_control === undefined)).toBe(true);
+    });
+
     it('wraps a string system in a block array and caches it', () => {
       const result = applyAnthropicMessagesMutations({
         messages: [{ role: 'user', content: 'hi' }],
