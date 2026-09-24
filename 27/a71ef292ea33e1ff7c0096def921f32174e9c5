@@ -1,0 +1,19 @@
+packages/backend/src/common/constants/subscription-clients.ts
+  s_1f01d59f8d1cc0::t_72b1e4c37deba4 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "27a71ef292ea33e1ff7c0096def921f32174e9c5",
+  "prompts": {},
+  "sessions": {
+    "s_1f01d59f8d1cc0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f2d9fadfeffeEWn5bsJq1ITuFv",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
