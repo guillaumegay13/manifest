@@ -1,0 +1,28 @@
+.changeset/anthropic-cache-ttl-conflict.md
+  s_b29129b136bbbe::t_9753f21228d39c 1-5
+packages/frontend/src/components/ClaudeCodeSetup.tsx
+  s_b29129b136bbbe::t_128c3572f390e3 76-82
+packages/frontend/tests/components/ClaudeCodeSetup.test.tsx
+  s_b29129b136bbbe::t_c4b1fa30a0aae7 30-36
+packages/backend/src/routing/proxy/__tests__/anthropic-adapter.spec.ts
+  s_b29129b136bbbe::t_a20cc7d4500da5 2474-2496,2498-2501
+  s_b29129b136bbbe::t_1a2f81e1511f75 2497
+packages/backend/src/routing/proxy/anthropic-adapter.ts
+  s_b29129b136bbbe::t_78e639e1b44950 514-517,519-521
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4a8a3ea9d0f6ecb052842a48ba4728d17a5dd237",
+  "prompts": {},
+  "sessions": {
+    "s_b29129b136bbbe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "697a2d54-930e-4472-8b47-35fc5631af1a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
