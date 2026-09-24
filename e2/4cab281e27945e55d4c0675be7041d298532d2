@@ -1,0 +1,27 @@
+packages/backend/src/model-discovery/model-discovery.service.spec.ts
+  s_1f01d59f8d1cc0::t_366fd52228c9d5 2018,2389,2592
+  s_1f01d59f8d1cc0::t_46b32699899cf2 2382,2585
+packages/shared/src/subscription/configs.ts
+  s_1f01d59f8d1cc0::t_eaf7362befe296 26-29
+packages/shared/__tests__/subscription.spec.ts
+  s_1f01d59f8d1cc0::t_06fa11253b9825 336-337
+packages/backend/src/model-discovery/model-fallback.spec.ts
+  s_1f01d59f8d1cc0::t_9ad67da90a1413 337
+  s_1f01d59f8d1cc0::t_e30b0687e6e1c7 323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "e24cab281e27945e55d4c0675be7041d298532d2",
+  "prompts": {},
+  "sessions": {
+    "s_1f01d59f8d1cc0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f2d9fadfeffeEWn5bsJq1ITuFv",
+        "model": "auto"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
