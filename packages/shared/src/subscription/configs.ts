@@ -23,6 +23,10 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
       // claude-opus-4 / claude-haiku-4 prefixes above. claude-opus-5 is not —
       // the 5 generation dropped the 4.x prefix, so it needs its own entry.
       'claude-opus-5',
+      // Opus 5.5 is a point release callers address directly, so it needs its
+      // own entry too: prefix matching lets it inherit claude-opus-5's context
+      // window, but the curated catalog never emits a name it does not list.
+      'claude-opus-5-5',
       'claude-sonnet-5',
     ]),
     subscriptionCapabilities: Object.freeze({

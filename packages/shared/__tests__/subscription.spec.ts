@@ -333,6 +333,8 @@ describe('getSubscriptionKnownModels', () => {
     expect(models).toContain('claude-sonnet-4');
     // claude-sonnet-5 (launched 2026-06-30) is served on the Claude plan.
     expect(models).toContain('claude-sonnet-5');
+    // Opus 5.5 is a point release addressed directly by callers.
+    expect(models).toContain('claude-opus-5-5');
   });
 
   it('returns the curated ChatGPT plan models for OpenAI', () => {
