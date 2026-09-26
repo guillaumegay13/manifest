@@ -196,6 +196,35 @@ describe('request limit gate (/v1 proxy)', () => {
     expect(billableAfter).toBe(billableBefore);
   });
 
+  // A failed renewal leaves the subscription past_due while Stripe retries it.
+  // Showing that tenant as Free offered "Upgrade", and checkout then started a
+  // second subscription next to the one still being retried.
+  it.each([
+    ['active', 'pro'],
+    ['trialing', 'pro'],
+    ['past_due', 'pro'],
+    ['unpaid', 'free'],
+    ['canceled', 'free'],
+    ['incomplete', 'free'],
+    ['incomplete_expired', 'free'],
+  ])('resolves a %s pro subscription to the %s plan', async (status, expected) => {
+    const tenantRows = await ds.query(`SELECT id FROM tenants WHERE owner_user_id = $1 LIMIT 1`, [
+      TEST_USER_ID,
+    ]);
+    await ds.query(
+      `INSERT INTO "subscription" ("id", "plan", "referenceId", "status") VALUES ('sub-status-e2e', 'pro', $1, $2)`,
+      [TEST_USER_ID, status],
+    );
+    try {
+      const plan = await app
+        .get(PlanService)
+        .getPlan({ tenantId: tenantRows[0].id, userId: TEST_USER_ID });
+      expect(plan).toBe(expected);
+    } finally {
+      await ds.query(`DELETE FROM "subscription" WHERE "id" = 'sub-status-e2e'`);
+    }
+  });
+
   it('allows requests once the tenant is on an active pro subscription (unlimited)', async () => {
     await ds.query(
       `INSERT INTO "subscription" ("id", "plan", "referenceId", "status") VALUES ('sub-req-e2e-1', 'pro', $1, 'active')`,
