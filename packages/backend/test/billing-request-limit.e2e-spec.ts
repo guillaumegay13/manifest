@@ -94,6 +94,12 @@ afterAll(async () => {
 });
 
 describe('request limit gate (/v1 proxy)', () => {
+  // Every case sets its own plan. A subscription row left by a killed run would
+  // otherwise turn the Free cases into Pro or fail a fixed-id INSERT.
+  beforeEach(async () => {
+    await ds.query(`DELETE FROM "subscription" WHERE "referenceId" = $1`, [TEST_USER_ID]);
+  });
+
   it('blocks a free tenant over the monthly request cap with a real 402 for tool callers', async () => {
     const tenantRows = await ds.query(`SELECT id FROM tenants WHERE owner_user_id = $1 LIMIT 1`, [
       TEST_USER_ID,
@@ -211,9 +217,6 @@ describe('request limit gate (/v1 proxy)', () => {
     const tenantRows = await ds.query(`SELECT id FROM tenants WHERE owner_user_id = $1 LIMIT 1`, [
       TEST_USER_ID,
     ]);
-    // Start from no rows: a row left by a killed run would fail the INSERT or,
-    // if it were active, turn every case into Pro.
-    await ds.query(`DELETE FROM "subscription" WHERE "referenceId" = $1`, [TEST_USER_ID]);
     try {
       await ds.query(
         `INSERT INTO "subscription" ("id", "plan", "referenceId", "status") VALUES ('sub-status-e2e', 'pro', $1, $2)`,
