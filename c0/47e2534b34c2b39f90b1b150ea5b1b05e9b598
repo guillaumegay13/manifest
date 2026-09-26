@@ -1,0 +1,35 @@
+packages/backend/src/billing/plan.service.ts
+  s_09de8b020044d0::t_455ad688a42ae0 30,142
+packages/backend/test/billing-request-limit.e2e-spec.ts
+  s_09de8b020044d0::t_c0c6c1d98e5241 199-227
+packages/backend/src/billing/subscription-status.ts
+  s_09de8b020044d0::t_455ad688a42ae0 1-9,13-19
+  s_09de8b020044d0::t_366dfd85f4f50a 10-12
+packages/backend/src/database/request-recording-retention.service.ts
+  s_09de8b020044d0::t_455ad688a42ae0 52,64
+  s_09de8b020044d0::t_20307809360657 6
+.changeset/past-due-keeps-pro.md
+  s_09de8b020044d0::t_592992f9e6a8c6 1-5
+packages/backend/src/billing/plan.service.spec.ts
+  s_09de8b020044d0::t_de146fa89ca1cc 108-110
+packages/backend/src/billing/subscription-status.spec.ts
+  s_09de8b020044d0::t_95672c9b0831e2 1-14
+packages/backend/src/database/request-recording-retention.service.spec.ts
+  s_09de8b020044d0::t_be9232476da757 68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c047e2534b34c2b39f90b1b150ea5b1b05e9b598",
+  "prompts": {},
+  "sessions": {
+    "s_09de8b020044d0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cbd27233-c7b3-473b-8bf5-7461e3624d2f",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
