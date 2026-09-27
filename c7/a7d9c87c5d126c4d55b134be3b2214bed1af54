@@ -1,0 +1,14 @@
+.changeset/configurable-gateway-rate-caps.md
+  h_4314c622e2d856 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c7a7d9c87c5d126c4d55b134be3b2214bed1af54",
+  "prompts": {},
+  "humans": {
+    "h_4314c622e2d856": {
+      "author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
