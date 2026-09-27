@@ -14,6 +14,7 @@ const TEST_AGENT_ID = 'agent-001';
 const TEST_TENANT_ID = 'tenant-1';
 
 describe('ProviderController', () => {
+  const previousMode = process.env['MANIFEST_MODE'];
   let controller: ProviderController;
   let mockProviderService: Record<string, jest.Mock>;
   let mockDiscoveryService: Record<string, jest.Mock>;
@@ -25,6 +26,7 @@ describe('ProviderController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env['MANIFEST_MODE'] = 'selfhosted';
     mockProviderService = {
       getProviders: jest.fn().mockResolvedValue([]),
       upsertProvider: jest.fn().mockResolvedValue({ provider: {}, isNew: false }),
@@ -67,6 +69,11 @@ describe('ProviderController', () => {
       mockPricingSync as unknown as PricingSyncService,
       mockCacheManager as never,
     );
+  });
+
+  afterAll(() => {
+    if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
+    else process.env['MANIFEST_MODE'] = previousMode;
   });
 
   describe('upsertProvider region validation', () => {
@@ -505,10 +512,38 @@ describe('ProviderController', () => {
         isNew: true,
       });
 
-      await controller.upsertProvider(mockCtx, mockAgentName, { provider: 'ollama' });
+      await controller.upsertProvider(mockCtx, mockAgentName, {
+        provider: 'ollama',
+        authType: 'local',
+      });
 
       expect(mockOllamaSync.sync).toHaveBeenCalled();
       expect(mockProviderService.upsertProvider).toHaveBeenCalled();
+    });
+
+    it('rejects built-in local providers in cloud before contacting localhost', async () => {
+      process.env['MANIFEST_MODE'] = 'cloud';
+
+      await expect(
+        controller.upsertProvider(mockCtx, mockAgentName, {
+          provider: 'ollama',
+          authType: 'local',
+        }),
+      ).rejects.toThrow('Built-in local providers are only available in self-hosted Manifest');
+
+      expect(mockOllamaSync.sync).not.toHaveBeenCalled();
+      expect(mockProviderService.upsertProvider).not.toHaveBeenCalled();
+    });
+
+    it('rejects local auth on a non-local built-in provider in cloud', async () => {
+      process.env['MANIFEST_MODE'] = 'cloud';
+
+      await expect(
+        controller.upsertProvider(mockCtx, mockAgentName, {
+          provider: 'openai',
+          authType: 'local',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('should accept region=cn for MiniMax subscription', async () => {
@@ -715,17 +750,61 @@ describe('ProviderController', () => {
       ).rejects.toThrow('AWS Bedrock region must be a valid AWS region code');
     });
 
-    it('should reject region when MiniMax is connected with api_key auth', async () => {
+    it('should reject region for providers without regional endpoints', async () => {
       await expect(
         controller.upsertProvider(mockCtx, mockAgentName, {
-          provider: 'minimax',
+          provider: 'openai',
           apiKey: 'sk-test',
           authType: 'api_key',
           region: 'cn',
         }),
       ).rejects.toThrow(
-        'region is only supported for Alibaba/Qwen providers, AWS Bedrock, MiniMax subscriptions, Xiaomi MiMo Token Plan, and Z.ai subscriptions',
+        'region is only supported for Alibaba/Qwen providers, AWS Bedrock, MiniMax, Xiaomi MiMo Token Plan, and Z.ai subscriptions',
       );
+    });
+
+    it('should reject an unsupported region for MiniMax API-key auth', async () => {
+      await expect(
+        controller.upsertProvider(mockCtx, mockAgentName, {
+          provider: 'minimax',
+          apiKey: 'sk-test',
+          authType: 'api_key',
+          region: 'eu',
+        }),
+      ).rejects.toThrow('MiniMax API-key region must be one of: global, cn');
+      expect(mockProviderService.upsertProvider).not.toHaveBeenCalled();
+    });
+
+    it('should accept region=cn for MiniMax API-key auth', async () => {
+      mockProviderService.upsertProvider.mockResolvedValue({
+        provider: {
+          id: 'p1',
+          provider: 'minimax',
+          is_active: true,
+          auth_type: 'api_key',
+          region: 'cn',
+        },
+        isNew: true,
+      });
+
+      const result = await controller.upsertProvider(mockCtx, mockAgentName, {
+        provider: 'minimax',
+        apiKey: 'sk-test',
+        authType: 'api_key',
+        region: 'cn',
+      });
+
+      expect(mockProviderService.upsertProvider).toHaveBeenCalledWith(
+        TEST_AGENT_ID,
+        'tenant-1',
+        'minimax',
+        'sk-test',
+        'api_key',
+        'cn',
+        undefined,
+        'user-1',
+      );
+      expect(result.region).toBe('cn');
     });
   });
 

@@ -43,6 +43,7 @@ describe('messages API client', () => {
       agent_name: 'demo',
       cost_min: '0.01',
       cost_max: '1.00',
+      trigger: 'fallback',
       include_total: 'false',
       include_filter_options: 'false',
     });
@@ -55,7 +56,33 @@ describe('messages API client', () => {
     expect(url).toContain('agent_name=demo');
     expect(url).toContain('cost_min=0.01');
     expect(url).toContain('cost_max=1.00');
+    expect(url).toContain('trigger=fallback');
     expect(url).toContain('include_total=false');
+    expect(url).toContain('include_filter_options=false');
+  });
+
+  it('getMessages can bypass the GET cache for polling', async () => {
+    const fetchMock = setupFetch({ rows: [] });
+    const params = { agent_name: 'cache-bypass-demo', limit: '1' };
+
+    await messages.getMessages(params);
+    await messages.getMessages(params, { cache: false });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('getMessageCount requests one row with an exact total', async () => {
+    const fetchMock = setupFetch({ total_count: 42 });
+
+    await messages.getMessageCount({ range: '30d', agent_name: 'demo' });
+
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('/api/v1/messages');
+    expect(url).toContain('range=30d');
+    expect(url).toContain('agent_name=demo');
+    expect(url).toContain('limit=1');
+    expect(url).toContain('include_total=true');
+    expect(url).toContain('cache_total=true');
     expect(url).toContain('include_filter_options=false');
   });
 

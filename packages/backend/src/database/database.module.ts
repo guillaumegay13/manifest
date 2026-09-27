@@ -9,6 +9,7 @@ import { Tenant } from '../entities/tenant.entity';
 import { Agent } from '../entities/agent.entity';
 import { AgentApiKey } from '../entities/agent-api-key.entity';
 import { AgentMessage } from '../entities/agent-message.entity';
+import { ManifestRequest } from '../entities/request.entity';
 import { ApiKey } from '../entities/api-key.entity';
 import { TenantProvider } from '../entities/tenant-provider.entity';
 import { TierAssignment } from '../entities/tier-assignment.entity';
@@ -22,6 +23,8 @@ import { DatabaseSeederService } from './database-seeder.service';
 import { DbTuningService } from './db-tuning.service';
 import { ModelPricesModule } from '../model-prices/model-prices.module';
 import { shouldRetryDbConnection } from '../common/utils/db-retry';
+import { RequestRecordingRetentionService } from './request-recording-retention.service';
+import { SecretReencryptionService } from './secret-reencryption.service';
 
 @Module({
   imports: [
@@ -56,7 +59,7 @@ import { shouldRetryDbConnection } from '../common/utils/db-retry';
         toRetry: shouldRetryDbConnection,
         logging: false,
         extra: {
-          // app.config.ts always resolves dbPoolMax (default 20), so there is no
+          // app.config.ts always resolves dbPoolMax (default 10), so there is no
           // undefined case to fall back from — keep that file the single source
           // of truth for the pool size.
           max: config.get<number>('app.dbPoolMax'),
@@ -75,6 +78,7 @@ import { shouldRetryDbConnection } from '../common/utils/db-retry';
       Agent,
       AgentApiKey,
       AgentMessage,
+      ManifestRequest,
       ApiKey,
       TenantProvider,
       TierAssignment,
@@ -87,7 +91,12 @@ import { shouldRetryDbConnection } from '../common/utils/db-retry';
     ]),
     ModelPricesModule,
   ],
-  providers: [DatabaseSeederService, DbTuningService],
+  providers: [
+    DatabaseSeederService,
+    DbTuningService,
+    RequestRecordingRetentionService,
+    SecretReencryptionService,
+  ],
   exports: [DatabaseSeederService],
 })
 export class DatabaseModule {}

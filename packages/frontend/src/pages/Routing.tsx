@@ -507,7 +507,7 @@ const Routing: Component = () => {
       />
 
       <Show
-        when={!connectedProviders.loading && !enabledProviders.loading}
+        when={connectedProviders() !== undefined && enabledProviders() !== undefined}
         fallback={<RoutingLoadingSkeleton />}
       >
         <Show when={hasProviders()} fallback={<NoConnectionsPrompt />}>
@@ -929,7 +929,6 @@ const Routing: Component = () => {
         onAddFallback={handleAddFallback}
         onProviderUpdate={handleProviderUpdate}
         onProviderPoll={handleProviderPoll}
-        onOpenProviderModal={openProviderModal}
       />
 
       <SetupModal

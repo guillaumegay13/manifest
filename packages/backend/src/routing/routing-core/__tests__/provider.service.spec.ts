@@ -1,4 +1,4 @@
-import type { ModelRoute } from 'manifest-shared';
+import { MAX_KEYS_PER_PROVIDER, type ModelRoute } from 'manifest-shared';
 import { ProviderService } from '../provider.service';
 import { TenantProvider } from '../../../entities/tenant-provider.entity';
 import { TierAssignment } from '../../../entities/tier-assignment.entity';
@@ -56,6 +56,7 @@ const makeRepo = (agents: AgentRow[] = ['agent-1']) => ({
 });
 
 describe('ProviderService — route-only cleanup paths', () => {
+  const previousMode = process.env['MANIFEST_MODE'];
   let providerRepo: ReturnType<typeof makeRepo>;
   let tierRepo: ReturnType<typeof makeRepo>;
   let specRepo: ReturnType<typeof makeRepo>;
@@ -70,6 +71,7 @@ describe('ProviderService — route-only cleanup paths', () => {
   let svc: ProviderService;
 
   beforeEach(() => {
+    process.env['MANIFEST_MODE'] = 'selfhosted';
     providerRepo = makeRepo();
     tierRepo = makeRepo();
     specRepo = makeRepo();
@@ -91,6 +93,11 @@ describe('ProviderService — route-only cleanup paths', () => {
       pricingCache as unknown as ModelPricingCacheService,
       routingCache as unknown as RoutingCacheService,
     );
+  });
+
+  afterAll(() => {
+    if (previousMode === undefined) delete process.env['MANIFEST_MODE'];
+    else process.env['MANIFEST_MODE'] = previousMode;
   });
 
   describe('removeProvider — route guards', () => {
@@ -953,6 +960,27 @@ describe('ProviderService — route-only cleanup paths', () => {
       }
     });
 
+    it('renames a key at tenant scope when no agent is given', async () => {
+      providerRepo.find.mockResolvedValue([
+        {
+          id: 'target',
+          provider: 'openai',
+          auth_type: 'api_key',
+          label: 'Key 2',
+          is_active: true,
+        },
+      ]);
+      tierRepo.find.mockResolvedValue([]);
+      specRepo.find.mockResolvedValue([]);
+      headerTierRepo.find.mockResolvedValue([]);
+
+      const renamed = await svc.renameKey(null, 'tenant-1', 'openai', 'api_key', 'Key 2', 'New');
+
+      expect(renamed.label).toBe('New');
+      expect(routingCache.invalidateAgent).not.toHaveBeenCalledWith(null);
+      expect(routingCache.invalidateTenant).toHaveBeenCalledWith('tenant-1');
+    });
+
     it('blocks full provider disconnect while header tiers route to it', async () => {
       providerRepo.find.mockResolvedValue([
         {
@@ -1065,6 +1093,19 @@ describe('ProviderService — route-only cleanup paths', () => {
       const result = await svc.getProviders('tenant-1');
       expect(result).toBe(cached);
       expect(providerRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('filters legacy built-in local providers from cloud routing', async () => {
+      process.env['MANIFEST_MODE'] = 'cloud';
+      providerRepo.find.mockResolvedValue([
+        { id: 'p1', provider: 'ollama', auth_type: 'local', is_active: true },
+        { id: 'p2', provider: 'custom:runtime-id', auth_type: 'local', is_active: true },
+      ]);
+
+      const result = await svc.getProviders('tenant-1');
+
+      expect(result.map((provider) => provider.provider)).toEqual(['custom:runtime-id']);
+      expect(routingCache.setProviders).toHaveBeenCalledWith('tenant-1', result);
     });
   });
 
@@ -1190,6 +1231,75 @@ describe('ProviderService — route-only cleanup paths', () => {
       await expect(
         svc.upsertProvider('agent-1', 'tenant-1', 'minimax', 'sk-cp-token', 'subscription', 'eu'),
       ).rejects.toThrow('MiniMax subscription region must be one of: global, cn');
+    });
+  });
+
+  describe('upsertProvider — MiniMax API-key region', () => {
+    let originalSecret: string | undefined;
+    beforeAll(() => {
+      originalSecret = process.env.BETTER_AUTH_SECRET;
+      process.env.BETTER_AUTH_SECRET = 'a'.repeat(48);
+    });
+    afterAll(() => {
+      if (originalSecret === undefined) delete process.env.BETTER_AUTH_SECRET;
+      else process.env.BETTER_AUTH_SECRET = originalSecret;
+    });
+
+    it('persists region=cn on a MiniMax API-key row', async () => {
+      providerRepo.findOne.mockResolvedValue(null);
+
+      await svc.upsertProvider(
+        'agent-1',
+        'tenant-1',
+        'minimax',
+        'sk-test-api-key',
+        'api_key',
+        'cn',
+      );
+
+      expect(providerRepo.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'minimax', auth_type: 'api_key', region: 'cn' }),
+      );
+    });
+
+    it('preserves existing MiniMax API-key region when caller omits it', async () => {
+      providerRepo.findOne.mockResolvedValue({
+        id: 'p1',
+        agent_id: 'agent-1',
+        provider: 'minimax',
+        auth_type: 'api_key',
+        label: 'Default',
+        region: 'cn',
+        is_active: true,
+      });
+
+      await svc.upsertProvider('agent-1', 'tenant-1', 'minimax', 'sk-rotated', 'api_key');
+
+      expect(providerRepo.save).toHaveBeenCalledWith(expect.objectContaining({ region: 'cn' }));
+    });
+
+    it('drops a non-MiniMax stored region when caller omits it', async () => {
+      providerRepo.findOne.mockResolvedValue({
+        id: 'p1',
+        agent_id: 'agent-1',
+        provider: 'minimax',
+        auth_type: 'api_key',
+        label: 'Default',
+        region: 'eu',
+        is_active: true,
+      });
+
+      await svc.upsertProvider('agent-1', 'tenant-1', 'minimax', 'sk-rotated', 'api_key');
+
+      expect(providerRepo.save).toHaveBeenCalledWith(expect.objectContaining({ region: null }));
+    });
+
+    it('rejects unsupported MiniMax API-key regions', async () => {
+      providerRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        svc.upsertProvider('agent-1', 'tenant-1', 'minimax', 'sk-test-api-key', 'api_key', 'eu'),
+      ).rejects.toThrow('MiniMax API-key region must be one of: global, cn');
     });
   });
 
@@ -1615,6 +1725,34 @@ describe('ProviderService — symmetric provider↔agent auto-connect', () => {
         { agent: 'agent-1', provider: provider.id },
         { agent: 'agent-2', provider: provider.id },
       ]);
+    });
+
+    it('rejects a new credential only at the 50-key safety ceiling', async () => {
+      const enabled: Array<{ agent: string; provider: string }> = [];
+      const { svc, providerRepo } = build(['agent-1'], enabled);
+      providerRepo.find.mockResolvedValue(
+        Array.from({ length: MAX_KEYS_PER_PROVIDER }, (_, index) => ({
+          id: `provider-${index}`,
+          provider: 'openai',
+          auth_type: 'api_key',
+          label: `Key ${index + 1}`,
+          priority: index,
+          is_active: true,
+        })) as TenantProvider[],
+      );
+
+      await expect(
+        svc.upsertProvider(
+          'agent-1',
+          'tenant-1',
+          'openai',
+          'sk-overflow',
+          'api_key',
+          undefined,
+          'Overflow',
+        ),
+      ).rejects.toThrow(`at most ${MAX_KEYS_PER_PROVIDER}`);
+      expect(providerRepo.insert).not.toHaveBeenCalled();
     });
 
     it('enables a brand-new tokenless subscription provider for every owned agent', async () => {

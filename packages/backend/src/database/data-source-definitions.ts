@@ -4,6 +4,7 @@
 // the exact same migration set. Using an explicit array (not a dist glob) keeps
 // stale compiled .js from deleted migrations out of the run (deleteOutDir is off).
 import { AgentMessage } from '../entities/agent-message.entity';
+import { ManifestRequest } from '../entities/request.entity';
 import { ApiKey } from '../entities/api-key.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { Agent } from '../entities/agent.entity';
@@ -23,6 +24,39 @@ import { PlaygroundRun } from '../entities/playground-run.entity';
 import { PlaygroundColumn } from '../entities/playground-column.entity';
 import { ReasoningContentCacheEntry } from '../entities/reasoning-content-cache-entry.entity';
 import { AgentEnabledProvider } from '../entities/agent-enabled-provider.entity';
+import { PublicErrorPage } from '../entities/public-error-page.entity';
+import { WaitlistClaim } from '../entities/waitlist-claim.entity';
+import { TenantRequestUsage } from '../entities/tenant-request-usage.entity';
+import { CliAuthCode } from '../entities/cli-auth-code.entity';
+import { AgentUsageDaily } from '../entities/agent-usage-daily.entity';
+import { RenameWaitlistClaimsTable1800000000000 } from './migrations/1800000000000-RenameWaitlistClaimsTable';
+import { ReclassifyPlanRequestLimitMessages1800100000000 } from './migrations/1800100000000-ReclassifyPlanRequestLimitMessages';
+import { AddMessageErrorCode1800200000000 } from './migrations/1800200000000-AddMessageErrorCode';
+import { DropUnusedAgentMessageIndexes1800300000000 } from './migrations/1800300000000-DropUnusedAgentMessageIndexes';
+import { ExtendDashboardCoveringIndex1801200000000 } from './migrations/1801200000000-ExtendDashboardCoveringIndex';
+
+import { AddTenantRequestUsage1801300000000 } from './migrations/1801300000000-AddTenantRequestUsage';
+import { AddRequestRecordings1801300000000 } from './migrations/1801300000000-AddRequestRecordings';
+import { MoveRecordingsToProviderAttempts1801400000000 } from './migrations/1801400000000-MoveRecordingsToProviderAttempts';
+import { EnableRecordingForNewAgents1801500000000 } from './migrations/1801500000000-EnableRecordingForNewAgents';
+import { DropLegacyAutofixRolloutColumns1801600000000 } from './migrations/1801600000000-DropLegacyAutofixRolloutColumns';
+import { AddApiKeyExpiresAt1801700000000 } from './migrations/1801700000000-AddApiKeyExpiresAt';
+import { CreateCliAuthCodes1801710000000 } from './migrations/1801710000000-CreateCliAuthCodes';
+import { AddRequestApiMode1801720000000 } from './migrations/1801720000000-AddRequestApiMode';
+import { AddCliAuthCodeChallenge1801730000000 } from './migrations/1801730000000-AddCliAuthCodeChallenge';
+import { AddApiKeyAbsoluteExpiresAt1801740000000 } from './migrations/1801740000000-AddApiKeyAbsoluteExpiresAt';
+import { AddAutofixConsentToInstallMetadata1801900000000 } from './migrations/1801900000000-AddAutofixConsentToInstallMetadata';
+import { SlimTenantAgentModelIndex1802000000000 } from './migrations/1802000000000-SlimTenantAgentModelIndex';
+import { AddCustomProviderAlias1802100000000 } from './migrations/1802100000000-AddCustomProviderAlias';
+import { AddRequestsAutofixHealedIndex1802200000000 } from './migrations/1802200000000-AddRequestsAutofixHealedIndex';
+import { TuneFactTableAutovacuum1802400000000 } from './migrations/1802400000000-TuneFactTableAutovacuum';
+import { AddAgentMessagesUnlinkedIndex1802500000000 } from './migrations/1802500000000-AddAgentMessagesUnlinkedIndex';
+import { AddAgentMessagesRecordingIndex1802600000000 } from './migrations/1802600000000-AddAgentMessagesRecordingIndex';
+import { AddAgentMessagesAutofixAttemptIndex1802700000000 } from './migrations/1802700000000-AddAgentMessagesAutofixAttemptIndex';
+import { AddAgentUsageDaily1802800000000 } from './migrations/1802800000000-AddAgentUsageDaily';
+import { AddAgentMessagesDirectUsageIndex1802900000000 } from './migrations/1802900000000-AddAgentMessagesDirectUsageIndex';
+import { CoverRequestsLogFilters1803000000000 } from './migrations/1803000000000-CoverRequestsLogFilters';
+import { CoverHarnessRequestsIndex1803100000000 } from './migrations/1803100000000-CoverHarnessRequestsIndex';
 import { InitialSchema1771464895790 } from './migrations/1771464895790-InitialSchema';
 import { HashApiKeys1771500000000 } from './migrations/1771500000000-HashApiKeys';
 import { ModelPricingImprovements1771600000000 } from './migrations/1771600000000-ModelPricingImprovements';
@@ -128,9 +162,23 @@ import { AddDashboardCoveringIndex1793200000000 } from './migrations/17932000000
 import { AddCrossTenantErrorTimestampIndex1795100000000 } from './migrations/1795100000000-AddCrossTenantErrorTimestampIndex';
 import { RemoveMessageRecording1795000000000 } from './migrations/1795000000000-RemoveMessageRecording';
 import { AddAutofixWaitlist1796000000000 } from './migrations/1796000000000-AddAutofixWaitlist';
+import { AddPublicErrorPages1797000000000 } from './migrations/1797000000000-AddPublicErrorPages';
+import { AddErrorClassification1798000000000 } from './migrations/1798000000000-AddErrorClassification';
+import { AddTenantLimitOverrides1798100000000 } from './migrations/1798100000000-AddTenantLimitOverrides';
+import { AddBillingEmailLogs1798200000000 } from './migrations/1798200000000-AddBillingEmailLogs';
+import { AddBillingEmailPreferences1798300000000 } from './migrations/1798300000000-AddBillingEmailPreferences';
+import { AddAutofixWaitlistSignups1799000000000 } from './migrations/1799000000000-AddAutofixWaitlistSignups';
+import { AddAutofixAgentFlags1799000010000 } from './migrations/1799000010000-AddAutofixAgentFlags';
+import { AddAutofixMessageFields1799000100000 } from './migrations/1799000100000-AddAutofixMessageFields';
+import { AddAutofixPhoenixIds1799000200000 } from './migrations/1799000200000-AddAutofixPhoenixIds';
+import { MakeAutofixEnabledNullable1799000300000 } from './migrations/1799000300000-MakeAutofixEnabledNullable';
+import { AddAutofixAccessGrant1799000400000 } from './migrations/1799000400000-AddAutofixAccessGrant';
+import { AddRequestsAndProviderAttempts1801000000000 } from './migrations/1801000000000-AddRequestsAndProviderAttempts';
+import { AddProviderAttemptOrdering1801100000000 } from './migrations/1801100000000-AddProviderAttemptOrdering';
 
 export const entities = [
   AgentMessage,
+  ManifestRequest,
   ApiKey,
   Tenant,
   Agent,
@@ -150,6 +198,11 @@ export const entities = [
   ReasoningContentCacheEntry,
   AgentEnabledProvider,
   BackfillState,
+  PublicErrorPage,
+  WaitlistClaim,
+  TenantRequestUsage,
+  CliAuthCode,
+  AgentUsageDaily,
 ];
 
 export const migrations = [
@@ -258,4 +311,45 @@ export const migrations = [
   RemoveMessageRecording1795000000000,
   AddCrossTenantErrorTimestampIndex1795100000000,
   AddAutofixWaitlist1796000000000,
+  AddPublicErrorPages1797000000000,
+  AddErrorClassification1798000000000,
+  AddTenantLimitOverrides1798100000000,
+  AddBillingEmailLogs1798200000000,
+  AddBillingEmailPreferences1798300000000,
+  AddAutofixWaitlistSignups1799000000000,
+  AddAutofixAgentFlags1799000010000,
+  AddAutofixMessageFields1799000100000,
+  AddAutofixPhoenixIds1799000200000,
+  MakeAutofixEnabledNullable1799000300000,
+  AddAutofixAccessGrant1799000400000,
+  RenameWaitlistClaimsTable1800000000000,
+  ReclassifyPlanRequestLimitMessages1800100000000,
+  AddMessageErrorCode1800200000000,
+  DropUnusedAgentMessageIndexes1800300000000,
+  AddRequestsAndProviderAttempts1801000000000,
+  AddProviderAttemptOrdering1801100000000,
+  ExtendDashboardCoveringIndex1801200000000,
+
+  AddTenantRequestUsage1801300000000,
+  AddRequestRecordings1801300000000,
+  MoveRecordingsToProviderAttempts1801400000000,
+  EnableRecordingForNewAgents1801500000000,
+  DropLegacyAutofixRolloutColumns1801600000000,
+  AddApiKeyExpiresAt1801700000000,
+  CreateCliAuthCodes1801710000000,
+  AddRequestApiMode1801720000000,
+  AddCliAuthCodeChallenge1801730000000,
+  AddApiKeyAbsoluteExpiresAt1801740000000,
+  AddAutofixConsentToInstallMetadata1801900000000,
+  SlimTenantAgentModelIndex1802000000000,
+  AddCustomProviderAlias1802100000000,
+  AddRequestsAutofixHealedIndex1802200000000,
+  TuneFactTableAutovacuum1802400000000,
+  AddAgentMessagesUnlinkedIndex1802500000000,
+  AddAgentMessagesRecordingIndex1802600000000,
+  AddAgentMessagesAutofixAttemptIndex1802700000000,
+  AddAgentUsageDaily1802800000000,
+  AddAgentMessagesDirectUsageIndex1802900000000,
+  CoverRequestsLogFilters1803000000000,
+  CoverHarnessRequestsIndex1803100000000,
 ];

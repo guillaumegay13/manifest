@@ -5,10 +5,10 @@ import {
   getModelLabel,
   getProvider,
   buildProviderDef,
+  subscriptionCatalog,
 } from '../../src/services/providers';
 import { validateApiKey, validateSubscriptionKey } from '../../src/services/provider-utils';
 import {
-  ROUTING_PROVIDER_API_KEY_URLS,
   EMAIL_PROVIDER_API_KEY_URLS,
   SUBSCRIPTION_PROVIDER_KEY_URLS,
   getRoutingProviderApiKeyUrl,
@@ -193,6 +193,24 @@ describe('validateApiKey', () => {
     expect(validateApiKey(xiaomi, `sk-${'a'.repeat(47)}`)).toEqual({ valid: true });
   });
 
+  it('validates Meta Model API key prefix and length', () => {
+    const meta = getProvider('meta')!;
+    expect(meta.keyPlaceholder).toBe('LLM_...');
+    expect(validateApiKey(meta, '')).toEqual({
+      valid: false,
+      error: 'API key is required',
+    });
+    expect(validateApiKey(meta, 'wrong-prefix-key-that-is-long-enough')).toEqual({
+      valid: false,
+      error: 'Meta keys start with "LLM_"',
+    });
+    expect(validateApiKey(meta, 'LLM_short')).toEqual({
+      valid: false,
+      error: 'Key is too short (minimum 20 characters)',
+    });
+    expect(validateApiKey(meta, `LLM_${'a'.repeat(20)}`)).toEqual({ valid: true });
+  });
+
   it('validates NVIDIA NIM key length without enforcing an undocumented prefix', () => {
     const nvidia = getProvider('nvidia')!;
     expect(nvidia.keyPlaceholder).toBe('nvapi-...');
@@ -205,6 +223,23 @@ describe('validateApiKey', () => {
       error: 'Key is too short (minimum 20 characters)',
     });
     expect(validateApiKey(nvidia, 'x'.repeat(20))).toEqual({ valid: true });
+  });
+
+  it('validates Hugging Face access tokens', () => {
+    const huggingface = getProvider('huggingface')!;
+    expect(validateApiKey(huggingface, '')).toEqual({
+      valid: false,
+      error: 'API key is required',
+    });
+    expect(validateApiKey(huggingface, 'sk_wrong_prefix_but_long_enough')).toEqual({
+      valid: false,
+      error: 'Hugging Face keys start with "hf_"',
+    });
+    expect(validateApiKey(huggingface, 'hf_short')).toEqual({
+      valid: false,
+      error: 'Key is too short (minimum 20 characters)',
+    });
+    expect(validateApiKey(huggingface, `hf_${'a'.repeat(20)}`)).toEqual({ valid: true });
   });
 });
 
@@ -452,6 +487,28 @@ describe('PROVIDERS', () => {
     expect(ollama.minKeyLength).toBe(0);
   });
 
+  it('exposes Gemini Free as a managed free provider', () => {
+    const provider = PROVIDERS.find((entry) => entry.id === 'gemini-free')!;
+    expect(provider.name).toBe('Gemini Free');
+    expect(provider.subtitle).toBe('Free Gemini models via Manifest');
+    expect(provider.keyPlaceholder).toBe('sk-...');
+    expect(getRoutingProviderApiKeyUrl('gemini-free')).toBe(
+      'https://calendly.com/sebastien-manifest/30min',
+    );
+  });
+
+  it('exposes the current Meta Muse Spark catalog and Contributor warning', () => {
+    const meta = PROVIDERS.find((provider) => provider.id === 'meta')!;
+    expect(meta.name).toBe('Meta');
+    expect(meta.models.map((model) => model.value)).toEqual([
+      'muse-spark-1.2',
+      'muse-spark-1.2-contributor',
+      'muse-spark-1.1',
+    ]);
+    expect(meta.models[1].label).toMatch(/may train Meta/);
+    expect(getRoutingProviderApiKeyUrl('meta')).toBe('https://dev.meta.ai/');
+  });
+
   it('each provider has required fields', () => {
     for (const p of PROVIDERS) {
       expect(p.id).toBeTruthy();
@@ -537,6 +594,21 @@ describe('PROVIDERS', () => {
     expect(byteplus.models).toEqual([]);
   });
 
+  it('ClinePass is subscription-only with API-key token paste flow', () => {
+    const clinePass = PROVIDERS.find((p) => p.id === 'cline-pass')!;
+    expect(clinePass).toBeDefined();
+    expect(clinePass.name).toBe('ClinePass');
+    expect(clinePass.supportsSubscription).toBe(true);
+    expect(clinePass.subscriptionOnly).toBe(true);
+    expect(clinePass.subscriptionAuthMode).toBe('token');
+    expect(clinePass.subscriptionCredentialKind).toBe('api-key');
+    expect(clinePass.subscriptionLabel).toBe('ClinePass subscription');
+    expect(clinePass.subscriptionKeyPlaceholder).toBe('Paste your ClinePass API key');
+    expect(clinePass.subscriptionSignInUrl).toBe('https://app.cline.bot');
+    expect(clinePass.subscriptionSignInLabel).toBe('Sign in to ClinePass');
+    expect(clinePass.models).toEqual([]);
+  });
+
   it('Cerebras is an API-key provider with dynamic models', () => {
     const cerebras = PROVIDERS.find((p) => p.id === 'cerebras')!;
     expect(cerebras).toBeDefined();
@@ -558,6 +630,18 @@ describe('PROVIDERS', () => {
     expect(pioneer.keyPlaceholder).toBe('pio_sk_...');
     expect(pioneer.minKeyLength).toBe(20);
     expect(pioneer.models).toEqual([]);
+  });
+
+  it('Hugging Face is an API-key provider with dynamic models', () => {
+    const huggingface = PROVIDERS.find((p) => p.id === 'huggingface')!;
+    expect(huggingface).toBeDefined();
+    expect(huggingface.name).toBe('Hugging Face');
+    expect(huggingface.supportsSubscription).toBeUndefined();
+    expect(huggingface.subscriptionOnly).toBeUndefined();
+    expect(huggingface.keyPrefix).toBe('hf_');
+    expect(huggingface.keyPlaceholder).toBe('hf_...');
+    expect(huggingface.minKeyLength).toBe(20);
+    expect(huggingface.models).toEqual([]);
   });
 
   it('MiniMax supports subscription with device-code flow', () => {
@@ -781,6 +865,12 @@ describe('PROVIDERS', () => {
     expect(getRoutingProviderApiKeyUrl('fireworks')).toBe('https://app.fireworks.ai/api-keys');
   });
 
+  it('provides an API key URL for Hugging Face', () => {
+    expect(getRoutingProviderApiKeyUrl('huggingface')).toBe(
+      'https://huggingface.co/settings/tokens',
+    );
+  });
+
   it('provides an API key URL for Cerebras', () => {
     expect(getRoutingProviderApiKeyUrl('cerebras')).toBe('https://cloud.cerebras.ai');
   });
@@ -887,6 +977,21 @@ describe('PROVIDERS', () => {
     });
   });
 
+  it('ClinePass subscription key is validated with generic token length', () => {
+    const clinePass = PROVIDERS.find((p) => p.id === 'cline-pass')!;
+    expect(validateSubscriptionKey(clinePass, '')).toEqual({
+      valid: false,
+      error: 'Token is required',
+    });
+    expect(validateSubscriptionKey(clinePass, 'short')).toEqual({
+      valid: false,
+      error: 'Token is too short (minimum 10 characters)',
+    });
+    expect(validateSubscriptionKey(clinePass, 'cp-valid-token-1234')).toEqual({
+      valid: true,
+    });
+  });
+
   it('Nous subscription key is validated with generic token length', () => {
     const nous = PROVIDERS.find((p) => p.id === 'nous')!;
     expect(validateSubscriptionKey(nous, '')).toEqual({
@@ -938,7 +1043,7 @@ describe('PROVIDERS', () => {
         !provider.noKeyRequired &&
         !provider.deviceLogin &&
         !provider.subscriptionOnly &&
-        !ROUTING_PROVIDER_API_KEY_URLS[provider.id],
+        !getRoutingProviderApiKeyUrl(provider.id),
     ).map((provider) => provider.id);
     expect(missingProviderIds).toEqual([]);
   });
@@ -956,6 +1061,25 @@ describe('PROVIDERS', () => {
 });
 
 /* ── STAGES constant ───────────────────────────── */
+
+describe('subscriptionCatalog', () => {
+  const open = PROVIDERS.find((p) => p.id === 'openai')!;
+  const google = PROVIDERS.find((p) => p.id === 'gemini')!;
+
+  it('marks the Google subscription closed to new connections', () => {
+    expect(google.subscriptionClosedNote).toMatch(/Gemini API key/);
+  });
+
+  it('lists a closed provider only where the workspace already has it', () => {
+    expect(subscriptionCatalog([open, google], () => false)).toEqual([open]);
+    expect(subscriptionCatalog([open, google], (id) => id === 'gemini')).toEqual([open, google]);
+  });
+
+  it('never lists providers without subscription support', () => {
+    const groq = PROVIDERS.find((p) => p.id === 'groq')!;
+    expect(subscriptionCatalog([groq], () => true)).toEqual([]);
+  });
+});
 
 describe('STAGES', () => {
   it('has 4 stages', () => {
@@ -984,6 +1108,12 @@ describe('getRoutingProviderApiKeyUrl', () => {
     expect(getRoutingProviderApiKeyUrl('openai')).toBe('https://platform.openai.com/api-keys');
   });
 
+  it('returns the ClinePass API-key settings URL', () => {
+    expect(getRoutingProviderApiKeyUrl('cline-pass')).toBe(
+      'https://app.cline.bot/settings/api-keys',
+    );
+  });
+
   it('returns undefined for an unknown provider', () => {
     expect(getRoutingProviderApiKeyUrl('unknown')).toBeUndefined();
   });
@@ -994,6 +1124,12 @@ describe('getRoutingProviderApiKeyUrl', () => {
 describe('getSubscriptionProviderKeyUrl', () => {
   it('returns the Ollama settings page URL for ollama-cloud', () => {
     expect(getSubscriptionProviderKeyUrl('ollama-cloud')).toBe('https://ollama.com/settings/keys');
+  });
+
+  it('returns the ClinePass API-key settings URL', () => {
+    expect(getSubscriptionProviderKeyUrl('cline-pass')).toBe(
+      'https://app.cline.bot/settings/api-keys',
+    );
   });
 
   it('returns undefined for subscription providers whose token comes from elsewhere (e.g. anthropic setup-token via CLI)', () => {

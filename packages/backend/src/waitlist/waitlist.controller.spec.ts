@@ -1,60 +1,110 @@
-import { WaitlistController } from './waitlist.controller';
+import { Request } from 'express';
 import { Repository } from 'typeorm';
-import { Tenant } from '../entities/tenant.entity';
+import { WaitlistClaim } from '../entities/waitlist-claim.entity';
+import { WaitlistController, claimRequestIsSameOrigin } from './waitlist.controller';
+
+function reqWith(headers: Record<string, string> = {}): Request {
+  return { headers } as unknown as Request;
+}
+
+describe('claimRequestIsSameOrigin', () => {
+  it('matches when the Origin host equals the Host header', () => {
+    expect(
+      claimRequestIsSameOrigin({
+        origin: 'https://app.manifest.build',
+        host: 'app.manifest.build',
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects a foreign origin', () => {
+    expect(
+      claimRequestIsSameOrigin({ origin: 'https://someone.example', host: 'app.manifest.build' }),
+    ).toBe(false);
+  });
+
+  it('rejects missing, array, or malformed headers', () => {
+    expect(claimRequestIsSameOrigin({})).toBe(false);
+    expect(claimRequestIsSameOrigin({ origin: ['a', 'b'], host: 'x' })).toBe(false);
+    expect(claimRequestIsSameOrigin({ origin: 'not a url', host: 'x' })).toBe(false);
+  });
+});
 
 describe('WaitlistController', () => {
+  let chain: {
+    insert: jest.Mock;
+    into: jest.Mock;
+    values: jest.Mock;
+    orUpdate: jest.Mock;
+    execute: jest.Mock;
+  };
   let controller: WaitlistController;
-  let tenantRepo: jest.Mocked<Pick<Repository<Tenant>, 'findOne' | 'update'>>;
 
   beforeEach(() => {
-    tenantRepo = {
-      findOne: jest.fn(),
-      update: jest.fn().mockResolvedValue(undefined),
+    chain = {
+      insert: jest.fn(),
+      into: jest.fn(),
+      values: jest.fn(),
+      orUpdate: jest.fn(),
+      execute: jest.fn().mockResolvedValue(undefined),
     };
-    controller = new WaitlistController(tenantRepo as unknown as Repository<Tenant>);
+    chain.insert.mockReturnValue(chain);
+    chain.into.mockReturnValue(chain);
+    chain.values.mockReturnValue(chain);
+    chain.orUpdate.mockReturnValue(chain);
+    controller = new WaitlistController({
+      createQueryBuilder: () => chain,
+    } as unknown as Repository<WaitlistClaim>);
   });
 
-  describe('getStatus', () => {
-    it('returns not joined when tenant has no waitlist timestamp', async () => {
-      tenantRepo.findOne.mockResolvedValue({ autofix_waitlist_at: null } as Tenant);
-      const result = await controller.getStatus({ tenantId: 't1', userId: 'u1' });
-      expect(result).toEqual({ joined: false, joinedAt: null });
-    });
-
-    it('returns joined when tenant has a waitlist timestamp', async () => {
-      const ts = '2026-06-25T10:00:00.000Z';
-      tenantRepo.findOne.mockResolvedValue({ autofix_waitlist_at: ts } as Tenant);
-      const result = await controller.getStatus({ tenantId: 't1', userId: 'u1' });
-      expect(result).toEqual({ joined: true, joinedAt: ts });
-    });
-
-    it('returns not joined when tenantId is null', async () => {
-      const result = await controller.getStatus({ tenantId: null, userId: 'u1' });
-      expect(result).toEqual({ joined: false, joinedAt: null });
-      expect(tenantRepo.findOne).not.toHaveBeenCalled();
-    });
-
-    it('returns not joined when tenant is not found', async () => {
-      tenantRepo.findOne.mockResolvedValue(null);
-      const result = await controller.getStatus({ tenantId: 't1', userId: 'u1' });
-      expect(result).toEqual({ joined: false, joinedAt: null });
-    });
+  it('keeps the legacy self-hosted claim endpoint as a no-op success', () => {
+    expect(controller.receiveClaim()).toEqual({ ok: true });
+    expect(chain.execute).not.toHaveBeenCalled();
   });
 
-  describe('join', () => {
-    it('sets autofix_waitlist_at and returns joined status', async () => {
-      const result = await controller.join({ tenantId: 't1', userId: 'u1' });
-      expect(tenantRepo.update).toHaveBeenCalledWith('t1', {
-        autofix_waitlist_at: expect.any(String),
-      });
-      expect(result.joined).toBe(true);
-      expect(result.joinedAt).toBeTruthy();
-    });
+  it('stores a claim with a normalized email and the declared source', async () => {
+    await expect(
+      controller.receivePivotClaim({ email: '  Jane@Example.COM ', source: 'cloud' }, reqWith()),
+    ).resolves.toEqual({ ok: true });
 
-    it('returns not joined when tenantId is null', async () => {
-      const result = await controller.join({ tenantId: null, userId: 'u1' });
-      expect(tenantRepo.update).not.toHaveBeenCalled();
-      expect(result.joined).toBe(false);
+    expect(chain.values).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'jane@example.com', source: 'cloud' }),
+    );
+    const row = chain.values.mock.calls[0][0] as { claimed_at: string };
+    expect(Number.isNaN(Date.parse(row.claimed_at))).toBe(false);
+  });
+
+  it('infers cloud for a sourceless same-origin claim (stale cloud bundle)', async () => {
+    await controller.receivePivotClaim(
+      { email: 'jane@example.com' },
+      reqWith({ origin: 'https://app.manifest.build', host: 'app.manifest.build' }),
+    );
+    expect(chain.values).toHaveBeenCalledWith(expect.objectContaining({ source: 'cloud' }));
+  });
+
+  it('defaults a sourceless cross-origin or headerless claim to self-hosted', async () => {
+    await controller.receivePivotClaim({ email: 'jane@example.com' }, reqWith());
+    expect(chain.values).toHaveBeenCalledWith(expect.objectContaining({ source: 'self-hosted' }));
+  });
+
+  it('lets an explicit source win over the origin inference', async () => {
+    await controller.receivePivotClaim(
+      { email: 'jane@example.com', source: 'self-hosted' },
+      reqWith({ origin: 'https://app.manifest.build', host: 'app.manifest.build' }),
+    );
+    expect(chain.values).toHaveBeenCalledWith(expect.objectContaining({ source: 'self-hosted' }));
+  });
+
+  it('lets the latest claim win on conflict, but never over a website row', async () => {
+    await controller.receivePivotClaim(
+      { email: 'jane@example.com', source: 'self-hosted' },
+      reqWith(),
+    );
+    expect(chain.orUpdate).toHaveBeenCalledWith(['source', 'claimed_at'], ['email'], {
+      overwriteCondition: {
+        where: '"waitlist_claims"."source" != :websiteSource',
+        parameters: { websiteSource: 'website' },
+      },
     });
   });
 });
