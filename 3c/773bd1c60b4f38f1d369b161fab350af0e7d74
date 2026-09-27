@@ -1,0 +1,31 @@
+packages/backend/src/routing/dto/custom-provider.dto.ts
+  s_6ea05005557598::t_8039d6fd6611ee 135-137
+.changeset/custom-provider-fetch-stored-key.md
+  s_6ea05005557598::t_b7d233e6bf3fee 1,3-5
+  s_6ea05005557598::t_b59dfa46626aa2 2
+packages/backend/src/routing/custom-provider/custom-provider.service.spec.ts
+  s_6ea05005557598::t_e76bb9f85d4504 1321-1322,1326-1334,1337,1347-1351,1354-1360,1362-1363,1365-1369,1376-1421,1423,1425,1427,1430-1431,1433,1436-1446,1449-1453,1455,1457-1461
+  s_6ea05005557598::t_b59dfa46626aa2 1370-1372
+packages/backend/src/routing/custom-provider/custom-provider.controller.ts
+  s_6ea05005557598::t_63223d7d64fc10 63-65,69-74
+packages/backend/src/routing/custom-provider/custom-provider.service.ts
+  s_6ea05005557598::t_63223d7d64fc10 7,32,70-80,101-102,530,581-584,586-590,592-602,608-612
+packages/backend/src/routing/custom-provider.controller.spec.ts
+  s_6ea05005557598::t_2a9e261f46ece7 323-324,328,334-335,340
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3c773bd1c60b4f38f1d369b161fab350af0e7d74",
+  "prompts": {},
+  "sessions": {
+    "s_6ea05005557598": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "154afb9b-81a3-42ae-9227-bdfd82a75bbd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
