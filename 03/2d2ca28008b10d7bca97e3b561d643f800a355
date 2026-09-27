@@ -1,0 +1,33 @@
+docker/.env.example
+  s_6ea05005557598::t_d4a9c80b822483 160-165
+packages/backend/.env.example
+  s_6ea05005557598::t_d4a9c80b822483 74-76
+.changeset/configurable-gateway-rate-caps.md
+  s_6ea05005557598::t_d4a9c80b822483 1-5
+CLAUDE.md
+  s_6ea05005557598::t_d4a9c80b822483 496
+docker/docker-compose.yml
+  s_6ea05005557598::t_d4a9c80b822483 81-83
+packages/backend/src/routing/proxy/proxy-rate-limiter.ts
+  s_6ea05005557598::t_bf2263a25a6309 24-30
+packages/backend/src/routing/proxy/__tests__/proxy-rate-limiter.spec.ts
+  s_6ea05005557598::t_9403187713524e 141-143,148-158
+  s_6ea05005557598::t_f55224923d7b4a 144-147
+  s_6ea05005557598::t_d4a9c80b822483 463-464,472-473,480-486
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "032d2ca28008b10d7bca97e3b561d643f800a355",
+  "prompts": {},
+  "sessions": {
+    "s_6ea05005557598": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "154afb9b-81a3-42ae-9227-bdfd82a75bbd",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
