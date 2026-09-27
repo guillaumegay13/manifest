@@ -1,0 +1,36 @@
+packages/backend/src/routing/routing-core/provider.service.ts
+  s_a82756d0b781b1::t_a6da0bc11f04ec 48-51,640
+packages/backend/src/routing/proxy/forward-endpoint-resolver.spec.ts
+  s_a82756d0b781b1::t_4d776e3d3f0913 33
+packages/backend/src/routing/proxy/forward-endpoint-resolver.ts
+  s_a82756d0b781b1::t_64abcaf517d8ba 91
+packages/backend/src/model-discovery/provider-model-fetcher.service.spec.ts
+  s_a82756d0b781b1::t_5e60f8a7258cf1 3557-3567
+packages/backend/src/routing/routing-core/__tests__/provider.service.spec.ts
+  s_a82756d0b781b1::t_5e60f8a7258cf1 1244-1275
+packages/backend/src/routing/provider.controller.ts
+  s_a82756d0b781b1::t_c06eb8846c1d6c 162
+  s_a82756d0b781b1::t_a6da0bc11f04ec 36-38,158
+  s_a82756d0b781b1::t_72748d0a29a7ec 35
+packages/backend/src/routing/oauth/minimax/minimax-oauth-helpers.ts
+  s_a82756d0b781b1::t_a6da0bc11f04ec 19-21
+packages/backend/src/routing/provider.controller.spec.ts
+  s_a82756d0b781b1::t_c06eb8846c1d6c 753-765
+  s_a82756d0b781b1::t_5e60f8a7258cf1 766-777
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ab730d6d247d66b18e28d1ff975ffbb5f152e6a2",
+  "prompts": {},
+  "sessions": {
+    "s_a82756d0b781b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "de160db6-3fea-4272-97cd-24eb297d2699",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
