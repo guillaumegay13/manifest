@@ -1588,7 +1588,7 @@ describe('ConnectionDetail (analytics)', () => {
 
   it('disables the Disconnect and Done buttons and shows progress while in flight', async () => {
     let resolveDisconnect!: (value: unknown) => void;
-    apiMocks.disconnectProvider.mockReturnValueOnce(
+    apiMocks.disconnectConnection.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveDisconnect = resolve;
       }),
@@ -1606,7 +1606,9 @@ describe('ConnectionDetail (analytics)', () => {
     expect((screen.getByText('Done') as HTMLButtonElement).disabled).toBe(true);
 
     resolveDisconnect({ notifications: [] });
-    await waitFor(() => expect(routerState.navigate).toHaveBeenCalledWith('/providers/usage-based'));
+    await waitFor(() =>
+      expect(routerState.navigate).toHaveBeenCalledWith('/providers/usage-based'),
+    );
   });
 
   it('shows an error toast when disconnecting fails', async () => {
