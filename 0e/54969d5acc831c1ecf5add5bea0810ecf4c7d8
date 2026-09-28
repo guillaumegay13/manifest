@@ -1,0 +1,21 @@
+design-system/registry/components.json
+  s_7295213dbb1567::t_5198d4334870cd 4404,4411,4418,4425,4432,4439,4446,4453,4460,4467,4474,4481,4488,4495,4502,4509,4516,4523,4530,4537,4544,4551,4631,4639,4647,4655,4663,4671,4687,4695,4703,4711,4719,4727,4735,4783,4823,4831,4839,4847,4855,4863,4871,4879,5075-5076
+design-system/registry/llms.txt
+  s_7295213dbb1567::t_5198d4334870cd 99,168,435-453,455-457,471-476,478-484,490,495-499,501-503
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0e54969d5acc831c1ecf5add5bea0810ecf4c7d8",
+  "prompts": {},
+  "sessions": {
+    "s_7295213dbb1567": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a0c3d0d9-54ce-4b54-aa16-99e7fb80f3d6",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
