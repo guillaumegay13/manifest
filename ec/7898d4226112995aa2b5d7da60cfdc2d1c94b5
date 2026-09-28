@@ -1,0 +1,24 @@
+packages/backend/src/routing/proxy/google-adapter.ts
+  s_50700451fbbb36::t_3eb26506476e20 347-348,355
+  s_50700451fbbb36::t_41aeb64de0c858 273
+packages/backend/src/routing/proxy/__tests__/google-adapter.spec.ts
+  s_50700451fbbb36::t_b80ce83ddea903 43-58
+.changeset/google-developer-role.md
+  s_50700451fbbb36::t_66e16b4e60d225 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ec7898d4226112995aa2b5d7da60cfdc2d1c94b5",
+  "prompts": {},
+  "sessions": {
+    "s_50700451fbbb36": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1126192f-b4a0-428c-a74f-4e7ebfed4eed",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
