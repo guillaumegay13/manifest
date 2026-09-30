@@ -1,0 +1,41 @@
+design-system/registry/components.json
+  s_8d981154211025::t_0f2e0d700e01ae 2229,5122
+packages/frontend/src/styles/routing.css
+  s_8d981154211025::t_20890bc276695d 914-934
+packages/frontend/src/components/ModelParamsDialog.tsx
+  s_8d981154211025::t_298e7cbb988c78 548
+  s_8d981154211025::t_48651ab9f14ef7 386,389-392
+  s_8d981154211025::t_d4c3b0aab6777b 447
+  s_8d981154211025::t_1f417d52503ad3 498-515
+  s_8d981154211025::t_bed2d70d5d862c 73-86
+  s_8d981154211025::t_551eb9eeb90905 436
+  s_8d981154211025::t_1a2ce29813390d 279
+  s_8d981154211025::t_ce94862bd1d0d0 117-119,124-127
+  s_8d981154211025::t_c2ddff0decd1d2 138-139,142,145-155
+  s_8d981154211025::t_a9450e78b9cff2 404
+packages/frontend/tests/components/ModelParamsAffordance.test.tsx
+  s_8d981154211025::t_60911c1d37c923 194,205
+  s_8d981154211025::t_9f047199f4ab31 226-228,237-239
+packages/frontend/tests/components/ModelParamsDialog.test.tsx
+  s_8d981154211025::t_ceb56e4d5c61bf 201,203-207,550,563,665-741
+design-system/registry/llms.txt
+  s_8d981154211025::t_0f2e0d700e01ae 99,267
+.changeset/model-params-unset-state.md
+  s_8d981154211025::t_d9c33d53e7ac11 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f644436934788e27f95b73ed55ffed0c802b79ec",
+  "prompts": {},
+  "sessions": {
+    "s_8d981154211025": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7435116a-9fd2-4afc-92e9-e019c373282c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
