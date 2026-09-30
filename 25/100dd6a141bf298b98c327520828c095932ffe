@@ -1,0 +1,42 @@
+packages/backend/src/routing/proxy/provider-client-converters.ts
+  s_9f43e150694d30::t_9ad140d876d4a7 9,81
+  s_9f43e150694d30::t_f3bc6e0e2d2d37 11,83
+packages/backend/src/routing/proxy/__tests__/anthropic-adapter.spec.ts
+  s_9f43e150694d30::t_499cf16b4fb3fa 3217-3219
+  s_9f43e150694d30::t_362368f647cb03 3,3121-3216,3220-3256
+  s_9f43e150694d30::t_9aa6c6e30d7f1d 3257
+packages/backend/src/routing/proxy/provider-client.ts
+  s_9f43e150694d30::t_8d022aa88f72fc 152-154
+  s_9f43e150694d30::t_44a9e9766e539e 18
+  s_9f43e150694d30::t_f3bc6e0e2d2d37 20,161-182,772
+  s_9f43e150694d30::t_b42e71fa905988 155
+  s_9f43e150694d30::t_e6a4162bd4af4e 773
+packages/backend/src/routing/proxy/__tests__/provider-client.spec.ts
+  s_9f43e150694d30::t_02d3794d0bed7c 984-993,995-997,1005-1014,1022-1055
+  s_9f43e150694d30::t_885878e3920139 905-920,922-983,994,1056-1062
+  s_9f43e150694d30::t_499cf16b4fb3fa 921
+  s_9f43e150694d30::t_0539ed4492cf7e 998-1004,1015-1021
+  s_9f43e150694d30::t_396fd68d042812 1063-1064
+packages/backend/src/routing/proxy/anthropic-adapter.ts
+  s_9f43e150694d30::t_44a9e9766e539e 138-139
+  s_9f43e150694d30::t_91985d1d945b6c 106-137,140-146
+  s_9f43e150694d30::t_f3bc6e0e2d2d37 63-66
+.changeset/bedrock-conversation-cache.md
+  s_9f43e150694d30::t_38dc90ac75408e 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "25100dd6a141bf298b98c327520828c095932ffe",
+  "prompts": {},
+  "sessions": {
+    "s_9f43e150694d30": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "117a31f9-603c-4d46-8886-fc3976cb5a79",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
