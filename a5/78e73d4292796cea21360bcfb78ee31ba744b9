@@ -1,0 +1,19 @@
+packages/backend/src/analytics/services/agent-usage-daily.service.spec.ts
+  s_b3ed35a95b7db3::t_a45e666b7fa060 81-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a578e73d4292796cea21360bcfb78ee31ba744b9",
+  "prompts": {},
+  "sessions": {
+    "s_b3ed35a95b7db3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1b7ee579-7ec9-44c8-8542-48d2e0cd54b2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
