@@ -1,0 +1,25 @@
+.changeset/agent-usage-rollup-latch.md
+  s_b3ed35a95b7db3::t_2c2047bc6417f8 1-5
+packages/backend/src/analytics/services/agent-usage-daily.service.spec.ts
+  s_b3ed35a95b7db3::t_25438e94a6073a 78-95
+packages/backend/src/analytics/services/agent-usage-daily.service.ts
+  s_b3ed35a95b7db3::t_2a6a5140a41893 60-63
+  s_b3ed35a95b7db3::t_3d9b942a239f2e 80
+  s_b3ed35a95b7db3::t_a1ad4f35bba98f 119-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "eafa16b2b27fcb52c9fc676d61e78c710a61fecd",
+  "prompts": {},
+  "sessions": {
+    "s_b3ed35a95b7db3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1b7ee579-7ec9-44c8-8542-48d2e0cd54b2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
