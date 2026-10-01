@@ -1,0 +1,25 @@
+packages/frontend/tests/components/ModelParamsDialog.test.tsx
+  s_8d981154211025::t_777180565b82b2 732-767
+packages/frontend/src/styles/routing.css
+  s_8d981154211025::t_3315a7f4416dc9 929-933
+packages/frontend/src/components/ModelParamsDialog.tsx
+  s_8d981154211025::t_70f2a5cfde4ada 330-332,335,337,344-348,364,369,372
+  s_8d981154211025::t_3315a7f4416dc9 141-155,526-531
+  s_8d981154211025::t_56fcdcd20f13e2 140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7f6d328fe4c5b934c294ddcd786306d5e562873f",
+  "prompts": {},
+  "sessions": {
+    "s_8d981154211025": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7435116a-9fd2-4afc-92e9-e019c373282c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
