@@ -1,0 +1,19 @@
+packages/frontend/tests/components/ModelParamsDialog.test.tsx
+  s_8d981154211025::t_7ce0c8f9818071 743-748,750
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "458046a4ee935de6210ba4f85dbc0ff826da9747",
+  "prompts": {},
+  "sessions": {
+    "s_8d981154211025": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7435116a-9fd2-4afc-92e9-e019c373282c",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
