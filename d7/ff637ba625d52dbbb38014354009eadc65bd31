@@ -1,0 +1,19 @@
+packages/backend/src/routing/proxy/chatgpt-adapter.spec.ts
+  s_2927e2a7b22455::t_f226ade2467203 312-334
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d7ff637ba625d52dbbb38014354009eadc65bd31",
+  "prompts": {},
+  "sessions": {
+    "s_2927e2a7b22455": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e729726-a202-40ed-8260-e5c8c0fdffd2",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
