@@ -70,6 +70,9 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionLabel: 'ChatGPT Plus/Pro/Team',
     subscriptionAuthMode: 'popup_oauth' as const,
     knownModels: Object.freeze([
+      'gpt-6-astra',
+      'gpt-6.1-sol',
+      'gpt-6-sol',
       'gpt-6-luna',
       'gpt-5.6-sol',
       'gpt-5.6-terra',
@@ -83,6 +86,9 @@ export const SUBSCRIPTION_PROVIDER_CONFIGS: Readonly<
     subscriptionCapabilities: Object.freeze({
       maxContextWindow: 200000,
       modelContextWindows: Object.freeze({
+        'gpt-6-astra': 1050000,
+        'gpt-6.1-sol': 1050000,
+        'gpt-6-sol': 1050000,
         'gpt-6-luna': 1050000,
         'gpt-5.6-sol': 1050000,
         'gpt-5.6-terra': 1050000,

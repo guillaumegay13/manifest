@@ -2946,9 +2946,12 @@ describe('ModelDiscoveryService', () => {
 
       const result = supplementWithKnownModels(raw, 'openai');
 
-      // 1 discovered + 8 ChatGPT-account supported knownModels
-      expect(result.length).toBe(9);
+      // 1 discovered + 11 ChatGPT-account supported knownModels
+      expect(result.length).toBe(12);
       expect(result[0].id).toBe('gpt-oss-120b');
+      expect(result.map((m) => m.id)).toContain('gpt-6-astra');
+      expect(result.map((m) => m.id)).toContain('gpt-6.1-sol');
+      expect(result.map((m) => m.id)).toContain('gpt-6-sol');
       expect(result.map((m) => m.id)).toContain('gpt-6-luna');
       expect(result.map((m) => m.id)).toContain('gpt-5.6-sol');
       expect(result.map((m) => m.id)).toContain('gpt-5.6-terra');
