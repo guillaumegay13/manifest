@@ -245,6 +245,10 @@ export function extractRequestMessages(
 export function extractRequestTools(
   requestBody: Record<string, unknown> | null | undefined,
 ): ChatTool[] {
+  // Gemini Code Assist wraps the request in a `{ request }` envelope.
+  if (isRecord(requestBody?.request) && Array.isArray(requestBody.request.tools)) {
+    requestBody = requestBody.request;
+  }
   if (!Array.isArray(requestBody?.tools)) return [];
   return requestBody.tools.filter(isRecord).flatMap((tool): ChatTool | ChatTool[] => {
     // One Gemini tool object can hold several function declarations.

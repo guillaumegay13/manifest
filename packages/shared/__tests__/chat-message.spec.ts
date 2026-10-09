@@ -712,4 +712,18 @@ describe('recorded chat message helpers', () => {
       },
     ]);
   });
+
+  it('reads tools from a Gemini Code Assist request envelope', () => {
+    expect(
+      extractRequestTools({
+        model: 'gemini-flash-latest',
+        request: { tools: [{ functionDeclarations: [{ name: 'lookup' }] }] },
+      }),
+    ).toEqual([
+      {
+        type: 'function',
+        function: { name: 'lookup', description: undefined, parameters: undefined },
+      },
+    ]);
+  });
 });
