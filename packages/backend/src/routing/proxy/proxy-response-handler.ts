@@ -40,7 +40,7 @@ import type {
   ThinkingBlockRouteContext,
 } from './thinking-block-cache';
 import type { ReasoningContentCache } from './reasoning-content-cache';
-import type { ExtractedSignature } from './google-adapter';
+import { createGoogleStreamState, type ExtractedSignature } from './google-adapter';
 import {
   extractThinkingBlocksFromMessagesResponse,
   type ExtractedThinkingBlocks,
@@ -657,6 +657,7 @@ export async function handleStreamResponse(
   }
 
   if (forward.isGoogle) {
+    const googleState = createGoogleStreamState();
     return pipeStream(
       forward.response.body!,
       res,
@@ -665,6 +666,7 @@ export async function handleStreamResponse(
         const { chunk: out, signatures } = providerClient.convertGoogleStreamChunk(
           innerChunk,
           meta.model,
+          googleState,
         );
         if (signatureCache && sessionKey) {
           for (const s of signatures) {

@@ -554,7 +554,34 @@ export interface GoogleStreamChunkResult {
   signatures: ExtractedSignature[];
 }
 
-export function transformGoogleStreamChunk(chunk: string, model: string): GoogleStreamChunkResult {
+/**
+ * Per-stream state. Gemini sends each functionCall in its own SSE event and
+ * the usage in a trailer, so the completion id, tool-call indices, and the
+ * tool_calls finish reason must span the whole stream, not one event.
+ */
+export interface GoogleStreamState {
+  id: string;
+  created: number;
+  toolCallCount: number;
+}
+
+export function createGoogleStreamState(): GoogleStreamState {
+  return {
+    id: `chatcmpl-${randomUUID()}`,
+    created: Math.floor(Date.now() / 1000),
+    toolCallCount: 0,
+  };
+}
+
+/**
+ * Transform one Google SSE event. Pass the same `state` for every event of a
+ * stream; omitting it treats the event as a stream of its own.
+ */
+export function transformGoogleStreamChunk(
+  chunk: string,
+  model: string,
+  state: GoogleStreamState = createGoogleStreamState(),
+): GoogleStreamChunkResult {
   const empty: GoogleStreamChunkResult = { chunk: null, signatures: [] };
   if (!chunk.trim()) return empty;
 
@@ -581,7 +608,7 @@ export function transformGoogleStreamChunk(chunk: string, model: string): Google
       const fc = part.functionCall as GeminiFunctionCall;
       const toolCallId = typeof fc.id === 'string' && fc.id ? fc.id : `call_${randomUUID()}`;
       const toolCall: Record<string, unknown> = {
-        index: toolCalls.length,
+        index: state.toolCallCount++,
         id: toolCallId,
         type: 'function',
         function: { name: fc.name, arguments: JSON.stringify(fc.args ?? {}) },
@@ -602,9 +629,9 @@ export function transformGoogleStreamChunk(chunk: string, model: string): Google
     if (text) delta.content = text;
     if (toolCalls.length > 0) delta.tool_calls = toolCalls;
     result += `data: ${JSON.stringify({
-      id: `chatcmpl-${randomUUID()}`,
+      id: state.id,
       object: 'chat.completion.chunk',
-      created: Math.floor(Date.now() / 1000),
+      created: state.created,
       model,
       choices: [{ index: 0, delta, finish_reason: null }],
     })}\n\n`;
@@ -612,18 +639,18 @@ export function transformGoogleStreamChunk(chunk: string, model: string): Google
 
   const usage = data.usageMetadata as Record<string, number> | undefined;
   if (usage) {
-    const finishReason = mapFinishReason(candidate ?? {}, toolCalls.length > 0);
+    const finishReason = mapFinishReason(candidate ?? {}, state.toolCallCount > 0);
     result += `data: ${JSON.stringify({
-      id: `chatcmpl-${randomUUID()}`,
+      id: state.id,
       object: 'chat.completion.chunk',
-      created: Math.floor(Date.now() / 1000),
+      created: state.created,
       model,
       choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
     })}\n\n`;
     result += `data: ${JSON.stringify({
-      id: `chatcmpl-${randomUUID()}`,
+      id: state.id,
       object: 'chat.completion.chunk',
-      created: Math.floor(Date.now() / 1000),
+      created: state.created,
       model,
       choices: [],
       usage: toChatUsage(usage),

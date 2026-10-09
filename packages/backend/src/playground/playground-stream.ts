@@ -1,5 +1,6 @@
 import type { ForwardResult, ProviderClient } from '../routing/proxy/provider-client';
 import { unwrapCodeAssistStreamPayload } from '../routing/oauth/gemini/codeassist-envelope';
+import { createGoogleStreamState } from '../routing/proxy/google-adapter';
 import { createSsePayloadParser } from '../routing/proxy/sse-parser';
 import { parseUsageObject, type StreamUsage } from '../routing/proxy/stream-writer';
 
@@ -27,9 +28,11 @@ function buildChunkTransform(
   providerClient: ProviderClient,
 ): ChunkTransform {
   if (forward.isGoogle) {
+    // Stateful: one state per stream keeps ids and tool-call indices stable.
+    const state = createGoogleStreamState();
     return (event) => {
       const innerEvent = forward.isCodeAssist ? unwrapCodeAssistStreamPayload(event) : event;
-      return providerClient.convertGoogleStreamChunk(innerEvent, model).chunk;
+      return providerClient.convertGoogleStreamChunk(innerEvent, model, state).chunk;
     };
   }
   if (forward.isAnthropic) {

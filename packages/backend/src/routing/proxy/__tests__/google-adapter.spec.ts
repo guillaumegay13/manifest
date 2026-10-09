@@ -2,6 +2,7 @@ import {
   toGoogleRequest,
   fromGoogleResponse,
   transformGoogleStreamChunk as transformGoogleStreamChunkRaw,
+  createGoogleStreamState,
 } from '../google-adapter';
 
 /**
@@ -2197,6 +2198,55 @@ describe('Google Adapter', () => {
       const result = transformGoogleStreamChunk(chunk, 'gemini-2.0-flash');
       expect(result).toContain('"prompt_tokens":10');
       expect(result).toContain('"finish_reason":"stop"');
+    });
+
+    describe('with per-stream state', () => {
+      const fnCallEvent = (id: string, name: string) =>
+        JSON.stringify({
+          candidates: [{ content: { parts: [{ functionCall: { id, name, args: {} } }] } }],
+        });
+      const usageTrailer = JSON.stringify({
+        candidates: [{ content: { parts: [] }, finishReason: 'STOP' }],
+        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
+      });
+      const sseEvents = (out: string | null) =>
+        out!
+          .split('\n\n')
+          .filter(Boolean)
+          .map((line) => JSON.parse(line.replace('data: ', '')));
+
+      function runStream(events: string[]) {
+        const state = createGoogleStreamState();
+        return events.flatMap((e) =>
+          sseEvents(transformGoogleStreamChunkRaw(e, 'gemini-2.5-flash', state).chunk),
+        );
+      }
+
+      it('gives tool calls from separate events distinct indices', () => {
+        const out = runStream([fnCallEvent('a', 'get_weather'), fnCallEvent('b', 'get_time')]);
+        expect(out[0].choices[0].delta.tool_calls[0]).toMatchObject({ index: 0, id: 'a' });
+        expect(out[1].choices[0].delta.tool_calls[0]).toMatchObject({ index: 1, id: 'b' });
+      });
+
+      it('keeps one completion id and created timestamp for the whole stream', () => {
+        const out = runStream([fnCallEvent('a', 'get_weather'), usageTrailer]);
+        expect(out).toHaveLength(3);
+        expect(new Set(out.map((e) => e.id)).size).toBe(1);
+        expect(new Set(out.map((e) => e.created)).size).toBe(1);
+      });
+
+      it('finishes with tool_calls when an earlier event emitted a tool call', () => {
+        const out = runStream([fnCallEvent('a', 'get_weather'), usageTrailer]);
+        expect(out[1].choices[0].finish_reason).toBe('tool_calls');
+      });
+
+      it('finishes with stop when no event emitted a tool call', () => {
+        const textEvent = JSON.stringify({
+          candidates: [{ content: { parts: [{ text: 'hi' }] } }],
+        });
+        const out = runStream([textEvent, usageTrailer]);
+        expect(out[1].choices[0].finish_reason).toBe('stop');
+      });
     });
   });
 

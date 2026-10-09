@@ -1932,6 +1932,30 @@ describe('proxy-response-handler', () => {
       expect(() => capturedTransform!('{}')).not.toThrow();
     });
 
+    it('passes one stream state to every Google chunk of a stream', async () => {
+      const { res } = mockResponse();
+      const forward = mockForward({ isGoogle: true });
+      const client = mockProviderClient();
+      const meta = makeMeta();
+
+      let capturedTransform: ((chunk: string) => string | null) | undefined;
+      pipeStreamSpy.mockImplementation(
+        async (_body: unknown, _res: unknown, transform?: (chunk: string) => string | null) => {
+          capturedTransform = transform;
+          return null;
+        },
+      );
+      client.convertGoogleStreamChunk.mockReturnValue({ chunk: 'data: {}\n\n', signatures: [] });
+
+      await handleStreamResponse(res as any, forward as any, meta, {}, client as any);
+      capturedTransform!('{"a":1}');
+      capturedTransform!('{"b":2}');
+
+      const [first, second] = client.convertGoogleStreamChunk.mock.calls;
+      expect(first[2]).toEqual(expect.objectContaining({ toolCallCount: 0 }));
+      expect(second[2]).toBe(first[2]);
+    });
+
     it('caches reasoning_content from compatible OpenAI-compatible streams', async () => {
       const { res } = mockResponse();
       const forward = mockForward();

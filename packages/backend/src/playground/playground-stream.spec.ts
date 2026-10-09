@@ -95,7 +95,7 @@ describe('consumeProviderStream', () => {
 
   it('uses the Google chunk converter for Google-format streams', async () => {
     const convertGoogleStreamChunk = jest.fn(
-      (_e: string, _m: string): { chunk: string | null } => ({
+      (_e: string, _m: string, _s?: unknown): { chunk: string | null } => ({
         chunk: 'data: {"choices":[{"delta":{"content":"G"}}]}\n\n',
       }),
     );
@@ -103,20 +103,27 @@ describe('consumeProviderStream', () => {
       convertGoogleStreamChunk: convertGoogleStreamChunk as never,
     });
     const result = await consumeProviderStream(
-      sseStream(['data: {"candidates":[]}\n\n']),
+      sseStream(['data: {"candidates":[]}\n\n', 'data: {"candidates":[]}\n\n']),
       { isGoogle: true, isAnthropic: false, isChatGpt: false },
       'gemini/x',
       pc,
       () => undefined,
       Date.now(),
     );
-    expect(convertGoogleStreamChunk).toHaveBeenCalledWith('{"candidates":[]}', 'gemini/x');
-    expect(result.content).toBe('G');
+    expect(convertGoogleStreamChunk).toHaveBeenCalledWith(
+      '{"candidates":[]}',
+      'gemini/x',
+      expect.objectContaining({ toolCallCount: 0 }),
+    );
+    // One state object spans the whole stream.
+    const [first, second] = convertGoogleStreamChunk.mock.calls;
+    expect(second[2]).toBe(first[2]);
+    expect(result.content).toBe('GG');
   });
 
   it('unwraps CodeAssist Google stream payloads before conversion', async () => {
     const convertGoogleStreamChunk = jest.fn(
-      (_e: string, _m: string): { chunk: string | null } => ({
+      (_e: string, _m: string, _s?: unknown): { chunk: string | null } => ({
         chunk: 'data: {"choices":[{"delta":{"content":"C"}}]}\n\n',
       }),
     );
@@ -133,7 +140,11 @@ describe('consumeProviderStream', () => {
       Date.now(),
     );
 
-    expect(convertGoogleStreamChunk).toHaveBeenCalledWith(JSON.stringify(inner), 'gemini/x');
+    expect(convertGoogleStreamChunk).toHaveBeenCalledWith(
+      JSON.stringify(inner),
+      'gemini/x',
+      expect.objectContaining({ toolCallCount: 0 }),
+    );
     expect(result.content).toBe('C');
   });
 
