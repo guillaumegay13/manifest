@@ -1,0 +1,26 @@
+packages/shared/src/chat-message.ts
+  s_907cb30f504bd0::t_f9c72f4d01b505 249
+  s_907cb30f504bd0::t_f25292e4112f34 83-86,120-121,250-261,304-337,360-370,373-387,391-405,407-438,440-441,443-446
+packages/shared/__tests__/chat-message.spec.ts
+  s_907cb30f504bd0::t_b6fbcdc4dbeb2a 629-633
+  s_907cb30f504bd0::t_b11dd5c0111038 580-628,634-714
+.changeset/recording-conversation-fixes.md
+  s_907cb30f504bd0::t_5fd621c18e1ad8 1,3-5
+  s_907cb30f504bd0::t_959fda277d5798 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4f1f9697f283c8abd2766f52bb92380a5117c916",
+  "prompts": {},
+  "sessions": {
+    "s_907cb30f504bd0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55bf3778-1229-4730-a3c7-0f14051476c5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
