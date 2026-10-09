@@ -2247,6 +2247,94 @@ describe('Google Adapter', () => {
         const out = runStream([textEvent, usageTrailer]);
         expect(out[1].choices[0].finish_reason).toBe('stop');
       });
+
+      // Live gemini-flash-latest shape: usageMetadata (cumulative) on every
+      // event, one functionCall per event, finishReason only on the last one.
+      it('closes a stream that repeats usage on every event exactly once', () => {
+        const withUsage = (event: Record<string, unknown>, n: number) =>
+          JSON.stringify({
+            ...event,
+            usageMetadata: {
+              promptTokenCount: 50,
+              candidatesTokenCount: n,
+              totalTokenCount: 50 + n,
+            },
+          });
+        const part = (p: Record<string, unknown>, finishReason?: string) => ({
+          candidates: [
+            { content: { role: 'model', parts: [p] }, ...(finishReason ? { finishReason } : {}) },
+          ],
+        });
+        const events = [
+          ...Array.from({ length: 9 }, (_, i) => withUsage(part({ text: `t${i}` }), i + 1)),
+          withUsage(part({ functionCall: { id: 'a', name: 'get_weather', args: {} } }), 12),
+          withUsage(part({ functionCall: { id: 'b', name: 'get_time', args: {} } }), 14),
+          withUsage(part({ text: '' }, 'STOP'), 15),
+        ];
+
+        const out = runStream(events);
+        const finishes = out.filter((e) => e.choices[0]?.finish_reason);
+        const usages = out.filter((e) => e.usage);
+        const toolCalls = out.flatMap((e) => e.choices[0]?.delta?.tool_calls ?? []);
+
+        expect(finishes).toHaveLength(1);
+        expect(finishes[0].choices[0].finish_reason).toBe('tool_calls');
+        expect(usages).toHaveLength(1);
+        expect(usages[0].usage).toMatchObject({ prompt_tokens: 50, completion_tokens: 15 });
+        expect(out[out.length - 1]).toBe(usages[0]);
+        expect(new Set(out.map((e) => e.id)).size).toBe(1);
+        expect(toolCalls.map((c: { index: number }) => c.index)).toEqual([0, 1]);
+        expect(out.filter((e) => e.choices[0]?.delta?.content)).toHaveLength(9);
+      });
+
+      it('reports the last seen usage when the terminal event carries none', () => {
+        const textWithUsage = JSON.stringify({
+          candidates: [{ content: { parts: [{ text: 'hi' }] } }],
+          usageMetadata: { promptTokenCount: 7, candidatesTokenCount: 3, totalTokenCount: 10 },
+        });
+        const stop = JSON.stringify({
+          candidates: [{ content: { parts: [] }, finishReason: 'STOP' }],
+        });
+        const out = runStream([textWithUsage, stop]);
+        expect(out.map((e) => e.choices[0]?.finish_reason ?? null)).toEqual([null, 'stop', null]);
+        expect(out[2].usage).toMatchObject({ prompt_tokens: 7, total_tokens: 10 });
+      });
+
+      it('sends a finish chunk without usage when no event had usage', () => {
+        const stop = JSON.stringify({
+          candidates: [{ content: { parts: [{ text: 'x' }] }, finishReason: 'STOP' }],
+        });
+        const out = runStream([stop]);
+        expect(out).toHaveLength(2);
+        expect(out[1].choices[0].finish_reason).toBe('stop');
+        expect(out.some((e) => e.usage)).toBe(false);
+      });
+
+      it('adds no second finish chunk for a usage trailer after the finish', () => {
+        const stop = JSON.stringify({
+          candidates: [{ content: { parts: [] }, finishReason: 'STOP' }],
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+        });
+        const trailer = JSON.stringify({
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 2, totalTokenCount: 3 },
+        });
+        const out = runStream([stop, trailer]);
+        expect(out.filter((e) => e.choices[0]?.finish_reason)).toHaveLength(1);
+        expect(out[out.length - 1].usage).toMatchObject({ total_tokens: 3 });
+      });
+
+      it('emits no finish or usage for a mid-stream event that only repeats usage', () => {
+        const midStream = JSON.stringify({
+          candidates: [{ content: { parts: [{ text: 'partial' }] } }],
+          usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 1, totalTokenCount: 6 },
+        });
+        const out = sseEvents(transformGoogleStreamChunkRaw(midStream, 'gemini-2.5-flash').chunk);
+        expect(out).toHaveLength(1);
+        expect(out[0].choices[0]).toMatchObject({
+          delta: { content: 'partial' },
+          finish_reason: null,
+        });
+      });
     });
   });
 

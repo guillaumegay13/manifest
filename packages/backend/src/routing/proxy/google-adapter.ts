@@ -556,13 +556,17 @@ export interface GoogleStreamChunkResult {
 
 /**
  * Per-stream state. Gemini sends each functionCall in its own SSE event and
- * the usage in a trailer, so the completion id, tool-call indices, and the
- * tool_calls finish reason must span the whole stream, not one event.
+ * repeats usage on every event, so the completion id, tool-call indices, the
+ * finish reason, and the usage must span the whole stream, not one event.
  */
 export interface GoogleStreamState {
   id: string;
   created: number;
   toolCallCount: number;
+  /** Latest cumulative usageMetadata seen, reported on the terminal event. */
+  usage?: Record<string, number>;
+  /** Set once the finish chunk is sent, so a later usage trailer adds no second one. */
+  finished: boolean;
 }
 
 export function createGoogleStreamState(): GoogleStreamState {
@@ -570,6 +574,7 @@ export function createGoogleStreamState(): GoogleStreamState {
     id: `chatcmpl-${randomUUID()}`,
     created: Math.floor(Date.now() / 1000),
     toolCallCount: 0,
+    finished: false,
   };
 }
 
@@ -637,24 +642,34 @@ export function transformGoogleStreamChunk(
     })}\n\n`;
   }
 
+  // Gemini repeats cumulative usageMetadata on every event, so only the
+  // terminal event (a finishReason, or a usage-only trailer with no
+  // candidate) closes the stream; its usage is the total.
   const usage = data.usageMetadata as Record<string, number> | undefined;
-  if (usage) {
-    const finishReason = mapFinishReason(candidate ?? {}, state.toolCallCount > 0);
-    result += `data: ${JSON.stringify({
-      id: state.id,
-      object: 'chat.completion.chunk',
-      created: state.created,
-      model,
-      choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
-    })}\n\n`;
-    result += `data: ${JSON.stringify({
-      id: state.id,
-      object: 'chat.completion.chunk',
-      created: state.created,
-      model,
-      choices: [],
-      usage: toChatUsage(usage),
-    })}\n\n`;
+  if (usage) state.usage = usage;
+  const isTerminal = Boolean(candidate?.finishReason) || (Boolean(usage) && !candidate);
+  if (isTerminal) {
+    if (!state.finished) {
+      state.finished = true;
+      const finishReason = mapFinishReason(candidate ?? {}, state.toolCallCount > 0);
+      result += `data: ${JSON.stringify({
+        id: state.id,
+        object: 'chat.completion.chunk',
+        created: state.created,
+        model,
+        choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
+      })}\n\n`;
+    }
+    if (state.usage) {
+      result += `data: ${JSON.stringify({
+        id: state.id,
+        object: 'chat.completion.chunk',
+        created: state.created,
+        model,
+        choices: [],
+        usage: toChatUsage(state.usage),
+      })}\n\n`;
+    }
   }
 
   return { chunk: result || null, signatures };
