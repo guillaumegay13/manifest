@@ -1,0 +1,21 @@
+packages/shared/__tests__/chat-message.spec.ts
+  s_907cb30f504bd0::t_1777a2fc5a8778 715-728
+packages/shared/src/chat-message.ts
+  s_907cb30f504bd0::t_74fb78b67abe68 248-251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "974148852ff37b0323b1628bc4e1fa1761b55e52",
+  "prompts": {},
+  "sessions": {
+    "s_907cb30f504bd0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55bf3778-1229-4730-a3c7-0f14051476c5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
