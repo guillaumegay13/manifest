@@ -1,0 +1,32 @@
+packages/shared/src/subscription/configs.ts
+  s_907cb30f504bd0::t_b7c993bc5620a9 33-34
+packages/backend/src/routing/bedrock-runtime-capabilities.spec.ts
+  s_907cb30f504bd0::t_b7c993bc5620a9 75
+packages/backend/src/model-discovery/model-discovery.service.spec.ts
+  s_907cb30f504bd0::t_b7c993bc5620a9 2068,2472,2477,2680,2685
+packages/shared/__tests__/subscription.spec.ts
+  s_907cb30f504bd0::t_b7c993bc5620a9 339
+packages/backend/src/model-discovery/model-fallback.spec.ts
+  s_907cb30f504bd0::t_b7c993bc5620a9 326,342
+packages/backend/src/routing/bedrock-runtime-capabilities.ts
+  s_907cb30f504bd0::t_b7c993bc5620a9 90
+.changeset/claude-haiku-5-5.md
+  s_907cb30f504bd0::t_b7c993bc5620a9 1,3-5
+  s_907cb30f504bd0::t_772f5d4f48abae 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9cd9f0711317194c1807c31679df3b69546cf526",
+  "prompts": {},
+  "sessions": {
+    "s_907cb30f504bd0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55bf3778-1229-4730-a3c7-0f14051476c5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
