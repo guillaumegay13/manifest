@@ -1,0 +1,37 @@
+packages/backend/src/routing/proxy/google-adapter.ts
+  s_907cb30f504bd0::t_6ad822c683d6e9 663,668,674-694
+  s_907cb30f504bd0::t_cc987e37b2c101 669-673
+packages/backend/src/playground/playground-stream.spec.ts
+  s_907cb30f504bd0::t_ba9c0d1265e211 4,125-151
+  s_907cb30f504bd0::t_067dc121075ba4 152-153
+packages/backend/src/routing/proxy/__tests__/proxy-response-handler.spec.ts
+  s_907cb30f504bd0::t_bfdf33f8c599dc 10,1939-1941
+  s_907cb30f504bd0::t_2eb1a4dcfa9684 1457,1936-1938,1942-2003
+  s_907cb30f504bd0::t_b8ab931ba6cecd 2004-2005
+packages/backend/src/routing/proxy/proxy-response-handler.ts
+  s_907cb30f504bd0::t_6ad822c683d6e9 44-47,682-688
+  s_907cb30f504bd0::t_9c900339f8003c 43,689
+.changeset/gemini-stream-state.md
+  s_907cb30f504bd0::t_aa9909aa74f191 5
+packages/backend/src/routing/proxy/__tests__/google-adapter.spec.ts
+  s_907cb30f504bd0::t_ba9c0d1265e211 6,2327-2352
+  s_907cb30f504bd0::t_c208c48f2c0d73 2353-2354
+packages/backend/src/playground/playground-stream.ts
+  s_907cb30f504bd0::t_1ebe2545a5a277 3,23-26,36,40-42,111,122,140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2fb6be3084cbd4c2bc10f51cdc96c46578977b1c",
+  "prompts": {},
+  "sessions": {
+    "s_907cb30f504bd0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55bf3778-1229-4730-a3c7-0f14051476c5",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
