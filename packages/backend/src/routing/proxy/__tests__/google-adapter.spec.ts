@@ -3,6 +3,7 @@ import {
   fromGoogleResponse,
   transformGoogleStreamChunk as transformGoogleStreamChunkRaw,
   createGoogleStreamState,
+  finishGoogleStream,
 } from '../google-adapter';
 
 /**
@@ -2321,6 +2322,34 @@ describe('Google Adapter', () => {
         const out = runStream([stop, trailer]);
         expect(out.filter((e) => e.choices[0]?.finish_reason)).toHaveLength(1);
         expect(out[out.length - 1].usage).toMatchObject({ total_tokens: 3 });
+      });
+
+      describe('finishGoogleStream', () => {
+        const midStream = JSON.stringify({
+          candidates: [{ content: { parts: [{ text: 'partial' }] } }],
+          usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 2, totalTokenCount: 7 },
+        });
+
+        it('returns the last usage once for a stream cut off before its finish', () => {
+          const state = createGoogleStreamState();
+          transformGoogleStreamChunkRaw(midStream, 'gemini-2.5-flash', state);
+
+          const [tail] = sseEvents(finishGoogleStream(state, 'gemini-2.5-flash'));
+          expect(tail).toMatchObject({ id: state.id, choices: [] });
+          expect(tail.usage).toMatchObject({ prompt_tokens: 5, completion_tokens: 2 });
+          expect(finishGoogleStream(state, 'gemini-2.5-flash')).toBeNull();
+        });
+
+        it('returns null for a finished stream or one that never reported usage', () => {
+          const finished = createGoogleStreamState();
+          transformGoogleStreamChunkRaw(
+            JSON.stringify({ candidates: [{ finishReason: 'STOP' }], usageMetadata: {} }),
+            'gemini-2.5-flash',
+            finished,
+          );
+          expect(finishGoogleStream(finished, 'gemini-2.5-flash')).toBeNull();
+          expect(finishGoogleStream(createGoogleStreamState(), 'gemini-2.5-flash')).toBeNull();
+        });
       });
 
       it('emits no finish or usage for a mid-stream event that only repeats usage', () => {

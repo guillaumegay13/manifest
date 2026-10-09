@@ -660,17 +660,35 @@ export function transformGoogleStreamChunk(
         choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
       })}\n\n`;
     }
-    if (state.usage) {
-      result += `data: ${JSON.stringify({
-        id: state.id,
-        object: 'chat.completion.chunk',
-        created: state.created,
-        model,
-        choices: [],
-        usage: toChatUsage(state.usage),
-      })}\n\n`;
-    }
+    if (state.usage) result += usageChunk(state, state.usage, model);
   }
 
   return { chunk: result || null, signatures };
+}
+
+function usageChunk(
+  state: GoogleStreamState,
+  usage: Record<string, number>,
+  model: string,
+): string {
+  return `data: ${JSON.stringify({
+    id: state.id,
+    object: 'chat.completion.chunk',
+    created: state.created,
+    model,
+    choices: [],
+    usage: toChatUsage(usage),
+  })}\n\n`;
+}
+
+/**
+ * End-of-stream hook. Gemini has no terminal event of its own, so an upstream
+ * that ends before any finishReason never reported usage; return the last
+ * cumulative usage seen so the request still records it. Usage only: no
+ * finish chunk is invented for a stream the provider did not finish.
+ */
+export function finishGoogleStream(state: GoogleStreamState, model: string): string | null {
+  if (state.finished || !state.usage) return null;
+  state.finished = true;
+  return usageChunk(state, state.usage, model);
 }

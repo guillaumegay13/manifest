@@ -1,6 +1,7 @@
 import { consumeProviderStream } from './playground-stream';
 import type { ProviderClient } from '../routing/proxy/provider-client';
 import type { ForwardResult } from '../routing/proxy/provider-client';
+import { transformGoogleStreamChunk } from '../routing/proxy/google-adapter';
 
 function sseStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
@@ -119,6 +120,35 @@ describe('consumeProviderStream', () => {
     const [first, second] = convertGoogleStreamChunk.mock.calls;
     expect(second[2]).toBe(first[2]);
     expect(result.content).toBe('GG');
+  });
+
+  describe('Google end-of-stream usage', () => {
+    const GOOGLE: Forward = { isGoogle: true, isAnthropic: false, isChatGpt: false };
+    const usageEvent = (text: string, n: number, finishReason?: string) =>
+      `data: ${JSON.stringify({
+        candidates: [{ content: { parts: [{ text }] }, ...(finishReason ? { finishReason } : {}) }],
+        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: n, totalTokenCount: 10 + n },
+      })}\n\n`;
+    const run = (events: string[]) =>
+      consumeProviderStream(
+        sseStream(events),
+        GOOGLE,
+        'gemini/x',
+        providerClientStub({ convertGoogleStreamChunk: transformGoogleStreamChunk }),
+        () => undefined,
+        Date.now(),
+      );
+
+    it('records the last usage when the stream ends before a finishReason', async () => {
+      const result = await run([usageEvent('a', 1), usageEvent('b', 2)]);
+      expect(result.content).toBe('ab');
+      expect(result.usage).toMatchObject({ prompt_tokens: 10, completion_tokens: 2 });
+    });
+
+    it('records the terminal usage of a complete stream', async () => {
+      const result = await run([usageEvent('a', 1), usageEvent('', 4, 'STOP')]);
+      expect(result.usage).toMatchObject({ prompt_tokens: 10, completion_tokens: 4 });
+    });
   });
 
   it('unwraps CodeAssist Google stream payloads before conversion', async () => {
