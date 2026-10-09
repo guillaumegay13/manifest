@@ -2211,7 +2211,7 @@ describe('Google Adapter', () => {
         usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
       });
       const sseEvents = (out: string | null) =>
-        out!
+        (out ?? '')
           .split('\n\n')
           .filter(Boolean)
           .map((line) => JSON.parse(line.replace('data: ', '')));
@@ -2311,7 +2311,7 @@ describe('Google Adapter', () => {
         expect(out.some((e) => e.usage)).toBe(false);
       });
 
-      it('adds no second finish chunk for a usage trailer after the finish', () => {
+      it('adds no second finish or usage chunk for a usage trailer after the finish', () => {
         const stop = JSON.stringify({
           candidates: [{ content: { parts: [] }, finishReason: 'STOP' }],
           usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
@@ -2321,7 +2321,38 @@ describe('Google Adapter', () => {
         });
         const out = runStream([stop, trailer]);
         expect(out.filter((e) => e.choices[0]?.finish_reason)).toHaveLength(1);
-        expect(out[out.length - 1].usage).toMatchObject({ total_tokens: 3 });
+        const usages = out.filter((e) => e.usage);
+        expect(usages).toHaveLength(1);
+        expect(usages[0].usage).toMatchObject({ total_tokens: 2 });
+      });
+
+      it('lets a usage-only trailer supply the usage a finish event lacked', () => {
+        const stop = JSON.stringify({
+          candidates: [{ content: { parts: [] }, finishReason: 'STOP' }],
+        });
+        const trailer = JSON.stringify({
+          usageMetadata: { promptTokenCount: 4, candidatesTokenCount: 2, totalTokenCount: 6 },
+        });
+        const out = runStream([fnCallEvent('a', 'get_weather'), stop, trailer]);
+        const finishes = out.filter((e) => e.choices[0]?.finish_reason);
+        const usages = out.filter((e) => e.usage);
+        expect(finishes).toHaveLength(1);
+        expect(finishes[0].choices[0].finish_reason).toBe('tool_calls');
+        expect(usages).toHaveLength(1);
+        expect(usages[0].usage).toMatchObject({ total_tokens: 6 });
+      });
+
+      it('closes on a usage-only trailer with no candidates after a tool call', () => {
+        const trailer = JSON.stringify({
+          usageMetadata: { promptTokenCount: 4, candidatesTokenCount: 2, totalTokenCount: 6 },
+        });
+        const out = runStream([fnCallEvent('a', 'get_weather'), trailer]);
+        expect(out.map((e) => e.choices[0]?.finish_reason ?? null)).toEqual([
+          null,
+          'tool_calls',
+          null,
+        ]);
+        expect(out.filter((e) => e.usage)).toHaveLength(1);
       });
 
       describe('finishGoogleStream', () => {

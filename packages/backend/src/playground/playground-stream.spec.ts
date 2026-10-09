@@ -129,25 +129,39 @@ describe('consumeProviderStream', () => {
         candidates: [{ content: { parts: [{ text }] }, ...(finishReason ? { finishReason } : {}) }],
         usageMetadata: { promptTokenCount: 10, candidatesTokenCount: n, totalTokenCount: 10 + n },
       })}\n\n`;
-    const run = (events: string[]) =>
-      consumeProviderStream(
+    // Records what the real converter emitted per event, so a regression to
+    // per-event finish/usage chunks fails even when the aggregate matches.
+    const emitted: (string | null)[] = [];
+    const recordingConverter = (...args: Parameters<typeof transformGoogleStreamChunk>) => {
+      const out = transformGoogleStreamChunk(...args);
+      emitted.push(out.chunk);
+      return out;
+    };
+    const run = (events: string[]) => {
+      emitted.length = 0;
+      return consumeProviderStream(
         sseStream(events),
         GOOGLE,
         'gemini/x',
-        providerClientStub({ convertGoogleStreamChunk: transformGoogleStreamChunk }),
+        providerClientStub({ convertGoogleStreamChunk: recordingConverter }),
         () => undefined,
         Date.now(),
       );
+    };
+    const closingEvents = () =>
+      emitted.map((chunk) => /"finish_reason":"|"usage":\{/.test(chunk ?? ''));
 
     it('records the last usage when the stream ends before a finishReason', async () => {
       const result = await run([usageEvent('a', 1), usageEvent('b', 2)]);
       expect(result.content).toBe('ab');
       expect(result.usage).toMatchObject({ prompt_tokens: 10, completion_tokens: 2 });
+      expect(closingEvents()).toEqual([false, false]);
     });
 
     it('records the terminal usage of a complete stream', async () => {
       const result = await run([usageEvent('a', 1), usageEvent('', 4, 'STOP')]);
       expect(result.usage).toMatchObject({ prompt_tokens: 10, completion_tokens: 4 });
+      expect(closingEvents()).toEqual([false, true]);
     });
   });
 

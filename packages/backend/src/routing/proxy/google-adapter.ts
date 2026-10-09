@@ -567,6 +567,8 @@ export interface GoogleStreamState {
   usage?: Record<string, number>;
   /** Set once the finish chunk is sent, so a later usage trailer adds no second one. */
   finished: boolean;
+  /** Set once the usage chunk is sent, so the stream reports usage exactly once. */
+  usageSent: boolean;
 }
 
 export function createGoogleStreamState(): GoogleStreamState {
@@ -575,6 +577,7 @@ export function createGoogleStreamState(): GoogleStreamState {
     created: Math.floor(Date.now() / 1000),
     toolCallCount: 0,
     finished: false,
+    usageSent: false,
   };
 }
 
@@ -660,7 +663,12 @@ export function transformGoogleStreamChunk(
         choices: [{ index: 0, delta: {}, finish_reason: finishReason }],
       })}\n\n`;
     }
-    if (state.usage) result += usageChunk(state, state.usage, model);
+    // A trailer after the finish event can still supply usage the finish
+    // event lacked, but never a second usage chunk.
+    if (state.usage && !state.usageSent) {
+      state.usageSent = true;
+      result += usageChunk(state, state.usage, model);
+    }
   }
 
   return { chunk: result || null, signatures };
@@ -688,7 +696,7 @@ function usageChunk(
  * finish chunk is invented for a stream the provider did not finish.
  */
 export function finishGoogleStream(state: GoogleStreamState, model: string): string | null {
-  if (state.finished || !state.usage) return null;
-  state.finished = true;
+  if (state.usageSent || !state.usage) return null;
+  state.usageSent = true;
   return usageChunk(state, state.usage, model);
 }
