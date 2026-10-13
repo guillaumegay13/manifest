@@ -1,0 +1,106 @@
+packages/backend/src/analytics/services/query-helpers.ts
+  s_9a13a5c69844d2::t_d5ff786affa459 2,131,135-136,138-139,141-143,148-151
+  s_9a13a5c69844d2::t_665d0c212004d5 152-153
+.changeset/shared-analytics-harness-scope.md
+  s_9a13a5c69844d2::t_169e974b85b605 1-5
+packages/backend/test/analytics-scope.mock.ts
+  s_9a13a5c69844d2::t_d5ff786affa459 1-12
+  s_9a13a5c69844d2::t_9dd8e696adfe00 13-15
+packages/backend/test/analytics-agent-scope.e2e-spec.ts
+  s_9a13a5c69844d2::t_d1568a72c86cd7 188-190,193,195-197,199-208,278
+  s_9a13a5c69844d2::t_9658ab20c0f49a 6-7,50-62,95-97,157,231-277
+  s_9a13a5c69844d2::t_f6925f19539f30 187,194,198,209-230
+  s_9a13a5c69844d2::t_7c4ac5d167f0ad 98-104,107-112,126-128,141-146,155-156,158-159,279-297
+packages/backend/src/analytics/services/analytics-scope.service.ts
+  s_9a13a5c69844d2::t_2e5f4a508dd003 1-12,18-33
+  s_9a13a5c69844d2::t_fef0afeea0aa49 13-17
+packages/backend/src/analytics/services/analytics-scope.service.spec.ts
+  s_9a13a5c69844d2::t_6d76e021726b0e 1-26
+  s_9a13a5c69844d2::t_9a22ba660961e4 27-31
+packages/backend/src/analytics/analytics.module.ts
+  s_9a13a5c69844d2::t_e52c62f5b66a9a 1,84,102
+packages/backend/src/analytics/controllers/attempt-analytics.controller.spec.ts
+  s_9a13a5c69844d2::t_34bdcc4f948194 1-2,26-29,41,55
+packages/backend/src/analytics/controllers/attempt-analytics.controller.ts
+  s_9a13a5c69844d2::t_24bf1e52f45733 1,14-17,24,33
+packages/backend/src/analytics/controllers/autofix-analytics.controller.spec.ts
+  s_9a13a5c69844d2::t_4f6eef26ff6fe3 1,14-18,48,54,61,71
+packages/backend/src/analytics/controllers/autofix-analytics.controller.ts
+  s_9a13a5c69844d2::t_9bd2616a22e589 1,37,66,76,94,103
+packages/backend/src/analytics/controllers/costs.controller.spec.ts
+  s_9a13a5c69844d2::t_56a2eff83a5a64 1-2,37,76-97
+packages/backend/src/analytics/controllers/costs.controller.ts
+  s_9a13a5c69844d2::t_08461480791dd4 1,17,25,28-31
+packages/backend/src/analytics/controllers/errors.controller.spec.ts
+  s_9a13a5c69844d2::t_5f77a2453f9dd4 1-2,29-32,46,57,67
+packages/backend/src/analytics/controllers/errors.controller.ts
+  s_9a13a5c69844d2::t_95981373525766 1,14-17,30
+packages/backend/src/analytics/controllers/overview.controller.spec.ts
+  s_9a13a5c69844d2::t_ad14033ce8483a 1-2,66,75,83,196,217,239,257,272,294-299,320,327,335,343-370,419,426,428,433,455,466,470,510-515,537,555,564-569
+packages/backend/src/analytics/controllers/overview.controller.ts
+  s_9a13a5c69844d2::t_d83de140db86d6 1,41,54,63,90,93,98,108,111,114-116,148-149,151-154,166,175,181,187,193-194,202-203,211-212,217-218,223-224,229-230,238-239,243,247-250,253-254,259,263-267,272-274,284,292-293,301
+packages/backend/src/analytics/controllers/provider-analytics.controller.spec.ts
+  s_9a13a5c69844d2::t_aba909ba19173a 1,98,152
+packages/backend/src/analytics/controllers/provider-analytics.controller.ts
+  s_9a13a5c69844d2::t_ec27794519993b 1,29,138,189,203
+packages/backend/src/analytics/controllers/tokens.controller.spec.ts
+  s_9a13a5c69844d2::t_5a727c272fe412 1-2,35,73-89
+packages/backend/src/analytics/controllers/tokens.controller.ts
+  s_9a13a5c69844d2::t_e3e828ae5680e8 1,17,25,28-30
+packages/backend/src/analytics/services/agent-usage-daily.service.spec.ts
+  s_9a13a5c69844d2::t_0e51a88c0f4aa3 1,185,199,216
+packages/backend/src/analytics/services/agent-usage-daily.service.ts
+  s_9a13a5c69844d2::t_6a97873d056a16 1,153,177,179,182,187,205,224,236,258
+packages/backend/src/analytics/services/aggregation.service.spec.ts
+  s_9a13a5c69844d2::t_48f7aa8b35816d 1,94,149-154,156,168,175,196-200,220-224,263-267,367-373,376,421-426,437-443,450-455,487-492,516-522,536-541
+packages/backend/src/analytics/services/aggregation.service.ts
+  s_9a13a5c69844d2::t_00d6f9bfd9a14b 1,11,47,52,64,77,80,89,93,102,119,127,177,187,206,231,255,257,269-270,386,400
+packages/backend/src/analytics/services/attempt-stats.service.spec.ts
+  s_9a13a5c69844d2::t_c6dcc0a385b84b 1,47-51,69,84-85,116,121-123
+packages/backend/src/analytics/services/attempt-stats.service.ts
+  s_9a13a5c69844d2::t_3e16bd9f972b45 1,64,70-71,86,103,394,406
+packages/backend/src/analytics/services/autofix-stats.service.spec.ts
+  s_9a13a5c69844d2::t_7d9755c8756214 1-2,229-233,250,281-284,322,356,412,426-428
+packages/backend/src/analytics/services/autofix-stats.service.ts
+  s_9a13a5c69844d2::t_f3577175ae6a6e 1,198,210,212,251,280,329,350,371,390,413,502,531
+packages/backend/src/analytics/services/error-breakdown.service.spec.ts
+  s_9a13a5c69844d2::t_fbaa06e175e2de 1,150
+packages/backend/src/analytics/services/error-breakdown.service.ts
+  s_9a13a5c69844d2::t_2fdce16a3f1f0f 1,53,59-61,70,81,98,104,114,135
+packages/backend/src/analytics/services/messages-query.filter-options.spec.ts
+  s_9a13a5c69844d2::t_17e35945fc4c6e 1,67,115-116,118,139,153
+packages/backend/src/analytics/services/messages-query.requests.spec.ts
+  s_9a13a5c69844d2::t_03596e7559f29e 1,59,64,83,109,159,196,232,277,306,349,399,432,513,560,586,636,673,687,716-717,740-741,757,759
+packages/backend/src/analytics/services/messages-query.service.cost-filter.spec.ts
+  s_9a13a5c69844d2::t_87816fb5d3d543 1-2,75
+packages/backend/src/analytics/services/messages-query.service.spec.ts
+  s_9a13a5c69844d2::t_07cb65bd4483b0 1-2,95,192-193,208-210,224
+packages/backend/src/analytics/services/messages-query.service.ts
+  s_9a13a5c69844d2::t_277948f4ee7cc2 1-5,109,238,258-263,334,337,638,788-793,795-796,828,836,868-885,890,947,993,998,1073,1091,1093-1094,1104,1106,1120,1122,1144,1160,1187,1208
+packages/backend/src/analytics/services/query-helpers.spec.ts
+  s_9a13a5c69844d2::t_e6f4a298e86282 1,153,166,168-171,182
+packages/backend/src/analytics/services/request-volume.service.spec.ts
+  s_9a13a5c69844d2::t_9b199fb2117ff5 1,68,71,166,177
+packages/backend/src/analytics/services/request-volume.service.ts
+  s_9a13a5c69844d2::t_592385ca1642d0 1,10,106,110,114-115,172,174,224,235,241,244,288,294,299,337,345,357
+packages/backend/src/analytics/services/timeseries-queries.service.spec.ts
+  s_9a13a5c69844d2::t_e1246aacb2d842 1,347-354,361-367,384,393-400,409-426,441-447,451-457,461-467,546-551,591,605-607,730,761,1088-1095,1340-1345,1349,1351,1356,1358,1400-1405,1408,1418-1420,1425-1430,1433,1443-1445,1477-1482,1491-1496
+packages/backend/src/analytics/services/timeseries-queries.service.ts
+  s_9a13a5c69844d2::t_8e358a6731ecf6 1,75,94,139,158,171,230,245,262,275,284,304,806,826,832,847,866,868,883,902,917,935,950,969,971,984,1002,1017,1035
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8131c4524e8551e13437aeda3600cc13c23c4cd7",
+  "prompts": {},
+  "sessions": {
+    "s_9a13a5c69844d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1344f-0f4a-7b03-a0c4-0ca9a32109bc",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
