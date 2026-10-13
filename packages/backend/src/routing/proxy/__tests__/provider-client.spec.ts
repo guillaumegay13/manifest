@@ -808,6 +808,54 @@ describe('ProviderClient', () => {
       expect(sentBody.max_tokens).toBeUndefined();
     });
 
+    describe('Bedrock Runtime GPT Chat Completions with function tools', () => {
+      // Runtime applies a default reasoning effort and then rejects it next to
+      // function tools (mnfst/llm-gateway#3065).
+      const tools = [
+        {
+          type: 'function',
+          function: { name: 'get_weather', parameters: { type: 'object', properties: {} } },
+        },
+      ];
+      const sentBodyFor = async (model: string, extra: Record<string, unknown>) => {
+        mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+        await client.forward({
+          provider: 'bedrock',
+          apiKey: 'bedrock-api-key-test',
+          model,
+          body: { ...body, ...extra },
+          stream: false,
+          apiMode: 'chat_completions',
+        });
+        return JSON.parse(mockFetch.mock.calls[0][1].body);
+      };
+
+      it.each([undefined, 'high'])(
+        'sends reasoning_effort none when the caller sent %s',
+        async (effort) => {
+          const sent = await sentBodyFor('us.openai.gpt-6-luna', {
+            tools,
+            ...(effort ? { reasoning_effort: effort } : {}),
+          });
+
+          expect(sent.reasoning_effort).toBe('none');
+          expect(sent.tools).toEqual(tools);
+        },
+      );
+
+      it('leaves reasoning_effort out when no tools are sent', async () => {
+        const sent = await sentBodyFor('us.openai.gpt-6-luna', { reasoning_effort: 'high' });
+
+        expect(sent.reasoning_effort).toBeUndefined();
+      });
+
+      it('leaves reasoning_effort out for Runtime models outside the GPT family', async () => {
+        const sent = await sentBodyFor('global.moonshotai.kimi-k3', { tools });
+
+        expect(sent.reasoning_effort).toBeUndefined();
+      });
+    });
+
     it('keeps max_tokens for Bedrock Runtime models that accept it', async () => {
       mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
 

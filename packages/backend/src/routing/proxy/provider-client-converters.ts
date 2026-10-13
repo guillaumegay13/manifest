@@ -332,6 +332,12 @@ export interface SanitizeOpenAiBodyOptions {
    * `max_completion_tokens`, or dropped when both are present.
    */
   requireMaxCompletionTokens?: boolean;
+  /**
+   * The upstream applies a default reasoning effort and rejects it next to
+   * function tools on Chat Completions, so a request with function tools is
+   * sent with `reasoning_effort: 'none'`.
+   */
+  noReasoningWithFunctionTools?: boolean;
 }
 
 /**
@@ -406,6 +412,13 @@ export function sanitizeOpenAiBody(
       continue;
     }
     cleaned[key] = value;
+  }
+  if (
+    options.noReasoningWithFunctionTools &&
+    Array.isArray(cleaned.tools) &&
+    cleaned.tools.some((tool) => (tool as { type?: unknown } | null)?.type === 'function')
+  ) {
+    cleaned.reasoning_effort = 'none';
   }
   return cleaned;
 }

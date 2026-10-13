@@ -881,11 +881,14 @@ export class ProviderClient {
     }
 
     // OpenAI-compatible path (default)
+    const isBedrockRuntimeGpt =
+      isBedrockProvider(ctx.provider) &&
+      getBedrockRuntimeCapabilities(ctx.model)?.chatTokenParameter === 'max_completion_tokens';
+    // GPT models on Bedrock Runtime reject `max_tokens`, and reject function
+    // tools next to their default reasoning effort (mnfst/llm-gateway#3065).
     const sanitized = sanitizeOpenAiBody(requestSource, endpointKey, ctx.model, {
-      // GPT models on Bedrock Runtime reject `max_tokens`.
-      requireMaxCompletionTokens:
-        isBedrockProvider(ctx.provider) &&
-        getBedrockRuntimeCapabilities(ctx.model)?.chatTokenParameter === 'max_completion_tokens',
+      requireMaxCompletionTokens: isBedrockRuntimeGpt,
+      noReasoningWithFunctionTools: isBedrockRuntimeGpt,
     });
     if (stream && endpoint.streamUsageReporting === 'openai_stream_options') {
       const existing =
