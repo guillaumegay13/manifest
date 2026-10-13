@@ -1,0 +1,21 @@
+packages/backend/src/routing/proxy/responses-adapter.ts
+  s_63c0fffb86776b::t_d190450ebd8a67 466-471,540-542,1033-1038
+packages/backend/src/routing/proxy/__tests__/responses-adapter.spec.ts
+  s_63c0fffb86776b::t_a7a818f004d25a 955-985
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "712b6e5b4dbdb9296b3e85a878418b46d9e6d3c9",
+  "prompts": {},
+  "sessions": {
+    "s_63c0fffb86776b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e2eeab26-e368-4830-b27a-8c2a192647ad",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
