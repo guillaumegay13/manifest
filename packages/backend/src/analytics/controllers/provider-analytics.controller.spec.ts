@@ -1,4 +1,4 @@
-import { mockScopeResolver, selectedAgent } from '../../../test/analytics-scope.mock';
+import { mockScopeResolver, selectedAgent } from '../__tests__/scope.fixture';
 import { ProviderAnalyticsController } from './provider-analytics.controller';
 import type { AggregationService } from '../services/aggregation.service';
 import type { TimeseriesQueriesService } from '../services/timeseries-queries.service';

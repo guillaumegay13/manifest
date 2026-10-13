@@ -1,4 +1,4 @@
-import { mockScopeResolver } from '../../../test/analytics-scope.mock';
+import { mockScopeResolver } from '../__tests__/scope.fixture';
 import { MessagesQueryService } from './messages-query.service';
 
 function makeQb(rows: Array<Record<string, unknown>> = []) {

@@ -1,5 +1,5 @@
 import { AnalyticsScopeService } from '../services/analytics-scope.service';
-import { mockScopeResolver, selectedAgent } from '../../../test/analytics-scope.mock';
+import { mockScopeResolver, selectedAgent } from '../__tests__/scope.fixture';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CacheModule } from '@nestjs/cache-manager';
 import { ErrorsController } from './errors.controller';

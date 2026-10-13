@@ -1,5 +1,5 @@
 import { AnalyticsScopeService } from './analytics-scope.service';
-import { mockScopeResolver } from '../../../test/analytics-scope.mock';
+import { mockScopeResolver } from '../__tests__/scope.fixture';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Brackets } from 'typeorm';

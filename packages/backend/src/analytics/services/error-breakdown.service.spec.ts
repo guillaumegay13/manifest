@@ -1,4 +1,4 @@
-import { selectedAgent } from '../../../test/analytics-scope.mock';
+import { selectedAgent } from '../__tests__/scope.fixture';
 import { Repository } from 'typeorm';
 import { ErrorBreakdownService } from './error-breakdown.service';
 import { AgentMessage } from '../../entities/agent-message.entity';

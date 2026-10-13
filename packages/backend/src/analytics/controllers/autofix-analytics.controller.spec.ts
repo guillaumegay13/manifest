@@ -1,4 +1,4 @@
-import { mockScopeResolver, selectedAgent } from '../../../test/analytics-scope.mock';
+import { mockScopeResolver, selectedAgent } from '../__tests__/scope.fixture';
 import { AutofixAnalyticsController } from './autofix-analytics.controller';
 
 describe('AutofixAnalyticsController', () => {

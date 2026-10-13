@@ -1,4 +1,4 @@
-import { selectedAgent } from '../../../test/analytics-scope.mock';
+import { selectedAgent } from '../__tests__/scope.fixture';
 import {
   computeTrend,
   downsample,

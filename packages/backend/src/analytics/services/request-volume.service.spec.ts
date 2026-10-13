@@ -1,4 +1,4 @@
-import { selectedAgent } from '../../../test/analytics-scope.mock';
+import { selectedAgent } from '../__tests__/scope.fixture';
 import { RequestVolumeService } from './request-volume.service';
 
 describe('RequestVolumeService (#2511 request-level volume)', () => {

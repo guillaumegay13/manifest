@@ -1,5 +1,5 @@
 import type { AgentScope } from './analytics-scope.service';
-import { selectedAgent } from '../../../test/analytics-scope.mock';
+import { selectedAgent } from '../__tests__/scope.fixture';
 import { AutofixStatsService } from './autofix-stats.service';
 
 const queryBuilder = () => {

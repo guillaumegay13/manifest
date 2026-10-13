@@ -1,4 +1,4 @@
-import { selectedAgent } from '../../../test/analytics-scope.mock';
+import { selectedAgent } from '../__tests__/scope.fixture';
 import { AgentUsageDailyService } from './agent-usage-daily.service';
 import { computeCutoff, toLocalSqlTimestamp } from '../../common/utils/postgres-sql';
 import { setAgentUsageDailyAutomaticReadsReady } from '../../common/utils/agent-usage-daily-flags';

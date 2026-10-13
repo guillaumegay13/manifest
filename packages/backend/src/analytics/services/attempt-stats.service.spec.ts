@@ -1,4 +1,4 @@
-import { selectedAgent } from '../../../test/analytics-scope.mock';
+import { selectedAgent } from '../__tests__/scope.fixture';
 import { AttemptStatsService } from './attempt-stats.service';
 import { EXCLUDE_PLAYGROUND_AGENTS_PREDICATE } from './query-helpers';
 
