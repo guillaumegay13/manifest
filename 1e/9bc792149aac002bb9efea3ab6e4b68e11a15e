@@ -1,0 +1,25 @@
+.changeset/faster-harness-request-log.md
+  s_9a13a5c69844d2::t_7207aba55ab3b5 1-5
+packages/backend/src/analytics/services/messages-query.requests.spec.ts
+  s_9a13a5c69844d2::t_bb2a15c55ae62e 690-715
+  s_9a13a5c69844d2::t_9be9ae83986c54 687-689,716-717,720,726-729
+packages/backend/src/analytics/services/messages-query.service.ts
+  s_9a13a5c69844d2::t_bb2a15c55ae62e 894-908
+  s_9a13a5c69844d2::t_9be9ae83986c54 327,329-330,636,892-893,909-911,927-931
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1e9bc792149aac002bb9efea3ab6e4b68e11a15e",
+  "prompts": {},
+  "sessions": {
+    "s_9a13a5c69844d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1344f-0f4a-7b03-a0c4-0ca9a32109bc",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
