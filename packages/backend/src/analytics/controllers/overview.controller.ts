@@ -163,7 +163,7 @@ export class OverviewController {
 
   @Get('overview/per-agent-timeseries')
   async getPerAgentTimeseries(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
-    const { range, hourly } = await this.deriveTimeseriesArgs(query, ctx.tenantId);
+    const { range, hourly } = this.deriveTimeseriesArgs(query);
     return this.timeseries.getPerAgentTimeseries(range, ctx.tenantId, hourly);
   }
 
@@ -172,25 +172,28 @@ export class OverviewController {
     @Query() query: RangeQueryDto,
     @TenantCtx() ctx: TenantContext,
   ) {
-    const { range, hourly } = await this.deriveTimeseriesArgs(query, ctx.tenantId);
+    const { range, hourly } = this.deriveTimeseriesArgs(query);
     return this.timeseries.getPerAgentMessageTimeseries(range, ctx.tenantId, hourly);
   }
 
   @Get('overview/per-agent-cost-timeseries')
   async getPerAgentCostTimeseries(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
-    const { range, hourly } = await this.deriveTimeseriesArgs(query, ctx.tenantId);
+    const { range, hourly } = this.deriveTimeseriesArgs(query);
     return this.timeseries.getPerAgentCostTimeseries(range, ctx.tenantId, hourly);
   }
 
   @Get('overview/agents/usage')
   async getOverviewAgentsUsage(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
-    const { range, hourly } = await this.deriveTimeseriesArgs(query, ctx.tenantId);
+    const { range, hourly } = this.deriveTimeseriesArgs(query);
     return this.timeseries.getAgentUsageTimeseries(range, ctx.tenantId, hourly);
   }
 
   @Get('overview/per-provider-timeseries')
   async getPerProviderTimeseries(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
-    const { range, hourly, agentScope } = await this.deriveTimeseriesArgs(query, ctx.tenantId);
+    const { range, hourly, agentScope } = await this.deriveScopedTimeseriesArgs(
+      query,
+      ctx.tenantId,
+    );
     return this.timeseries.getPerProviderTimeseries(range, ctx.tenantId, hourly, agentScope);
   }
 
@@ -199,7 +202,10 @@ export class OverviewController {
     @Query() query: RangeQueryDto,
     @TenantCtx() ctx: TenantContext,
   ) {
-    const { range, hourly, agentScope } = await this.deriveTimeseriesArgs(query, ctx.tenantId);
+    const { range, hourly, agentScope } = await this.deriveScopedTimeseriesArgs(
+      query,
+      ctx.tenantId,
+    );
     return this.timeseries.getPerProviderMessageTimeseries(range, ctx.tenantId, hourly, agentScope);
   }
 
@@ -208,25 +214,37 @@ export class OverviewController {
     @Query() query: RangeQueryDto,
     @TenantCtx() ctx: TenantContext,
   ) {
-    const { range, hourly, agentScope } = await this.deriveTimeseriesArgs(query, ctx.tenantId);
+    const { range, hourly, agentScope } = await this.deriveScopedTimeseriesArgs(
+      query,
+      ctx.tenantId,
+    );
     return this.timeseries.getPerProviderCostTimeseries(range, ctx.tenantId, hourly, agentScope);
   }
 
   @Get('overview/providers/usage')
   async getOverviewProvidersUsage(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
-    const { range, hourly, agentScope } = await this.deriveTimeseriesArgs(query, ctx.tenantId);
+    const { range, hourly, agentScope } = await this.deriveScopedTimeseriesArgs(
+      query,
+      ctx.tenantId,
+    );
     return this.timeseries.getProviderUsageTimeseries(range, ctx.tenantId, hourly, agentScope);
   }
 
   @Get('overview/per-model-cost-timeseries')
   async getPerModelCostTimeseries(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
-    const { range, hourly, agentScope } = await this.deriveTimeseriesArgs(query, ctx.tenantId);
+    const { range, hourly, agentScope } = await this.deriveScopedTimeseriesArgs(
+      query,
+      ctx.tenantId,
+    );
     return this.timeseries.getPerModelCostTimeseries(range, ctx.tenantId, hourly, agentScope);
   }
 
   @Get('overview/per-model-timeseries')
   async getPerModelTimeseries(@Query() query: RangeQueryDto, @TenantCtx() ctx: TenantContext) {
-    const { range, hourly, agentScope } = await this.deriveTimeseriesArgs(query, ctx.tenantId);
+    const { range, hourly, agentScope } = await this.deriveScopedTimeseriesArgs(
+      query,
+      ctx.tenantId,
+    );
     return this.timeseries.getPerModelTimeseries(range, ctx.tenantId, hourly, agentScope);
   }
 
@@ -235,27 +253,24 @@ export class OverviewController {
     @Query() query: RangeQueryDto,
     @TenantCtx() ctx: TenantContext,
   ) {
-    const { range, hourly, agentScope } = await this.deriveTimeseriesArgs(query, ctx.tenantId);
+    const { range, hourly, agentScope } = await this.deriveScopedTimeseriesArgs(
+      query,
+      ctx.tenantId,
+    );
     return this.timeseries.getPerModelMessageTimeseries(range, ctx.tenantId, hourly, agentScope);
   }
 
-  /**
-   * Shared derivation of the (range, hourly, agentScope) tuple every
-   * `overview/per-*-timeseries` endpoint needs. Extracted so the per-endpoint
-   * methods can't drift in how they default the range or compute `hourly`.
-   */
-  private async deriveTimeseriesArgs(
+  private deriveTimeseriesArgs(query: RangeQueryDto): { range: string; hourly: boolean } {
+    const range = query.range ?? '24h';
+    return { range, hourly: isHourlyRange(range) };
+  }
+
+  private async deriveScopedTimeseriesArgs(
     query: RangeQueryDto,
     tenantId: string | null,
-  ): Promise<{
-    range: string;
-    hourly: boolean;
-    agentScope?: AgentScope;
-  }> {
-    const range = query.range ?? '24h';
+  ): Promise<{ range: string; hourly: boolean; agentScope?: AgentScope }> {
     return {
-      range,
-      hourly: isHourlyRange(range),
+      ...this.deriveTimeseriesArgs(query),
       agentScope: await this.analyticsScope.resolve(tenantId, query.agent_name),
     };
   }

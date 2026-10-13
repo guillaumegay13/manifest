@@ -165,7 +165,11 @@ describe('addTenantFilter', () => {
 
   it('binds the resolved live agent ID', () => {
     const { qb, mockAndWhere } = makeMockQb();
-    addTenantFilter(qb, 'tenant-456', selectedAgent('tenant-456', 'agent-id'));
+    addTenantFilter(qb, 'tenant-456', {
+      tenantId: 'tenant-456',
+      agentName: 'my-agent',
+      agentId: 'agent-id',
+    });
     expect(mockAndWhere).toHaveBeenCalledWith('at.agent_id = :liveAgentId', {
       liveAgentId: 'agent-id',
     });

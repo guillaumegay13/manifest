@@ -1,4 +1,3 @@
-import { selectedAgent } from '../__tests__/scope.fixture';
 import { Repository } from 'typeorm';
 import { ErrorBreakdownService } from './error-breakdown.service';
 import { AgentMessage } from '../../entities/agent-message.entity';
@@ -145,14 +144,15 @@ describe('ErrorBreakdownService', () => {
     });
   });
 
-  it('scopes to the agent when agentName is provided', async () => {
+  it('scopes to the resolved agent ID', async () => {
     const { service, qb } = makeService(GROUPS, 5);
-    await service.getBreakdown({ tenantId: 't1', agentScope: selectedAgent('t1', 'my-agent') });
-    // addTenantFilter appends the live-agent subquery via andWhere.
-    const agentScoped = (qb.andWhere as jest.Mock).mock.calls.some(
-      ([clause]) => typeof clause === 'string' && clause.includes('FROM agents'),
-    );
-    expect(agentScoped).toBe(true);
+    await service.getBreakdown({
+      tenantId: 't1',
+      agentScope: { tenantId: 't1', agentName: 'my-agent', agentId: 'agent-id' },
+    });
+    expect(qb.andWhere).toHaveBeenCalledWith('at.agent_id = :liveAgentId', {
+      liveAgentId: 'agent-id',
+    });
   });
 
   it('handles a null tenant (no rows) without throwing', async () => {

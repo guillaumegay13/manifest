@@ -226,6 +226,28 @@ it.each(surfaces)(
   },
 );
 
+it.each([
+  'overview/per-agent-timeseries',
+  'overview/per-agent-message-timeseries',
+  'overview/per-agent-cost-timeseries',
+  'overview/agents/usage',
+])('does not resolve an unused harness selection for %s', async (surface) => {
+  const executed: Array<{ sql: string; parameters?: unknown[] }> = [];
+  const log = jest
+    .spyOn(app.get(DataSource).logger, 'logQuery')
+    .mockImplementation((sql, parameters) => executed.push({ sql, parameters }));
+  try {
+    await get(surface, harness);
+    expect(
+      executed.filter(
+        ({ sql, parameters }) => /FROM\s+"?agents"?/i.test(sql) && parameters?.includes(harness),
+      ),
+    ).toHaveLength(0);
+  } finally {
+    log.mockRestore();
+  }
+});
+
 it('keeps missing-harness filter options empty after warming the global model cache', async () => {
   await get('messages');
   const body = await get('messages', 'scope-missing-after-global');
