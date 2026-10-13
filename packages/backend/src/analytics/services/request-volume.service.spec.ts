@@ -1,3 +1,4 @@
+import { selectedAgent } from '../../../test/analytics-scope.mock';
 import { RequestVolumeService } from './request-volume.service';
 
 describe('RequestVolumeService (#2511 request-level volume)', () => {
@@ -64,10 +65,10 @@ describe('RequestVolumeService (#2511 request-level volume)', () => {
       tenantId: 't1',
       range: '7d',
       hourly: false,
-      agentName: 'demo-agent',
+      agentScope: selectedAgent('t1', 'demo-agent'),
     });
     const sql = lastSql();
-    expect(sql).toContain('deleted_at IS NULL');
+    expect(sql).toContain('r.agent_id = $3');
     expect(lastParams()).toEqual(['t1', expect.any(String), 'demo-agent']);
   });
 
@@ -162,7 +163,7 @@ describe('RequestVolumeService (#2511 request-level volume)', () => {
       from: '2026-01-01',
       splitAt: '2026-01-08',
       to: '2026-01-15',
-      agentName: 'demo',
+      agentScope: selectedAgent('t1', 'demo'),
     });
     expect(windows).toEqual({
       current: { total: 100, success: 70, healed: 4, fallback: 6, error: 20 },
@@ -173,7 +174,7 @@ describe('RequestVolumeService (#2511 request-level volume)', () => {
     const sql = lastSql();
     // One scan bounded by [from, to), split at the current-window start.
     expect(sql).toContain('AND r.timestamp < $3');
-    expect(sql).toContain('name = $4');
+    expect(sql).toContain('r.agent_id = $4');
     expect(sql).toContain('FILTER (WHERE t.ts >= $5)');
     expect(sql).toContain('FILTER (WHERE t.ts < $5)');
     expect(lastParams()).toEqual(['t1', '2026-01-01', '2026-01-15', 'demo', '2026-01-08']);

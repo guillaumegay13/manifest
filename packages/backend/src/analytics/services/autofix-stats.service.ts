@@ -1,3 +1,4 @@
+import type { AgentScope } from './analytics-scope.service';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
@@ -194,7 +195,7 @@ export class AutofixStatsService {
   async getStats(params: {
     tenantId: string | null;
     range?: string;
-    agentName?: string;
+    agentScope?: AgentScope;
   }): Promise<AutofixStatsResponse> {
     const range = params.range ?? '7d';
     const cutoff = computeCutoff(rangeToInterval(range));
@@ -206,9 +207,9 @@ export class AutofixStatsService {
         from: prevCutoff,
         splitAt: cutoff,
         to: computeCutoff('0 hours'),
-        agentName: params.agentName,
+        agentScope: params.agentScope,
       }),
-      this.queryNeedsAttention(cutoff, params.tenantId, params.agentName),
+      this.queryNeedsAttention(cutoff, params.tenantId, params.agentScope),
     ]);
     const current = this.windowCounts(windows.current);
     const previous = this.windowCounts(windows.previous);
@@ -247,7 +248,7 @@ export class AutofixStatsService {
   async getPerProviderStats(params: {
     tenantId: string | null;
     range?: string;
-    agentName?: string;
+    agentScope?: AgentScope;
   }): Promise<
     Array<{
       provider: string;
@@ -276,7 +277,7 @@ export class AutofixStatsService {
       .groupBy(providerExpr)
       .addGroupBy(authExpr)
       .addGroupBy(labelExpr);
-    addTenantFilter(qb, params.tenantId, params.agentName);
+    addTenantFilter(qb, params.tenantId, params.agentScope);
     excludePlaygroundAgents(qb);
 
     const rows = await qb.getRawMany<{
@@ -325,7 +326,7 @@ export class AutofixStatsService {
   async getPerModelStats(params: {
     tenantId: string | null;
     range?: string;
-    agentName?: string;
+    agentScope?: AgentScope;
   }): Promise<
     Array<{
       model: string;
@@ -346,7 +347,7 @@ export class AutofixStatsService {
       .andWhere(sqlIsCompletedStatus('at.status'))
       .andWhere('at.model IS NOT NULL')
       .groupBy('at.model');
-    addTenantFilter(qb, params.tenantId, params.agentName);
+    addTenantFilter(qb, params.tenantId, params.agentScope);
     excludePlaygroundAgents(qb);
 
     const rows = await qb.getRawMany<{
@@ -367,7 +368,7 @@ export class AutofixStatsService {
     tenantId: string | null;
     range?: string;
     by?: string;
-    agentName?: string;
+    agentScope?: AgentScope;
     failedOnly?: boolean;
   }): Promise<AutofixTimeseriesResponse> {
     const range = params.range ?? '7d';
@@ -386,7 +387,7 @@ export class AutofixStatsService {
         tenantId: params.tenantId,
         range,
         hourly,
-        agentName: params.agentName,
+        agentScope: params.agentScope,
         failedOnly: params.failedOnly,
       });
       return this.pivotTimeseries(range, by, rows);
@@ -409,7 +410,7 @@ export class AutofixStatsService {
     }
 
     qb.groupBy(bucketExpr).addGroupBy(dimExpr).orderBy(bucketExpr, 'ASC');
-    addTenantFilter(qb, params.tenantId, params.agentName);
+    addTenantFilter(qb, params.tenantId, params.agentScope);
     excludePlaygroundAgents(qb);
 
     const rows = await qb.getRawMany<{ bucket: string; dim: string | null; count: string }>();
@@ -498,7 +499,7 @@ export class AutofixStatsService {
   private async queryNeedsAttention(
     cutoff: string,
     tenantId: string | null,
-    agentName?: string,
+    agentScope?: AgentScope,
   ): Promise<AutofixStatsResponse['needs_attention']> {
     const qb = this.messageRepo
       .createQueryBuilder('at')
@@ -527,7 +528,7 @@ export class AutofixStatsService {
       .addGroupBy("(at.autofix_phoenix->>'issueId')::text")
       .orderBy('count', 'DESC')
       .limit(5);
-    addTenantFilter(qb, tenantId, agentName);
+    addTenantFilter(qb, tenantId, agentScope);
     excludePlaygroundAgents(qb);
 
     const rows = await qb.getRawMany<{

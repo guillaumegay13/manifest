@@ -1,3 +1,4 @@
+import { mockScopeResolver } from '../../../test/analytics-scope.mock';
 import { MessagesQueryService } from './messages-query.service';
 import { computeCutoff } from '../../common/utils/postgres-sql';
 
@@ -63,6 +64,7 @@ function makeService(opts: {
           query: jest.fn().mockResolvedValue([]),
         };
   const service = new MessagesQueryService(
+    mockScopeResolver(requestRepo?.query),
     turnRepo as never,
     { find: jest.fn().mockResolvedValue([]) } as never,
     requestRepo as never,
@@ -110,10 +112,10 @@ describe('MessagesQueryService filter options', () => {
       'tenant-1',
       'bot-1',
     ]);
-    expect(requestQb.andWhere).toHaveBeenCalledWith('r.agent_id = :blockedAgentId', {
-      blockedAgentId: 'agent-1',
+    expect(requestQb.andWhere).toHaveBeenCalledWith('r.agent_id = :liveAgentId', {
+      liveAgentId: 'agent-1',
     });
-    expect(clauses.some((clause) => clause.includes('r.tenant_id = :blockedTenantId'))).toBe(true);
+    expect(clauses.some((clause) => clause.includes('r.tenant_id = :tenantId'))).toBe(true);
     // The window comes from the caller's range, not the 90-day default: a
     // regression that ignored params.range would otherwise pass every test here.
     // Compared against the same formatter rather than an absolute clock
@@ -134,7 +136,7 @@ describe('MessagesQueryService filter options', () => {
       agent_name: 'gone',
     });
 
-    expect(requestQb.andWhere).toHaveBeenCalledWith('1 = 0');
+    expect(requestQb.andWhere).toHaveBeenCalledWith('1 = 0', { tenantId: 'tenant-1' });
   });
 
   it("reads the tenant's attempts in range once instead of probing each request", async () => {
@@ -148,7 +150,7 @@ describe('MessagesQueryService filter options', () => {
       .find((clause) => clause.includes('blocked_attempt'));
     expect(antiJoin).toContain('NOT EXISTS');
     expect(antiJoin).toContain('blocked_attempt.request_id = r.id');
-    expect(antiJoin).toContain('blocked_attempt.tenant_id = :blockedTenantId');
+    expect(antiJoin).toContain('blocked_attempt.tenant_id = :tenantId');
     expect(antiJoin).toContain(
       "blocked_attempt.timestamp >= CAST(:cutoff AS timestamp) - interval '1 day'",
     );

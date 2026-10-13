@@ -1,3 +1,4 @@
+import { selectedAgent } from '../../../test/analytics-scope.mock';
 import { AgentUsageDailyService } from './agent-usage-daily.service';
 import { computeCutoff, toLocalSqlTimestamp } from '../../common/utils/postgres-sql';
 import { setAgentUsageDailyAutomaticReadsReady } from '../../common/utils/agent-usage-daily-flags';
@@ -181,7 +182,7 @@ describe('AgentUsageDailyService', () => {
 
     await expect(
       service.getRangeRows('tenant-a', '30d', {
-        agentName: 'bot-1',
+        agentScope: selectedAgent('tenant-a', 'bot-1'),
         excludeDirect: true,
       }),
     ).resolves.toEqual([
@@ -195,7 +196,7 @@ describe('AgentUsageDailyService', () => {
       }),
     ]);
     expect(query.mock.calls[0][1]).toEqual(['tenant-a', '2026-08-23', null, 'bot-1']);
-    expect(query.mock.calls[0][0]).toContain('a."deleted_at" IS NULL');
+    expect(query.mock.calls[0][0]).toContain('u."agent_id" = $4');
     expect(query.mock.calls[1][0]).toContain('pa."agent_usage_rolled_up_at" IS NOT NULL');
     expect(query.mock.calls[1][0]).toContain(`AT TIME ZONE 'UTC'`);
     expect(query.mock.calls[1][0]).toContain('pa."timestamp" >= (($2::date::timestamp');
@@ -212,7 +213,7 @@ describe('AgentUsageDailyService', () => {
 
     await service.getRangeRows('tenant-a', '7d', { previous: true });
 
-    expect(query.mock.calls[0][1]).toEqual(['tenant-a', '2026-09-08', '2026-09-15', null]);
+    expect(query.mock.calls[0][1]).toEqual(['tenant-a', '2026-09-08', '2026-09-15']);
   });
 
   it('skips scheduled work when disabled or already running', async () => {

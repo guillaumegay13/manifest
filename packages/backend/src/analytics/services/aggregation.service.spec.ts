@@ -1,3 +1,4 @@
+import { selectedAgent } from '../../../test/analytics-scope.mock';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Brackets } from 'typeorm';
@@ -90,7 +91,7 @@ describe('AggregationService', () => {
 
     it('passes agentName to tenant filter when provided', async () => {
       mockGetRawOne.mockResolvedValueOnce({ '?column?': 1 });
-      const result = await service.hasAnyData('test-user', 'my-agent');
+      const result = await service.hasAnyData('test-user', selectedAgent('test-user', 'my-agent'));
       expect(result).toBe(true);
     });
 
@@ -145,13 +146,14 @@ describe('AggregationService', () => {
         { createQueryBuilder: jest.fn(() => requestQb) } as never,
       );
 
-      await expect(requestAware.hasAnyData('tenant-1', 'agent-1')).resolves.toBe(false);
-      expect(requestQb.andWhere).toHaveBeenCalledWith(
-        expect.stringContaining('deleted_at IS NULL'),
-        { requestAgentName: 'agent-1' },
-      );
+      await expect(
+        requestAware.hasAnyData('tenant-1', selectedAgent('tenant-1', 'agent-1')),
+      ).resolves.toBe(false);
+      expect(requestQb.andWhere).toHaveBeenCalledWith('r.agent_id = :liveAgentId', {
+        liveAgentId: 'agent-1',
+      });
       await expect(requestAware.hasAnyData(null)).resolves.toBe(false);
-      expect(requestQb.where).toHaveBeenCalledWith('1 = 0');
+      expect(requestQb.andWhere).toHaveBeenCalledWith('1 = 0', { tenantId: null });
     });
 
     it('does not exclude Playground traffic by default', async () => {
@@ -163,14 +165,14 @@ describe('AggregationService', () => {
 
     it('excludes client-pinned (direct) requests when excludeDirect=true', async () => {
       mockGetRawOne.mockResolvedValueOnce({ '?column?': 1 });
-      await service.hasAnyData('tenant-1', 'bot-1', true, true);
+      await service.hasAnyData('tenant-1', selectedAgent('tenant-1', 'bot-1'), true, true);
       const clauses = mockQb.andWhere.mock.calls.map((c: unknown[]) => c[0]);
       expect(clauses).toContain(EXCLUDE_DIRECT_ATTEMPTS_PREDICATE);
     });
 
     it('keeps direct requests by default', async () => {
       mockGetRawOne.mockResolvedValueOnce({ '?column?': 1 });
-      await service.hasAnyData('tenant-1', 'bot-1', true);
+      await service.hasAnyData('tenant-1', selectedAgent('tenant-1', 'bot-1'), true);
       const clauses = mockQb.andWhere.mock.calls.map((c: unknown[]) => c[0]);
       expect(clauses).not.toContain(EXCLUDE_DIRECT_ATTEMPTS_PREDICATE);
     });
@@ -191,7 +193,11 @@ describe('AggregationService', () => {
 
     it('passes agentName to tenant filter', async () => {
       mockGetRawOne.mockResolvedValueOnce({ total: 500 });
-      const result = await service.getPreviousTokenTotal('7d', 'test-user', 'my-agent');
+      const result = await service.getPreviousTokenTotal(
+        '7d',
+        'test-user',
+        selectedAgent('test-user', 'my-agent'),
+      );
       expect(result).toBe(500);
     });
   });
@@ -211,7 +217,11 @@ describe('AggregationService', () => {
 
     it('passes agentName to tenant filter', async () => {
       mockGetRawOne.mockResolvedValueOnce({ total: 1.0 });
-      const result = await service.getPreviousCostTotal('30d', 'test-user', 'my-agent');
+      const result = await service.getPreviousCostTotal(
+        '30d',
+        'test-user',
+        selectedAgent('test-user', 'my-agent'),
+      );
       expect(result).toBe(1.0);
     });
   });
@@ -250,7 +260,11 @@ describe('AggregationService', () => {
         .mockResolvedValueOnce({ msg_count: 10, inp: 100, out: 50, cost: 1.0 })
         .mockResolvedValueOnce({ msg_count: 8, tokens: 120, cost: 0.8 });
 
-      const result = await service.getSummaryMetrics('7d', 'tenant-123', 'bot-1');
+      const result = await service.getSummaryMetrics(
+        '7d',
+        'tenant-123',
+        selectedAgent('tenant-123', 'bot-1'),
+      );
       expect(result.messages.value).toBe(10);
     });
 
@@ -350,10 +364,16 @@ describe('AggregationService', () => {
       const rollupAware = new AggregationService({} as never, undefined, daily as never);
 
       await expect(
-        rollupAware.getPreviousWindowMetrics('365d', 'tenant-1', 'bot-1', true, true),
+        rollupAware.getPreviousWindowMetrics(
+          '365d',
+          'tenant-1',
+          selectedAgent('tenant-1', 'bot-1'),
+          true,
+          true,
+        ),
       ).resolves.toEqual({ tokens: 180, cost: 2, messages: 6 });
       expect(daily.getRangeRows).toHaveBeenCalledWith('tenant-1', '365d', {
-        agentName: 'bot-1',
+        agentScope: selectedAgent('tenant-1', 'bot-1'),
         previous: true,
         excludeDirect: true,
       });
@@ -398,7 +418,12 @@ describe('AggregationService', () => {
     it('excludes Playground traffic when requested', async () => {
       mockGetRawOne.mockResolvedValueOnce({ msg_count: 8, tokens: 120, cost: 0.8 });
 
-      const result = await service.getPreviousWindowMetrics('7d', 'tenant-123', 'bot-1', true);
+      const result = await service.getPreviousWindowMetrics(
+        '7d',
+        'tenant-123',
+        selectedAgent('tenant-123', 'bot-1'),
+        true,
+      );
       expect(result.messages).toBe(8);
       // The Playground-exclusion predicate is applied to the previous-window query.
       const clauses = mockQb.andWhere.mock.calls.map((c: unknown[]) => c[0]);
@@ -409,14 +434,25 @@ describe('AggregationService', () => {
 
     it('excludes client-pinned (direct) requests when excludeDirect=true', async () => {
       mockGetRawOne.mockResolvedValueOnce({ msg_count: 8, tokens: 120, cost: 0.8 });
-      await service.getPreviousWindowMetrics('7d', 'tenant-123', 'bot-1', true, true);
+      await service.getPreviousWindowMetrics(
+        '7d',
+        'tenant-123',
+        selectedAgent('tenant-123', 'bot-1'),
+        true,
+        true,
+      );
       const clauses = mockQb.andWhere.mock.calls.map((c: unknown[]) => c[0]);
       expect(clauses).toContain(EXCLUDE_DIRECT_ATTEMPTS_PREDICATE);
     });
 
     it('keeps direct requests by default', async () => {
       mockGetRawOne.mockResolvedValueOnce({ msg_count: 8, tokens: 120, cost: 0.8 });
-      await service.getPreviousWindowMetrics('7d', 'tenant-123', 'bot-1', true);
+      await service.getPreviousWindowMetrics(
+        '7d',
+        'tenant-123',
+        selectedAgent('tenant-123', 'bot-1'),
+        true,
+      );
       const clauses = mockQb.andWhere.mock.calls.map((c: unknown[]) => c[0]);
       expect(clauses).not.toContain(EXCLUDE_DIRECT_ATTEMPTS_PREDICATE);
     });
@@ -448,7 +484,12 @@ describe('AggregationService', () => {
       ]);
       const requestAware = new AggregationService({ query } as never, {} as never);
 
-      const result = await requestAware.getRequestReliability('24h', 'tenant-1', 'agent-1', true);
+      const result = await requestAware.getRequestReliability(
+        '24h',
+        'tenant-1',
+        selectedAgent('tenant-1', 'agent-1'),
+        true,
+      );
 
       expect(result).toEqual({
         total: 4,
@@ -472,7 +513,13 @@ describe('AggregationService', () => {
       const query = jest.fn().mockResolvedValue([]);
       const requestAware = new AggregationService({ query } as never, {} as never);
 
-      await requestAware.getRequestReliability('24h', 'tenant-1', 'agent-1', true, true);
+      await requestAware.getRequestReliability(
+        '24h',
+        'tenant-1',
+        selectedAgent('tenant-1', 'agent-1'),
+        true,
+        true,
+      );
 
       const sql = query.mock.calls[0][0] as string;
       // Linked requests are dropped via NOT EXISTS over their attempts...
@@ -486,7 +533,12 @@ describe('AggregationService', () => {
       const query = jest.fn().mockResolvedValue([]);
       const requestAware = new AggregationService({ query } as never, {} as never);
 
-      await requestAware.getRequestReliability('24h', 'tenant-1', 'agent-1', true);
+      await requestAware.getRequestReliability(
+        '24h',
+        'tenant-1',
+        selectedAgent('tenant-1', 'agent-1'),
+        true,
+      );
 
       const sql = query.mock.calls[0][0] as string;
       expect(sql).not.toContain('direct_attempt');

@@ -1,3 +1,4 @@
+import type { AgentScope } from './analytics-scope.service';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DataSource } from 'typeorm';
@@ -149,7 +150,7 @@ export class AgentUsageDailyService implements OnModuleInit {
   async getRangeRows(
     tenantId: string,
     range: string,
-    options: { agentName?: string; previous?: boolean; excludeDirect?: boolean } = {},
+    options: { agentScope?: AgentScope; previous?: boolean; excludeDirect?: boolean } = {},
   ): Promise<AgentUsageDailyRow[]> {
     const days = DAILY_RANGE_DAYS[range];
     if (days === undefined) return [];
@@ -173,22 +174,17 @@ export class AgentUsageDailyService implements OnModuleInit {
          AND u."day" >= $2::date
          AND ($3::date IS NULL OR u."day" < $3::date)
          AND a."is_playground" = false
-         AND ($4::varchar IS NULL OR (a."name" = $4 AND a."deleted_at" IS NULL))
+         ${options.agentScope ? 'AND u."agent_id" = $4' : ''}
        ORDER BY u."day" ASC, a."name" ASC`,
-      [tenantId, startDay, endDay, options.agentName ?? null],
+      [tenantId, startDay, endDay, ...(options.agentScope ? [options.agentScope.agentId] : [])],
     )) as AgentUsageDailyRow[];
 
-    if (!options.excludeDirect || !options.agentName || rows.length === 0) return rows;
+    if (!options.excludeDirect || !options.agentScope || rows.length === 0) return rows;
 
     const storageTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
     const directRows = (await this.dataSource.query(
-      `WITH target_agent AS (
-         SELECT "id"
-         FROM "agents"
-         WHERE "tenant_id" = $1 AND "name" = $4 AND "deleted_at" IS NULL
-         LIMIT 1
-       ), direct_attempts AS (
+      `WITH direct_attempts AS (
          SELECT
            (((pa."timestamp" AT TIME ZONE $5) AT TIME ZONE 'UTC')::date) AS "day",
            COUNT(*) FILTER (WHERE pa."request_id" IS NULL)::bigint AS "request_count",
@@ -205,8 +201,8 @@ export class AgentUsageDailyService implements OnModuleInit {
            COALESCE(SUM(pa."output_tokens"), 0)::bigint AS "output_tokens",
            COALESCE(SUM(CASE WHEN pa."cost_usd" >= 0 THEN pa."cost_usd" ELSE 0 END), 0)::numeric AS "cost_usd"
          FROM "agent_messages" pa
-         JOIN target_agent a ON a."id" = pa."agent_id"
          WHERE pa."tenant_id" = $1
+           AND pa."agent_id" = $4
            AND pa."routing_reason" = 'direct'
            AND pa."agent_usage_rolled_up_at" IS NOT NULL
            AND pa."timestamp" >= (($2::date::timestamp AT TIME ZONE 'UTC') AT TIME ZONE $5)
@@ -224,8 +220,8 @@ export class AgentUsageDailyService implements OnModuleInit {
              WHERE r."status" IS NOT NULL AND r."status" NOT IN ('ok', 'success')
            )::bigint AS "failed_request_count"
          FROM "requests" r
-         JOIN target_agent a ON a."id" = r."agent_id"
          WHERE r."tenant_id" = $1
+           AND r."agent_id" = $4
            AND r."agent_usage_rolled_up_at" IS NOT NULL
            AND r."timestamp" >= (($2::date::timestamp AT TIME ZONE 'UTC') AT TIME ZONE $5)
            AND (
@@ -237,7 +233,7 @@ export class AgentUsageDailyService implements OnModuleInit {
              FROM "agent_messages" pa
              WHERE pa."request_id" = r."id"
                AND pa."tenant_id" = $1
-               AND pa."agent_id" = a."id"
+               AND pa."agent_id" = $4
                AND pa."routing_reason" = 'direct'
            )
          GROUP BY "day"
@@ -259,7 +255,7 @@ export class AgentUsageDailyService implements OnModuleInit {
          FROM direct_requests
        ) direct_usage
        GROUP BY "day"`,
-      [tenantId, startDay, endDay, options.agentName, storageTimeZone],
+      [tenantId, startDay, endDay, options.agentScope.agentId, storageTimeZone],
     )) as AgentUsageDailyRow[];
     const directByDay = new Map(directRows.map((row) => [row.day, row]));
 

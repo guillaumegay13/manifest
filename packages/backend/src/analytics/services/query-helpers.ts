@@ -1,4 +1,5 @@
 import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
+import type { AgentScope } from './analytics-scope.service';
 import { MANIFEST_ERROR_ORIGINS } from 'manifest-shared';
 import { CustomProvider } from '../../entities/custom-provider.entity';
 
@@ -127,52 +128,27 @@ export function downsample(data: number[], targetLen: number): number[] {
   return result;
 }
 
-/**
- * Constrain a message aggregate to the LIVE agent currently owning a slug.
- *
- * `agent_messages` stores `agent_id` alongside `agent_name`, so filtering by
- * name alone would pull in rows from a soft-deleted agent that shares the slug
- * with a live one (slug reuse). Resolving to the live agent's id keeps a
- * recreated agent's chart free of its dead namesake's history. Assumes the
- * query builder aliases `agent_messages` as `at`.
- */
-export function filterByLiveAgentName<T extends ObjectLiteral>(
-  qb: SelectQueryBuilder<T>,
-  agentName: string,
-  tenantId: string,
-): SelectQueryBuilder<T> {
-  return qb.andWhere(
-    `at.agent_id = (
-        SELECT a.id FROM agents a
-        WHERE a.tenant_id = :liveTenantId
-          AND a.name = :liveAgentName
-          AND a.deleted_at IS NULL
-        LIMIT 1
-      )`,
-    { liveAgentName: agentName, liveTenantId: tenantId },
-  );
-}
-
-/**
- * Scope a message aggregate to the tenant. Pass `null` when the requesting
- * user has no tenant yet (fresh account) — the filter then matches nothing,
- * which is the correct "no data" answer. Tenancy is the ONLY scope; the
- * informational `at.user_id` column is never consulted.
- */
+/** Scope any analytics table by tenant and the already-resolved live harness. */
 export function addTenantFilter<T extends ObjectLiteral>(
   qb: SelectQueryBuilder<T>,
   tenantId: string | null,
-  agentName?: string,
+  agentScope?: AgentScope,
+  alias = 'at',
 ): SelectQueryBuilder<T> {
-  if (tenantId === null) {
-    // No tenant → no rows. Keeps callers branch-free.
-    return qb.andWhere('1 = 0');
+  if (!tenantId || (agentScope && (agentScope.tenantId !== tenantId || !agentScope.agentId))) {
+    return qb.andWhere('1 = 0', { tenantId });
   }
-  qb.andWhere('at.tenant_id = :tenantId', { tenantId });
-  if (agentName) {
-    filterByLiveAgentName(qb, agentName, tenantId);
+  qb.andWhere(`${alias}.tenant_id = :tenantId`, { tenantId });
+  if (agentScope) {
+    qb.andWhere(`${alias}.agent_id = :liveAgentId`, { liveAgentId: agentScope.agentId });
   }
   return qb;
+}
+
+/** Agent-only predicate for raw SQL whose tenant predicate is already present. */
+export function sqlAgentScope(alias: string, parameter: string, agentScope?: AgentScope): string {
+  if (!agentScope) return '';
+  return `AND ${alias}.agent_id = ${parameter}`;
 }
 
 /**

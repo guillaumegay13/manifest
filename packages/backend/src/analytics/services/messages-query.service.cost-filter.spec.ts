@@ -1,3 +1,5 @@
+import { AnalyticsScopeService } from './analytics-scope.service';
+import { mockScopeResolver } from '../../../test/analytics-scope.mock';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Brackets } from 'typeorm';
@@ -70,6 +72,7 @@ describe('MessagesQueryService — cost filter edge cases', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AnalyticsScopeService, useValue: mockScopeResolver() },
         MessagesQueryService,
         {
           provide: getRepositoryToken(AgentMessage),

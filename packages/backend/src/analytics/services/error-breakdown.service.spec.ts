@@ -1,3 +1,4 @@
+import { selectedAgent } from '../../../test/analytics-scope.mock';
 import { Repository } from 'typeorm';
 import { ErrorBreakdownService } from './error-breakdown.service';
 import { AgentMessage } from '../../entities/agent-message.entity';
@@ -146,7 +147,7 @@ describe('ErrorBreakdownService', () => {
 
   it('scopes to the agent when agentName is provided', async () => {
     const { service, qb } = makeService(GROUPS, 5);
-    await service.getBreakdown({ tenantId: 't1', agentName: 'my-agent' });
+    await service.getBreakdown({ tenantId: 't1', agentScope: selectedAgent('t1', 'my-agent') });
     // addTenantFilter appends the live-agent subquery via andWhere.
     const agentScoped = (qb.andWhere as jest.Mock).mock.calls.some(
       ([clause]) => typeof clause === 'string' && clause.includes('FROM agents'),

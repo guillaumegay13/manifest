@@ -1,3 +1,5 @@
+import { AnalyticsScopeService } from './analytics-scope.service';
+import { mockScopeResolver } from '../../../test/analytics-scope.mock';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Brackets, In } from 'typeorm';
@@ -90,6 +92,7 @@ describe('MessagesQueryService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AnalyticsScopeService, useValue: mockScopeResolver() },
         MessagesQueryService,
         {
           provide: getRepositoryToken(AgentMessage),
@@ -186,10 +189,9 @@ describe('MessagesQueryService', () => {
       { name: 'Premium', ids: ['ht-a', 'ht-b'] },
       { name: 'Batch', ids: ['ht-c'] },
     ]);
-    expect(mockHeaderTierQb.where).toHaveBeenCalledWith('ht.tenant_id = :headerTierTenant', {
-      headerTierTenant: 'tenant-1',
+    expect(mockHeaderTierQb.andWhere).toHaveBeenCalledWith('ht.tenant_id = :tenantId', {
+      tenantId: 'tenant-1',
     });
-    expect(mockHeaderTierQb.andWhere).not.toHaveBeenCalled();
   });
 
   it('offers only the selected harness custom tiers when one is picked', async () => {
@@ -203,10 +205,9 @@ describe('MessagesQueryService', () => {
     });
 
     expect(result.header_tiers).toEqual([{ name: 'Premium', ids: ['ht-a'] }]);
-    const agentScope = mockHeaderTierQb.andWhere.mock.calls[0];
-    expect(String(agentScope[0])).toContain('ht.agent_id = (');
-    expect(String(agentScope[0])).toContain('WHERE tenant_id = :headerTierTenant');
-    expect(agentScope[1]).toEqual({ headerTierAgent: 'agent-alpha' });
+    expect(mockHeaderTierQb.andWhere).toHaveBeenCalledWith('ht.agent_id = :liveAgentId', {
+      liveAgentId: 'agent-alpha',
+    });
   });
 
   it('offers no custom tiers to a caller without a tenant', async () => {
@@ -220,6 +221,7 @@ describe('MessagesQueryService', () => {
 
   it('offers no custom tiers when the header-tier repository is not wired', async () => {
     const bare = new MessagesQueryService(
+      mockScopeResolver(),
       {
         createQueryBuilder: jest.fn(() => mockQbRef),
         query: jest.fn().mockResolvedValue([]),

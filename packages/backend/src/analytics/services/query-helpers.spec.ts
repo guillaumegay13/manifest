@@ -1,3 +1,4 @@
+import { selectedAgent } from '../../../test/analytics-scope.mock';
 import {
   computeTrend,
   downsample,
@@ -14,7 +15,6 @@ import {
   filterByKeyLabel,
   filterByTenantProviderId,
   scopeToConnection,
-  filterByLiveAgentName,
   MESSAGE_ROW_SELECT_ALIASES,
   sqlCountMessages,
   ERROR_MESSAGE_STATUSES,
@@ -150,7 +150,7 @@ describe('addTenantFilter', () => {
     addTenantFilter(qb, null);
 
     expect(mockAndWhere).toHaveBeenCalledTimes(1);
-    expect(mockAndWhere).toHaveBeenCalledWith('1 = 0');
+    expect(mockAndWhere).toHaveBeenCalledWith('1 = 0', { tenantId: null });
   });
 
   it('filters by tenant_id when tenantId is provided', () => {
@@ -163,42 +163,12 @@ describe('addTenantFilter', () => {
     });
   });
 
-  it('resolves agentName to the live agent_id via subquery so soft-deleted agents do not leak', () => {
+  it('binds the resolved live agent ID', () => {
     const { qb, mockAndWhere } = makeMockQb();
-    addTenantFilter(qb, 'tenant-456', 'my-agent');
-
-    expect(mockAndWhere).toHaveBeenCalledTimes(2);
-    const secondCall = mockAndWhere.mock.calls[1];
-    expect(secondCall[0]).toContain('at.agent_id = (');
-    expect(secondCall[0]).toContain('FROM agents');
-    expect(secondCall[0]).toContain('deleted_at IS NULL');
-    // The agent lookup is scoped via the tenant id, never `at.tenant_id`.
-    expect(secondCall[0]).toContain('a.tenant_id = :liveTenantId');
-    expect(secondCall[0]).not.toContain('at.tenant_id');
-    expect(secondCall[1]).toEqual({ liveAgentName: 'my-agent', liveTenantId: 'tenant-456' });
-  });
-
-  it('does not add agent_name filter when agentName is undefined', () => {
-    const { qb, mockAndWhere } = makeMockQb();
-    addTenantFilter(qb, 'tenant-456');
-
-    expect(mockAndWhere).toHaveBeenCalledTimes(1);
-  });
-
-  it('filterByLiveAgentName scopes by the tenant id', () => {
-    const { qb, mockAndWhere } = makeMockQb();
-    const result = filterByLiveAgentName(qb, 'my-agent', 'tenant-456');
-
-    expect(result).toBe(qb);
-    expect(mockAndWhere).toHaveBeenCalledTimes(1);
-    const call = mockAndWhere.mock.calls[0];
-    expect(call[0]).toContain('at.agent_id = (');
-    expect(call[0]).toContain('FROM agents');
-    expect(call[0]).toContain('deleted_at IS NULL');
-    expect(call[0]).toContain('a.tenant_id = :liveTenantId');
-    // Must never key the lookup off the (possibly NULL) message tenant_id.
-    expect(call[0]).not.toContain('at.tenant_id');
-    expect(call[1]).toEqual({ liveAgentName: 'my-agent', liveTenantId: 'tenant-456' });
+    addTenantFilter(qb, 'tenant-456', selectedAgent('tenant-456', 'agent-id'));
+    expect(mockAndWhere).toHaveBeenCalledWith('at.agent_id = :liveAgentId', {
+      liveAgentId: 'agent-id',
+    });
   });
 
   it('returns the query builder for chaining', () => {
@@ -209,7 +179,7 @@ describe('addTenantFilter', () => {
 
   it('accepts both agentName and tenantId together', () => {
     const { qb, mockAndWhere } = makeMockQb();
-    addTenantFilter(qb, 'tenant-456', 'my-agent');
+    addTenantFilter(qb, 'tenant-456', selectedAgent('tenant-456', 'my-agent'));
 
     expect(mockAndWhere).toHaveBeenCalledTimes(2);
   });

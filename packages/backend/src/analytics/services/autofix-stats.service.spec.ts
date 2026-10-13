@@ -1,3 +1,5 @@
+import type { AgentScope } from './analytics-scope.service';
+import { selectedAgent } from '../../../test/analytics-scope.mock';
 import { AutofixStatsService } from './autofix-stats.service';
 
 const queryBuilder = () => {
@@ -224,7 +226,11 @@ describe('AutofixStatsService', () => {
     internals.queryNeedsAttention = jest.fn().mockResolvedValue([{ error_message: 'bad' }]);
 
     await expect(
-      service.getStats({ tenantId: 'tenant', range: '30d', agentName: 'agent' }),
+      service.getStats({
+        tenantId: 'tenant',
+        range: '30d',
+        agentScope: selectedAgent('tenant', 'agent'),
+      }),
     ).resolves.toEqual({
       success_rate: { value: 0.8, previous: 0 },
       autofix_saves: { value: 2, previous: 0 },
@@ -241,7 +247,7 @@ describe('AutofixStatsService', () => {
       from: expect.any(String),
       splitAt: expect.any(String),
       to: expect.any(String),
-      agentName: 'agent',
+      agentScope: selectedAgent('tenant', 'agent'),
     });
   });
 
@@ -272,7 +278,10 @@ describe('AutofixStatsService', () => {
     messageRepo.createQueryBuilder.mockReturnValueOnce(providerQb);
 
     await expect(
-      service.getPerProviderStats({ tenantId: 'tenant', agentName: 'demo' }),
+      service.getPerProviderStats({
+        tenantId: 'tenant',
+        agentScope: selectedAgent('tenant', 'demo'),
+      }),
     ).resolves.toEqual([
       {
         provider: 'openai',
@@ -310,7 +319,7 @@ describe('AutofixStatsService', () => {
     ]);
     messageRepo.createQueryBuilder.mockReturnValueOnce(modelQb);
     await expect(
-      service.getPerModelStats({ tenantId: 'tenant', agentName: 'demo' }),
+      service.getPerModelStats({ tenantId: 'tenant', agentScope: selectedAgent('tenant', 'demo') }),
     ).resolves.toEqual([{ model: 'gpt-4o', attempts: 6, failed: 1, succeeded: 5 }]);
   });
 
@@ -344,7 +353,7 @@ describe('AutofixStatsService', () => {
       tenantId: 'tenant',
       range: '24h',
       hourly: true,
-      agentName: undefined,
+      agentScope: undefined,
       failedOnly: true,
     });
     // The disposition path never scans attempts directly anymore.
@@ -400,7 +409,7 @@ describe('AutofixStatsService', () => {
       queryNeedsAttention: (
         cutoff: string,
         tenantId: string | null,
-        agentName?: string,
+        agentScope?: AgentScope,
       ) => Promise<unknown>;
     };
     const qb = queryBuilder();
@@ -414,7 +423,9 @@ describe('AutofixStatsService', () => {
       },
     ]);
     messageRepo.createQueryBuilder.mockReturnValue(qb);
-    await expect(internals.queryNeedsAttention('cutoff', 'tenant', 'demo')).resolves.toEqual([
+    await expect(
+      internals.queryNeedsAttention('cutoff', 'tenant', selectedAgent('tenant', 'demo')),
+    ).resolves.toEqual([
       {
         error_message: '',
         provider: 'openai',

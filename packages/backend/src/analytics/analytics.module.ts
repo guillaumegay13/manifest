@@ -1,3 +1,4 @@
+import { AnalyticsScopeService } from './services/analytics-scope.service';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentMessage } from '../entities/agent-message.entity';
@@ -80,6 +81,7 @@ import { AgentUsageDailyService } from './services/agent-usage-daily.service';
     AutofixAnalyticsController,
   ],
   providers: [
+    AnalyticsScopeService,
     AggregationService,
     AgentDuplicationService,
     AgentLifecycleService,
@@ -97,6 +99,7 @@ import { AgentUsageDailyService } from './services/agent-usage-daily.service';
     AgentUsageDailyService,
   ],
   exports: [
+    AnalyticsScopeService,
     SpecificityFeedbackService,
     ProviderUsageService,
     AgentLifecycleService,
