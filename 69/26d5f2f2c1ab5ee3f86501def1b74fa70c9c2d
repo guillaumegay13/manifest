@@ -1,0 +1,20 @@
+packages/backend/test/analytics-agent-scope.e2e-spec.ts
+  s_9a13a5c69844d2::t_9aa767eb07f8fe 103,154-155
+  s_9a13a5c69844d2::t_19e2837086497e 1-102,104-153,156-157
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6926d5f2f2c1ab5ee3f86501def1b74fa70c9c2d",
+  "prompts": {},
+  "sessions": {
+    "s_9a13a5c69844d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1344f-0f4a-7b03-a0c4-0ca9a32109bc",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
