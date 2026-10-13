@@ -1,0 +1,25 @@
+packages/backend/src/analytics/controllers/overview.controller.ts
+  s_9a13a5c69844d2::t_f9141c13b6cdeb 166,175,181,187,193-196,205-208,217-220,226-229,235-238,244-247,256-259,263-268,271,273
+packages/backend/src/analytics/services/error-breakdown.service.spec.ts
+  s_9a13a5c69844d2::t_c89894685c0940 147,149-155
+packages/backend/src/analytics/services/query-helpers.spec.ts
+  s_9a13a5c69844d2::t_b0ea2b8ad1583d 168-172
+packages/backend/test/analytics-agent-scope.e2e-spec.ts
+  s_9a13a5c69844d2::t_4c724c1ccff1a6 229-250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6ba368a56ada2cad5a7dbd924072d73745e292e5",
+  "prompts": {},
+  "sessions": {
+    "s_9a13a5c69844d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1344f-0f4a-7b03-a0c4-0ca9a32109bc",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
