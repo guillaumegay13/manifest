@@ -684,38 +684,49 @@ describe('MessagesQueryService request-first queries', () => {
       expect(clause).not.toContain('autofix_applied = true OR');
     });
 
-    it('resolves the harness to its id first so Postgres plans with the value', async () => {
-      const agentLookup = jest.fn().mockResolvedValue([{ id: 'agent-9' }]);
-      const { requestQb, legacyBase } = await run(
-        { tenantId: 'tenant-1', range: '7d', agent_name: 'bot-1' },
-        agentLookup,
-      );
+    it.each([undefined, '7d'])(
+      'resolves the harness once for both branches with range %s',
+      async (range) => {
+        const agentLookup = jest.fn().mockResolvedValue([{ id: 'agent-9' }]);
+        const { requestQb, legacyBase } = await run(
+          { tenantId: 'tenant-1', range, agent_name: 'bot-1' },
+          agentLookup,
+        );
 
-      expect(agentLookup).toHaveBeenCalledWith(
-        'SELECT id FROM agents WHERE tenant_id = $1 AND name = $2 AND deleted_at IS NULL LIMIT 1',
-        ['tenant-1', 'bot-1'],
-      );
-      expect(requestQb.andWhere).toHaveBeenCalledWith('r.agent_id = :requestAgentId', {
-        requestAgentId: 'agent-9',
-      });
-      const clauses = requestQb.andWhere.mock.calls.map((call) => String(call[0]));
-      expect(clauses.some((clause) => clause.includes('FROM agents'))).toBe(false);
+        expect(agentLookup).toHaveBeenCalledWith(
+          'SELECT id FROM agents WHERE tenant_id = $1 AND name = $2 AND deleted_at IS NULL LIMIT 1',
+          ['tenant-1', 'bot-1'],
+        );
+        expect(agentLookup).toHaveBeenCalledTimes(1);
+        expect(requestQb.andWhere).toHaveBeenCalledWith('r.agent_id = :requestAgentId', {
+          requestAgentId: 'agent-9',
+        });
+        const clauses = requestQb.andWhere.mock.calls.map((call) => String(call[0]));
+        expect(clauses.some((clause) => clause.includes('FROM agents'))).toBe(false);
 
-      // The unlinked legacy branch keeps the tenant-bound lookup.
-      const legacyAgent = legacyBase.andWhere.mock.calls.find((call) =>
-        String(call[0]).includes('at.agent_id = ('),
-      );
-      expect(String(legacyAgent?.[0])).toContain('a.tenant_id = :liveTenantId');
-      expect(legacyAgent?.[1]).toEqual({ liveAgentName: 'bot-1', liveTenantId: 'tenant-1' });
-    });
+        expect(legacyBase.andWhere).toHaveBeenCalledWith('at.tenant_id = :tenantId', {
+          tenantId: 'tenant-1',
+        });
+        expect(legacyBase.andWhere).toHaveBeenCalledWith('at.agent_id = :liveAgentId', {
+          liveAgentId: 'agent-9',
+        });
+        expect(
+          legacyBase.andWhere.mock.calls.some((call) => String(call[0]).includes('FROM agents')),
+        ).toBe(false);
+      },
+    );
 
     it('matches nothing for a harness name with no live agent', async () => {
-      const { requestQb } = await run(
+      const { requestQb, legacyBase } = await run(
         { tenantId: 'tenant-1', range: '7d', agent_name: 'gone' },
         jest.fn().mockResolvedValue([]),
       );
 
       expect(requestQb.andWhere).toHaveBeenCalledWith('1 = 0');
+      expect(legacyBase.andWhere).toHaveBeenCalledWith('1 = 0');
+      expect(
+        legacyBase.andWhere.mock.calls.some((call) => String(call[0]).includes('at.agent_id')),
+      ).toBe(false);
       expect(
         requestQb.andWhere.mock.calls.some((call) => String(call[0]).includes('r.agent_id')),
       ).toBe(false);

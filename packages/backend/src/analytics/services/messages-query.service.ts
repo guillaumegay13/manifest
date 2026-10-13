@@ -324,9 +324,10 @@ export class MessagesQueryService {
     // Still bound without a tenant: the agent and attempt-window subqueries
     // reference it, and `1 = 0` already empties the result.
     else qb.andWhere('1 = 0', { requestTenantId: null });
+    let liveAgentId: string | null | undefined;
     if (params.agent_name && params.tenantId) {
-      const agentId = await this.resolveLiveAgentId(params.tenantId, params.agent_name);
-      if (agentId) qb.andWhere('r.agent_id = :requestAgentId', { requestAgentId: agentId });
+      liveAgentId = await this.resolveLiveAgentId(params.tenantId, params.agent_name);
+      if (liveAgentId) qb.andWhere('r.agent_id = :requestAgentId', { requestAgentId: liveAgentId });
       else qb.andWhere('1 = 0');
     }
     // Only meaningful with a tenant: without one the query is already `1 = 0`.
@@ -632,7 +633,7 @@ export class MessagesQueryService {
     // Keep the log complete while the online backfill is running. Each still-
     // unlinked attempt is temporarily its own synthetic request; it disappears
     // from this branch as soon as the backfill links it to a real parent.
-    const legacyBase = await this.buildBaseMessageQuery(params);
+    const legacyBase = await this.buildBaseMessageQuery(params, liveAgentId);
     legacyBase.andWhere('at.request_id IS NULL');
     if (resolvedConnections) {
       if (resolvedConnections.length === 0) legacyBase.andWhere('1 = 0');
@@ -888,23 +889,26 @@ export class MessagesQueryService {
     return Object.fromEntries(rows.map((cp) => [`custom:${cp.id}`, cp.name]));
   }
 
-  private async buildBaseMessageQuery(params: {
-    range?: string;
-    tenantId: string | null;
-    provider?: string;
-    models?: string[];
-    service_type?: string;
-    cost_min?: number;
-    cost_max?: number;
-    agent_name?: string;
-    status?: MessageStatusFilter;
-    triggers?: MessageTriggerFilter[];
-    origin?: MessageOriginFilter;
-    error_class?: string;
-    routing_tier?: string;
-    specificity_category?: string;
-    header_tier_id?: string;
-  }): Promise<SelectQueryBuilder<AgentMessage>> {
+  private async buildBaseMessageQuery(
+    params: {
+      range?: string;
+      tenantId: string | null;
+      provider?: string;
+      models?: string[];
+      service_type?: string;
+      cost_min?: number;
+      cost_max?: number;
+      agent_name?: string;
+      status?: MessageStatusFilter;
+      triggers?: MessageTriggerFilter[];
+      origin?: MessageOriginFilter;
+      error_class?: string;
+      routing_tier?: string;
+      specificity_category?: string;
+      header_tier_id?: string;
+    },
+    liveAgentId?: string | null,
+  ): Promise<SelectQueryBuilder<AgentMessage>> {
     const cutoff = params.range ? computeCutoff(rangeToInterval(params.range)) : undefined;
     const qb = this.turnRepo.createQueryBuilder('at');
     if (cutoff) qb.where('at.timestamp >= :cutoff', { cutoff });
@@ -920,7 +924,11 @@ export class MessagesQueryService {
     if (params.cost_max !== undefined)
       qb.andWhere('at.cost_usd <= :costMax', { costMax: params.cost_max });
     if (params.agent_name && params.tenantId) {
-      filterByLiveAgentName(qb, params.agent_name, params.tenantId);
+      // Reuse the resolved value so the planner can choose the partial unlinked
+      // index rather than scanning the harness's full attempt history.
+      if (liveAgentId === undefined) filterByLiveAgentName(qb, params.agent_name, params.tenantId);
+      else if (liveAgentId) qb.andWhere('at.agent_id = :liveAgentId', { liveAgentId });
+      else qb.andWhere('1 = 0');
     }
 
     if (params.status === 'failed') {
