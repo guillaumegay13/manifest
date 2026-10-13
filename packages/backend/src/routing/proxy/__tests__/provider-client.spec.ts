@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { ProviderClient } from '../provider-client';
+import { messagesToChatCompletionsRequest } from '../anthropic-messages-adapter';
 import { ManifestError } from '../../../common/errors/manifest-error';
 import { buildCustomEndpoint, buildEndpointOverride } from '../provider-endpoints';
 import { ThinkingBlockCache, type ThinkingBlockRouteContext } from '../thinking-block-cache';
@@ -835,6 +836,31 @@ describe('ProviderClient', () => {
 
         expect(sent.reasoning_effort).toBe('none');
         expect(sent.tools).toEqual(tools);
+      });
+
+      it('sends reasoning_effort none for an Anthropic Messages request with tools', async () => {
+        mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+        const messagesBody = {
+          max_tokens: 1024,
+          messages: [{ role: 'user', content: 'Hello' }],
+          tools: [{ name: 'get_weather', input_schema: { type: 'object', properties: {} } }],
+        };
+        await client.forward({
+          provider: 'bedrock',
+          apiKey: 'bedrock-api-key-test',
+          model: 'us.openai.gpt-6-luna',
+          body: messagesBody,
+          resolveChatBody: async () => messagesToChatCompletionsRequest(messagesBody),
+          stream: false,
+          apiMode: 'messages',
+        });
+
+        expect(mockFetch.mock.calls[0][0]).toBe(
+          'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/chat/completions',
+        );
+        const sent = JSON.parse(mockFetch.mock.calls[0][1].body);
+        expect(sent.tools[0].type).toBe('function');
+        expect(sent.reasoning_effort).toBe('none');
       });
 
       it.each([{ tools }, {}])('forwards the caller reasoning_effort (%o)', async (extra) => {
