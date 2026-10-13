@@ -1,0 +1,27 @@
+.changeset/bedrock-gpt-tools-no-reasoning.md
+  s_4c82ddecaa32b2::t_c52cdc7b784261 1-5
+packages/backend/src/routing/proxy/provider-client-converters.ts
+  s_4c82ddecaa32b2::t_0081faa8de3413 419
+  s_4c82ddecaa32b2::t_8af9edd5e93f11 335-340,416-418,420-421
+  s_4c82ddecaa32b2::t_93b57394bb24ce 422
+packages/backend/src/routing/proxy/__tests__/provider-client.spec.ts
+  s_4c82ddecaa32b2::t_a4ef337ffc7844 811-858
+packages/backend/src/routing/proxy/provider-client.ts
+  s_4c82ddecaa32b2::t_0081faa8de3413 884-888,890-891
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "90a8e3185e4c33e6e74e3cc6c689ed6533f5d87a",
+  "prompts": {},
+  "sessions": {
+    "s_4c82ddecaa32b2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7c7b3e57-7a20-4529-9186-83884caf1512",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
