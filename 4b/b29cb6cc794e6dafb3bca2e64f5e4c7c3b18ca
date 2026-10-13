@@ -1,0 +1,19 @@
+.changeset/bedrock-runtime-gpt-responses.md
+  s_5f77b220b5a5f7::t_15af4756e0b59e 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4bb29cb6cc794e6dafb3bca2e64f5e4c7c3b18ca",
+  "prompts": {},
+  "sessions": {
+    "s_5f77b220b5a5f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "49b2634c-cb9a-4c42-88ea-70c33539634a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
