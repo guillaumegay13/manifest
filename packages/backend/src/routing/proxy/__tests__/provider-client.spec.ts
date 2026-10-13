@@ -808,7 +808,7 @@ describe('ProviderClient', () => {
       expect(sentBody.max_tokens).toBeUndefined();
     });
 
-    describe('Bedrock Runtime GPT Chat Completions with function tools', () => {
+    describe('reasoning_effort on Bedrock Runtime GPT Chat Completions', () => {
       // Runtime applies a default reasoning effort and then rejects it next to
       // function tools (mnfst/llm-gateway#3065).
       const tools = [
@@ -830,21 +830,24 @@ describe('ProviderClient', () => {
         return JSON.parse(mockFetch.mock.calls[0][1].body);
       };
 
-      it.each([undefined, 'high'])(
-        'sends reasoning_effort none when the caller sent %s',
-        async (effort) => {
-          const sent = await sentBodyFor('us.openai.gpt-6-luna', {
-            tools,
-            ...(effort ? { reasoning_effort: effort } : {}),
-          });
+      it('sends reasoning_effort none when the caller sent none', async () => {
+        const sent = await sentBodyFor('us.openai.gpt-6-luna', { tools });
 
-          expect(sent.reasoning_effort).toBe('none');
-          expect(sent.tools).toEqual(tools);
-        },
-      );
+        expect(sent.reasoning_effort).toBe('none');
+        expect(sent.tools).toEqual(tools);
+      });
 
-      it('leaves reasoning_effort out when no tools are sent', async () => {
-        const sent = await sentBodyFor('us.openai.gpt-6-luna', { reasoning_effort: 'high' });
+      it.each([{ tools }, {}])('forwards the caller reasoning_effort (%o)', async (extra) => {
+        const sent = await sentBodyFor('us.openai.gpt-6-luna', {
+          ...extra,
+          reasoning_effort: 'high',
+        });
+
+        expect(sent.reasoning_effort).toBe('high');
+      });
+
+      it('leaves reasoning_effort out when neither tools nor an effort are sent', async () => {
+        const sent = await sentBodyFor('us.openai.gpt-6-luna', {});
 
         expect(sent.reasoning_effort).toBeUndefined();
       });

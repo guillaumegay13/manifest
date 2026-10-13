@@ -888,7 +888,7 @@ export class ProviderClient {
     // tools next to their default reasoning effort (mnfst/llm-gateway#3065).
     const sanitized = sanitizeOpenAiBody(requestSource, endpointKey, ctx.model, {
       requireMaxCompletionTokens: isBedrockRuntimeGpt,
-      noReasoningWithFunctionTools: isBedrockRuntimeGpt,
+      forwardReasoningEffort: isBedrockRuntimeGpt,
     });
     if (stream && endpoint.streamUsageReporting === 'openai_stream_options') {
       const existing =
