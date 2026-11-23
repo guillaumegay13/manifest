@@ -1,0 +1,21 @@
+packages/backend/src/common/constants/subscription-clients.ts
+  s_4605e2bd5721c3::t_127a9743c6047f 16
+.changeset/chatgpt-subscription-gpt-6-2.md
+  s_4605e2bd5721c3::t_127a9743c6047f 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4cecf81a9479962ff6a237f7b35bab678c8f7eeb",
+  "prompts": {},
+  "sessions": {
+    "s_4605e2bd5721c3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a207e6-962e-7103-931a-f32251e4a868",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
