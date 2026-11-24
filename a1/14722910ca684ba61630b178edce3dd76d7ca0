@@ -1,0 +1,27 @@
+packages/frontend/tests/pages/McpServer.test.tsx
+  s_f1d15f1c971b67::t_a23d7a7348989a 86,106-111,114,123
+  s_f1d15f1c971b67::t_1b9e293a51f5d9 154-156
+packages/frontend/tests/pages/Cli.test.tsx
+  s_f1d15f1c971b67::t_a23d7a7348989a 89-93
+packages/frontend/src/pages/integrations/Cli.tsx
+  s_f1d15f1c971b67::t_a23d7a7348989a 94-96
+packages/frontend/src/pages/integrations/McpServer.tsx
+  s_f1d15f1c971b67::t_a23d7a7348989a 55-60,156-162
+  s_f1d15f1c971b67::t_08c5f5d005384e 54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a114722910ca684ba61630b178edce3dd76d7ca0",
+  "prompts": {},
+  "sessions": {
+    "s_f1d15f1c971b67": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20cc7-1348-7a21-ae78-4a7f886b99fb",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
