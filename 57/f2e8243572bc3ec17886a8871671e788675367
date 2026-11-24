@@ -1,0 +1,26 @@
+packages/backend/src/routing/__tests__/bedrock-runtime-chat-routing.spec.ts
+  s_b4381c11d8b29c::t_cce5f109c900d2 110-127
+  s_b4381c11d8b29c::t_5aa3a34ee06ca2 12-17,31
+packages/backend/src/model-discovery/provider-model-fetcher.service.spec.ts
+  s_b4381c11d8b29c::t_5aa3a34ee06ca2 309-332
+.changeset/bedrock-runtime-gpt-profiles.md
+  s_b4381c11d8b29c::t_cce5f109c900d2 1-5
+packages/backend/src/routing/bedrock-runtime-capabilities.ts
+  s_b4381c11d8b29c::t_cce5f109c900d2 8,26,66-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "57f2e8243572bc3ec17886a8871671e788675367",
+  "prompts": {},
+  "sessions": {
+    "s_b4381c11d8b29c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20cb1-da48-7163-b095-bd17da57c472",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
