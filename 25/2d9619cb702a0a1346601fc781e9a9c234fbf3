@@ -1,0 +1,19 @@
+.changeset/mcp-vibe-oauth.md
+  s_1dbf6fe49b4975::t_b18d83b9da8ceb 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "252d9619cb702a0a1346601fc781e9a9c234fbf3",
+  "prompts": {},
+  "sessions": {
+    "s_1dbf6fe49b4975": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20c76-463f-7db2-bff4-5a7d3e85b98f",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
