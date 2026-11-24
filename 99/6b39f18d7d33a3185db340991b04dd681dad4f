@@ -1,0 +1,21 @@
+packages/backend/src/mcp/mcp.controller.spec.ts
+  s_f1d15f1c971b67::t_4b42ea4c36f276 383-388
+packages/backend/src/auth/auth.instance.spec.ts
+  s_f1d15f1c971b67::t_4b42ea4c36f276 709
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "996b39f18d7d33a3185db340991b04dd681dad4f",
+  "prompts": {},
+  "sessions": {
+    "s_f1d15f1c971b67": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a20cc7-1348-7a21-ae78-4a7f886b99fb",
+        "model": "gpt-6.2-sol"
+      },
+      "human_author": "Guillaume Gay <guillaume.gay@protonmail.com>"
+    }
+  }
+}
